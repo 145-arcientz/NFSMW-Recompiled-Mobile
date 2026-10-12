@@ -385,6 +385,8 @@ REX_HOOK_RAW(sub_826E8EE8) {
  * the game's loop checks the conditions again.
  */
 constexpr uint32_t kRetornoOrdenes = 0x82441DC4;
+// PARCHE LOCAL (NFSMW Recompiled): la lista de ordenes de sub_823C8378 y sub_823C83F8 (ver abajo).
+constexpr uint32_t kListaOrdenes = 0x82909650;
 REX_EXTERN(__imp__sub_823C83F8);
 REX_HOOK_RAW(sub_823C83F8) {
   static const bool activo = REXCVAR_GET(nfsmw_ejecutor_sin_vueltas);
@@ -412,7 +414,48 @@ REX_HOOK_RAW(sub_823C83F8) {
       nfsmw::esperas::Sumar(nfsmw::esperas::kEjecutorSinOrdenes, ns_sin_ordenes);
     }
   }
+  // PARCHE LOCAL (NFSMW Recompiled): solo las ordenes ya publicadas (ver sub_823C8378, abajo). El
+  // contador, con adquisicion: lo que sub_823C8378 escribio antes de su barrera ya se ve.
+  {
+    const uint32_t escritas = __builtin_bswap32(
+        __atomic_load_n(reinterpret_cast<const uint32_t*>(base + kListaOrdenes), __ATOMIC_ACQUIRE));
+    const uint32_t publicadas = escritas - Leer32(base, kListaOrdenes + 4);
+    if (ctx.r4.u32 > publicadas) {
+      ctx.r4.u64 = publicadas;
+    }
+  }
   __imp__sub_823C83F8(ctx, base);
+}
+
+/*
+ * PARCHE LOCAL (NFSMW Recompiled): anadir una orden a la lista, con barrera.
+ *
+ * La original copia los datos de la orden al final de la lista, escribe en la entrada la funcion (+0) y el
+ * tamano redondeado a 16 (+4), mueve el final de la lista (+20) y sube su contador (+0), sin barreras. El
+ * ejecutor (arriba) las va haciendo a la vez desde otro hilo, y en ARM puede ver el contador nuevo antes que la
+ * entrada: llama a la funcion 0 y el juego se cierra. Aqui se escribe lo mismo y en el mismo sitio, con una
+ * barrera de liberacion antes de publicar el final y el contador. Con la lista cerrada (+12 a 0) la funcion
+ * se llama en el acto: eso lo sigue haciendo la original.
+ */
+REX_EXTERN(__imp__sub_823C8378);
+REX_HOOK_RAW(sub_823C8378) {
+  if (Leer32(base, kListaOrdenes + 12) == 0) {
+    __imp__sub_823C8378(ctx, base);
+    return;
+  }
+  const auto escribir = [base](uint32_t direccion, uint32_t valor) {
+    valor = __builtin_bswap32(valor);
+    std::memcpy(base + direccion, &valor, sizeof(valor));
+  };
+  const uint32_t bytes = (ctx.r6.u32 + 15) & ~15u;
+  const uint32_t entrada = Leer32(base, kListaOrdenes + 20);
+  std::memmove(base + entrada, base + ctx.r4.u32, bytes);
+  escribir(entrada + 0, ctx.r5.u32);
+  escribir(entrada + 4, bytes);
+  std::atomic_thread_fence(std::memory_order_release);
+  escribir(kListaOrdenes + 20, entrada + bytes);
+  escribir(kListaOrdenes + 0, Leer32(base, kListaOrdenes + 0) + 1);
+  ctx.r3.u64 = entrada;  // lo que deja la original: el resultado de su memmove
 }
 
 // Right after the flag is set to 1 (sub_82442058).

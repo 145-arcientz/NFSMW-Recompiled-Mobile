@@ -16,6 +16,11 @@
 #include <rex/logging.h>
 #include <rex/system/kernel_state.h>
 #include <rex/system/xam/user_profile.h>
+#include <rex/cvar.h>
+
+// PARCHE LOCAL - gamertag (tools/parche_gamertag.py).
+REXCVAR_DEFINE_STRING(user_gamertag, "User", "Kernel",
+                      "Gamertag del perfil de Xbox 360: hasta 15 caracteres");
 
 namespace rex {
 namespace system {
@@ -26,7 +31,12 @@ UserProfile::UserProfile() {
   // if non-zero, it prevents the user from playing the game.
   // "You do not have permissions to perform this operation."
   xuid_ = 0xB13EBABEBABEBABE;
-  name_ = "User";
+  // PARCHE LOCAL - gamertag: el del cvar, cortado a los 15 de Xbox 360.
+  name_ = REXCVAR_GET(user_gamertag).substr(0, 15);
+  if (name_.empty()) {
+    name_ = "User";
+  }
+  REXLOG_INFO("[perfil] gamertag '{}'", name_);
 
   // https://cs.rin.ru/forum/viewtopic.php?f=38&t=60668&hilit=gfwl+live&start=195
   // https://github.com/arkem/py360/blob/master/py360/constants.py

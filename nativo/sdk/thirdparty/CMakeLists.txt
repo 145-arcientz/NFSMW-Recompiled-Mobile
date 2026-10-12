@@ -324,6 +324,21 @@ if(UNIX AND NOT APPLE)
 endif()
 
 add_subdirectory(sdl3)
+
+#=============================================================================
+# PARCHE LOCAL - Turnip: libadrenotools (BSD-2), solo Android
+#
+# No es submodulo del SDK: lo clona tools/android/preparar_sdk.py del proyecto
+# NFSMW en thirdparty/libadrenotools. Sin el clon no se compila y el SDK queda
+# como antes, con el driver Vulkan del sistema.
+#
+# Ademas de la libreria estatica deja cuatro .so de hooks (main_hook,
+# file_redirect_hook, gsl_alloc_hook, hook_impl) que el APK tiene que llevar en
+# nativeLibraryDir.
+#=============================================================================
+if(ANDROID AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libadrenotools/CMakeLists.txt")
+    add_subdirectory(libadrenotools)
+endif()
 endif()  # NOT REXGLUE_PLATFORM_SWITCH
 
 #=============================================================================

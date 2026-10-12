@@ -139,7 +139,24 @@ int WINAPI wWinMain(HINSTANCE hinstance, HINSTANCE hinstance_prev, LPWSTR comman
 
 #else
 
+#if REX_PLATFORM_ANDROID
+// PARCHE LOCAL - sonda de Vulkan
+//
+// La app (nativo_android.cpp, en esta misma libreria) la define: si los
+// argumentos piden la sonda, la ejecuta y devuelve su resultado; si no,
+// devuelve -1 y se arranca el juego como siempre.
+extern "C" int NfsmwSondaSiSePide(int argc, char** argv) __attribute__((weak));
+#endif
+
 int main(int argc, char* argv[]) {
+#if REX_PLATFORM_ANDROID
+  if (NfsmwSondaSiSePide) {
+    const int sonda = NfsmwSondaSiSePide(argc, argv);
+    if (sonda >= 0) {
+      return sonda;
+    }
+  }
+#endif
   return RunWindowedApp(argc, argv);
 }
 

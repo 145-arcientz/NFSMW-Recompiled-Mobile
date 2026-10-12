@@ -22,6 +22,11 @@ set(SDL_SHARED ON CACHE BOOL "SDL shared library loaded by SDLActivity" FORCE)
 set(SDL_STATIC OFF CACHE BOOL "Use SDL's shared Android library" FORCE)
 
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../../../../../app" "nfsmw-app")
+# LOCAL (16 GB de RAM): los ficheros generados, de 4 en 4.
+set_property(GLOBAL APPEND PROPERTY JOB_POOLS recomp=4)
+if(TARGET nfsmw_recomp)
+    set_target_properties(nfsmw_recomp PROPERTIES JOB_POOL_COMPILE recomp)
+endif()
 target_sources(nfsmw PRIVATE "${CMAKE_CURRENT_LIST_DIR}/android_touch.cpp"
                              "${CMAKE_CURRENT_LIST_DIR}/android_rendimiento.cpp")
 
@@ -62,6 +67,7 @@ if(NFSMW_ANDROID_LTO AND CMAKE_BUILD_TYPE STREQUAL "Release")
         endif()
     endforeach()
     cmake_host_system_information(RESULT NFSMW_NUCLEOS QUERY NUMBER_OF_LOGICAL_CORES)
+    set(NFSMW_NUCLEOS 4)  # LOCAL: 16 GB de RAM
     target_link_options(nfsmw PRIVATE -flto=thin "-Wl,--thinlto-jobs=${NFSMW_NUCLEOS}"
                         "-Wl,--thinlto-cache-dir=${CMAKE_BINARY_DIR}/thinlto-cache")
     # Hot code together, as orden_funciones.ld does on the Switch; lld has no section ordering file for GCC,

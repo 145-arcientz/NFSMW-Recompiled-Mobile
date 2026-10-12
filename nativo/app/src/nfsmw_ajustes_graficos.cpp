@@ -103,7 +103,8 @@ REXCVAR_DEFINE_STRING(nfsmw_limite_fps, "60", "Graficos",
                       "ritmo fijo de 30 FPS, sin altibajos, con el juego a su velocidad. Se aplica al reiniciar")
     // 90 and 120 (Android, experimental): the vblank the game counts runs at that rate, for high refresh
     // rate phone panels.
-    .allowed({"60", "30", "90", "120"})
+    // PARCHE LOCAL (NFSMW Recompiled): "sin_limite", el vblank a 240 Hz (ver AplicarModoDeVideo).
+    .allowed({"60", "30", "90", "120", "sin_limite"})
     .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
 
 /*
@@ -291,8 +292,12 @@ void AplicarAjustesGraficos() {
 #endif
   Poner("resolution", "");  // empty preset: the width and height above apply
   const std::string limite = REXCVAR_GET(nfsmw_limite_fps);
+  // PARCHE LOCAL (NFSMW Recompiled): "sin_limite" pone el vblank a 240 Hz, el maximo del SDK
+  // (video_mode_refresh_rate va de 24 a 240). El juego espera como mucho ~4 ms a un vblank y el
+  // tope pasa a ser lo que de el movil.
   Poner("video_mode_refresh_rate",
-        limite == "30" || limite == "90" || limite == "120" ? limite.c_str() : "60");
+        limite == "sin_limite" ? "240"
+        : limite == "30" || limite == "90" || limite == "120" ? limite.c_str() : "60");
   REXLOG_INFO("[ajustes] resolucion interna {} y limite de FPS {}: modo de video {}x{} a {} Hz", resolucion, limite,
               rex::cvar::GetFlagByName("video_mode_width"), rex::cvar::GetFlagByName("video_mode_height"),
               rex::cvar::GetFlagByName("video_mode_refresh_rate"));

@@ -229,7 +229,19 @@ bool ReXApp::ConstructRuntime(const PathConfig& paths) {
     rex::ShowSimpleMessageBox(rex::SimpleMessageBoxType::Error, msg);
     return false;
   }
-  if (!std::filesystem::is_directory(paths.game_data_root)) {
+  // PARCHE LOCAL - ISO
+  //
+  // Aqui se exigia un DIRECTORIO. Una imagen de disco es un fichero, y en
+  // Android puede llegar como URI content:// del selector del sistema, que no
+  // es una ruta del sistema de ficheros.
+  std::error_code ec_raiz;
+  bool raiz_valida = std::filesystem::is_directory(paths.game_data_root, ec_raiz) ||
+                     std::filesystem::is_regular_file(paths.game_data_root, ec_raiz);
+#if REX_PLATFORM_ANDROID
+  raiz_valida =
+      raiz_valida || rex::filesystem::IsAndroidContentUri(paths.game_data_root.string());
+#endif
+  if (!raiz_valida) {
     auto msg = fmt::format("--game_data_root does not exist: {}", paths.game_data_root.string());
     REXLOG_ERROR("{}", msg);
     rex::ShowSimpleMessageBox(rex::SimpleMessageBoxType::Error, msg);
@@ -302,8 +314,16 @@ bool ReXApp::ConstructRuntime(const PathConfig& paths) {
     }
     std::string host_tail{tail};
     std::replace(host_tail.begin(), host_tail.end(), '\\', '/');
+    // PARCHE LOCAL - ISO
+    //
+    // Esta comprobacion previa traduce game:\ a una ruta del host, y eso solo
+    // tiene sentido si la raiz es una CARPETA. En una imagen de disco el XEX
+    // vive DENTRO, y de resolverlo se encarga el VFS en LoadXexImage, unas
+    // lineas mas abajo.
+    std::error_code ec_xex;
+    const bool raiz_es_carpeta = std::filesystem::is_directory(paths.game_data_root, ec_xex);
     auto xex_host = paths.game_data_root / host_tail;
-    if (!std::filesystem::is_regular_file(xex_host)) {
+    if (raiz_es_carpeta && !std::filesystem::is_regular_file(xex_host)) {
       auto msg = fmt::format("Entrypoint XEX not found: {}", xex_host.string());
       REXLOG_ERROR("{}", msg);
       rex::ShowSimpleMessageBox(rex::SimpleMessageBoxType::Error, msg);

@@ -11,6 +11,8 @@
 
 #include <rex/chrono/clock.h>
 #include <rex/cvar.h>
+#include <rex/filesystem.h>                            // PARCHE LOCAL - ISO
+#include <rex/filesystem/devices/disc_image_device.h>  // PARCHE LOCAL - ISO
 #include <rex/filesystem/devices/host_path_device.h>
 #include <rex/filesystem/devices/null_device.h>
 #include <rex/filesystem/vfs.h>
@@ -309,18 +311,44 @@ bool Runtime::SetupVfs() {
     return true;
   }
 
-  auto abs_game_root = std::filesystem::absolute(game_data_root_);
-  if (!std::filesystem::exists(abs_game_root)) {
-    REXSYS_ERROR("Runtime::SetupVfs: game_data_root does not exist: {}", abs_game_root.string());
-    return false;
+  // PARCHE LOCAL - ISO
+  //
+  // Una URI content:// de Android NO es una ruta: absolute() le pegaria delante
+  // el directorio de trabajo y exists() diria que no esta. Se deja tal cual y se
+  // abre mas abajo por el puente de Java.
+  bool es_uri_android = false;
+#if REX_PLATFORM_ANDROID
+  es_uri_android = rex::filesystem::IsAndroidContentUri(game_data_root_.string());
+#endif
+  auto abs_game_root = game_data_root_;
+  if (!es_uri_android) {
+    abs_game_root = std::filesystem::absolute(game_data_root_);
+    if (!std::filesystem::exists(abs_game_root)) {
+      REXSYS_ERROR("Runtime::SetupVfs: game_data_root does not exist: {}", abs_game_root.string());
+      return false;
+    }
   }
 
   // Mount game_data_root as \Device\Harddisk0\Partition1
   auto mount_path = "\\Device\\Harddisk0\\Partition1";
-  auto device = std::make_unique<rex::filesystem::HostPathDevice>(
-      mount_path, abs_game_root, !REXCVAR_GET(allow_game_relative_writes));
+  // PARCHE LOCAL - ISO
+  //
+  // Un FICHERO -o una URI content:// en Android- es una imagen de disco y se
+  // monta con DiscImageDevice, que el SDK ya traia y nadie usaba. Una carpeta
+  // sigue yendo por HostPathDevice, como siempre.
+  std::unique_ptr<rex::filesystem::Device> device;
+  std::error_code ec_imagen;
+  if (es_uri_android || std::filesystem::is_regular_file(abs_game_root, ec_imagen)) {
+    REXSYS_INFO("Runtime::SetupVfs: game_data_root es una imagen de disco: {}",
+                abs_game_root.string());
+    device = std::make_unique<rex::filesystem::DiscImageDevice>(mount_path, abs_game_root);
+  } else {
+    device = std::make_unique<rex::filesystem::HostPathDevice>(
+        mount_path, abs_game_root, !REXCVAR_GET(allow_game_relative_writes));
+  }
   if (!device->Initialize()) {
-    REXSYS_ERROR("Runtime::SetupVfs: Failed to initialize host path device");
+    REXSYS_ERROR("Runtime::SetupVfs: Failed to initialize game data device ({})",
+                 abs_game_root.string());
     return false;
   }
   if (!file_system_->RegisterDevice(std::move(device))) {

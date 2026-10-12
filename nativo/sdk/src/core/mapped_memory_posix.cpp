@@ -114,6 +114,17 @@ std::unique_ptr<MappedMemory> MappedMemory::Open(const std::filesystem::path& pa
       open_flags |= O_RDWR;
       break;
   }
+  // PARCHE LOCAL - ISO
+  //
+  // En Android la ISO llega como URI content:// del selector del sistema.
+  // Abrirla por ruta no vale -ni siquiera como /proc/self/fd/N, que reabre el
+  // fichero de verdad y choca con los permisos del almacenamiento compartido-,
+  // asi que el descriptor se le pide a Java.
+#if REX_PLATFORM_ANDROID
+  if (rex::filesystem::IsAndroidContentUri(path.string())) {
+    return OpenForAndroidContentUri(path.string(), mode, offset, length);
+  }
+#endif
   int file_descriptor = open(path.c_str(), open_flags);
   if (file_descriptor < 0) {
     return nullptr;

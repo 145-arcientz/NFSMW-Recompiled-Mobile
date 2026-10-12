@@ -130,6 +130,28 @@ void SDLWindowedAppContext::ProcessEvent(SDL_Event& event) {
     return;
   }
   switch (event.type) {
+    // PARCHE LOCAL - pausa
+    //
+    // Estos son eventos de APLICACION, sin ventana asociada, asi que no entran
+    // por el reparto de eventos de ventana de mas arriba. En Android marcan el
+    // momento en que la superficie se destruye y se vuelve a crear.
+    //
+    // WILL_ y no DID_ al irse: la superficie tiene que soltarse ANTES de que
+    // desaparezca. Al volver es al reves, DID_, porque hasta entonces todavia
+    // no hay superficie que coger.
+    case SDL_EVENT_WILL_ENTER_BACKGROUND:
+    case SDL_EVENT_DID_ENTER_FOREGROUND: {
+      const bool disponible = event.type == SDL_EVENT_DID_ENTER_FOREGROUND;
+#if REX_PLATFORM_ANDROID
+      if (disponible) break;
+#endif
+      for (const auto& [id, window] : windows_) {
+        if (window) {
+          window->HandleSurfaceAvailability(disponible);
+        }
+      }
+      break;
+    }
     case SDL_EVENT_QUIT:
       if (synchronously_handled_quit_events_ != 0) {
         --synchronously_handled_quit_events_;

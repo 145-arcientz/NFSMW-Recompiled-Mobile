@@ -32,6 +32,13 @@ class DynamicLibrary {
 
   bool Load(const std::filesystem::path& path, SymbolResolution mode = SymbolResolution::kLazy);
   void Close();
+  // PARCHE LOCAL - Turnip: toma posesion de un handle ya abierto por otro
+  // cargador (adrenotools en Android). Close() lo libera igual que si lo
+  // hubiera abierto Load().
+  void Adopt(void* handle) {
+    Close();
+    handle_ = handle;
+  }
   explicit operator bool() const { return handle_ != nullptr; }
 
   void* GetRawSymbol(const char* name) const;

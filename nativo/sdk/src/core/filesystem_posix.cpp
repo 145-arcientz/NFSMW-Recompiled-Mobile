@@ -321,13 +321,23 @@ bool IsAndroidContentUri(const std::string_view source) {
   return source.starts_with("content://");
 }
 
+// PARCHE LOCAL - URI content://
+//
+// Se apunta una vez, al cargar libmain.so y antes de que exista ningun hilo
+// del juego: no hace falta que sea atomico.
+static AndroidContentOpener g_android_content_opener = nullptr;
+
+void SetAndroidContentOpener(AndroidContentOpener opener) {
+  g_android_content_opener = opener;
+}
+
 int OpenAndroidContentFileDescriptor(const std::string_view uri, const char* mode) {
-  // SAF access requires a Java ContentResolver and an app-owned JNI bridge.
-  // The Android app currently imports selected trees into private POSIX storage.
-  (void)uri;
-  (void)mode;
-  errno = ENOSYS;
-  return -1;
+  if (!g_android_content_opener) {
+    errno = ENOSYS;
+    return -1;
+  }
+  const std::string copia(uri);
+  return g_android_content_opener(copia.c_str(), mode);
 }
 #endif
 

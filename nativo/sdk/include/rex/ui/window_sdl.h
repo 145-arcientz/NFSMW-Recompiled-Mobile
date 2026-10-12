@@ -42,6 +42,8 @@ class WindowSDL final : public Window {
   void HandleMouseEvent(SDL_Event& event);
   void HandleDropEvent(SDL_Event& event);
   void HandlePaintEvent();
+  // PARCHE LOCAL - pausa: la superficie de Android se va y vuelve con la app.
+  void HandleSurfaceAvailability(bool available);
 
  protected:
   uint32_t GetLatestDpiImpl() const override;

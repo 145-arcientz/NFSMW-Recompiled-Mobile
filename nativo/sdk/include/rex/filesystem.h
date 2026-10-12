@@ -131,6 +131,12 @@ void AndroidInitialize();
 void AndroidShutdown();
 bool IsAndroidContentUri(const std::string_view source);
 int OpenAndroidContentFileDescriptor(const std::string_view uri, const char* mode);
+// PARCHE LOCAL - URI content://
+//
+// Quien abre una URI content:// y devuelve su descriptor (o -1). Lo pone la
+// app, que es la que tiene la actividad de Java; sin el, abrir una URI falla.
+using AndroidContentOpener = int (*)(const char* uri, const char* mode);
+void SetAndroidContentOpener(AndroidContentOpener opener);
 #endif  // REX_PLATFORM_ANDROID
 
 }  // namespace filesystem

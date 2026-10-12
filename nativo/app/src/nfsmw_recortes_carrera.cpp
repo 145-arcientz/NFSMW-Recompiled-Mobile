@@ -261,6 +261,23 @@ void AnotarTestigo(bool con_muestras) {
 
 }  // namespace nfsmw::reflejo_demanda
 
+// PARCHE LOCAL (NFSMW Recompiled): las funciones del motor de menus (FEng) que lee la app de
+// Android (nativo_android.cpp, seccion 10) para saber que hay debajo de un toque en un menu. Como
+// g_nfsmw_android_contexto, aqui para que crear_arbol.py las traduzca a la edicion del juego y su
+// comprobacion las compare en las dos. La app comprueba sus instrucciones antes de fiarse.
+//   [0]  FEngFindImage: cFEng::mInstance          [7]  FEngSetTopLeft: posicion, tamano, textos
+//   [1]  cFEng::QueuePackageMessage: mFEng         [8]  FEngSetScript: los guiones
+//   [2]  FEngine::Update: la lista de paquetes     [9]  FEObject::SetCurrentScript
+//   [3]  FEngine::ProcessMouseForPackage           [10] FEPackage: el guion que sigue a otro
+//   [4]  FEngGetCurrentButton                      [11] FEMenuScreen::FEMenuScreen: iconos de A y B
+//   [5]  FEPackage::ForAllObjects                  [12] FindFont
+//   [6]  FEPackage: los objetos de un grupo        [13] FEngFont::GetTextHeight
+//   [14] el texto de una etiqueta en el idioma     [15] FEngSetLanguageHash: la etiqueta de un texto
+extern "C" const uint32_t g_nfsmw_android_menus[16] = {0x8227FD70, 0x82284E88, 0x822FD0D0, 0x822FE558,
+                                                       0x82282BC0, 0x82302510, 0x82302480, 0x82280910,
+                                                       0x8227FF78, 0x82301B70, 0x82302A40, 0x822D8CE8,
+                                                       0x822D7720, 0x822D8AB0, 0x822BCE60, 0x822824E0};
+
 REXCVAR_DEFINE_INT32(nfsmw_cubemap_caras_max, REX_PLATFORM_SWITCH != 0 ? 1 : -1, "NFSMW",
                      "Caras del mapa de entorno del coche que se actualizan por fotograma en "
                      "carrera (-1 = las que decide el juego)")
@@ -335,6 +352,25 @@ REXCVAR_DEFINE_INT32(nfsmw_cubemap_diag_ciclo_s, 0, "NFSMW",
                      "y cambia de cara cada N segundos (anota cada cambio), para ver cual usa el "
                      "retrovisor")
     .range(0, 60);
+
+// PARCHE LOCAL (NFSMW Recompiled): las direcciones del juego que lee la app de Android
+// (nativo_android.cpp, nativeContexto) para saber en que parte del juego se esta y cambiar
+// los controles tactiles. Van aqui, en su app, porque crear_arbol.py las traduce a la edicion
+// del juego con todo lo demas, y su comprobacion compara estas funciones en las dos ediciones.
+//   [0] TheGameFlowManager.CurrentGameFlowState: 3 = menus, 6 = en el mundo
+//   [1] GRaceStatus::fObj
+//   [2] GRaceStatus::GetRaceType: lwz r3,0x1A30(r3), el puntero a los parametros de la carrera
+//   [3] GRaceParameters::GetRaceType: el tipo, del indice de la base de datos (mIndex) o, en las
+//       carreras rapidas, que no lo tienen, del atributo "racetype" de la carrera
+//   [4] la tabla de los once nombres de tipo ("circuit", "p2p", "drag"...) y su valor
+//   [5] Attrib: la busqueda de un atributo en una coleccion y en sus padres
+//   [6] Attrib: donde esta el valor de un nodo
+//   [7] FEManager::mPauseRequest: cuantas peticiones de pausa hay (menu de pausa, mensajes...)
+//   [8] FEManager::RequestPauseSimulation: mPauseReason[mPauseRequest++] = motivo
+// La app comprueba esas instrucciones antes de fiarse de los desplazamientos.
+extern "C" const uint32_t g_nfsmw_android_contexto[9] = {0x82A39AD8, 0x82A2CB18, 0x820E5E28,
+                                                         0x8233A000, 0x8290D828, 0x821485E8,
+                                                         0x82145C50, 0x82A2C5CC, 0x82285B80};
 
 namespace nfsmw::recortes_carrera {
 namespace {
@@ -1022,5 +1058,211 @@ REX_HOOK_RAW(sub_8243C6E0) {
     REXLOG_INFO("[recortes] carrera: cubemap limitado a {} cara(s) por fotograma mas {} fija(s) "
                 "(mascara 0x{:X}; el juego activaba {})",
                 maximo, fijas, siempre, n + fijas);
+  }
+}
+
+/*
+ * PARCHE LOCAL (NFSMW Recompiled): las estelas de luz del nitro, del largo de la Xbox 360 a cualquier fps.
+ *
+ * VehicleRenderConn::RenderFlares (sub_824E63D8; r3 la vista, r4 el reflejo) guarda en cada fotograma de la
+ * vista del jugador (id 1 o 2 en +4, sin reflejo) la posicion y la matriz del coche en un anillo de 3 de su
+ * CarRenderInfo (VehicleRenderConn +68): el indice en +4752, las matrices (64 bytes) en +4512 y las
+ * posiciones (16 bytes) en +4704. Con el nitro dibuja destellos entre esas tres, asi que la estela es lo que
+ * avanza el coche en dos fotogramas: 66 ms en la consola, a 30 fps, y la mitad a 60. Antes de la original,
+ * los dos huecos que no va a escribir (el mas viejo y el del medio) se llenan con la posicion de hace 2/30 s y
+ * 1/30 s, interpoladas de un historial propio por coche hecho con lo que la original escribe; la original pone
+ * la de ahora en el tercero. Solo ella lee el anillo. Sin historial suficiente (los primeros fotogramas) se
+ * deja lo del juego.
+ */
+#include <array>
+#include <deque>
+
+REXCVAR_DEFINE_BOOL(nfsmw_estelas_nitro_30, true, "NFSMW",
+                    "Estelas de luz del nitro con el largo de la Xbox 360 (30 fps) a cualquier limite de fps. "
+                    "false = como el juego, que las acorta al subir los fps");
+
+namespace nfsmw::estelas_nitro {
+namespace {
+constexpr uint32_t kListaCoches = 0x82C84D38;  // VehicleRenderConn::GetList(): +4 el array, +12 cuantos
+constexpr uint32_t kOffInfo = 68;              // VehicleRenderConn -> CarRenderInfo
+constexpr uint32_t kOffIndice = 4752;          // CarRenderInfo::matrixIndex
+constexpr uint32_t kOffMatrices = 4512;        // CarRenderInfo::LastFewMatrices[3]
+constexpr uint32_t kOffPosiciones = 4704;      // CarRenderInfo::LastFewPositions[3]
+constexpr double kPaso = 1.0 / 30.0;           // un fotograma de la Xbox 360
+constexpr double kGuardar = 0.25;              // segundos de historial
+constexpr size_t kMaxMuestras = 96;
+constexpr size_t kMaxCoches = 32;
+constexpr uint32_t kMaxLista = 64;
+
+struct Muestra {
+  double t;
+  float pos[3];
+  uint8_t matriz[64];  // tal cual en la memoria del juego
+};
+struct Historial {
+  uint32_t info = 0;
+  double usado = 0;
+  std::deque<Muestra> muestras;
+};
+std::array<Historial, kMaxCoches> g_historiales;
+
+uint32_t Leer(const uint8_t* base, uint32_t dir) {
+  uint32_t v;
+  std::memcpy(&v, base + dir, sizeof(v));
+  return __builtin_bswap32(v);
+}
+float LeerF(const uint8_t* base, uint32_t dir) {
+  const uint32_t v = Leer(base, dir);
+  float f;
+  std::memcpy(&f, &v, sizeof(f));
+  return f;
+}
+void EscribirF(uint8_t* base, uint32_t dir, float f) {
+  uint32_t v;
+  std::memcpy(&v, &f, sizeof(v));
+  v = __builtin_bswap32(v);
+  std::memcpy(base + dir, &v, sizeof(v));
+}
+
+Historial* Buscar(uint32_t info) {
+  for (auto& h : g_historiales) {
+    if (h.info == info) {
+      return &h;
+    }
+  }
+  return nullptr;
+}
+Historial& BuscarOCrear(uint32_t info, double ahora) {
+  if (Historial* h = Buscar(info)) {
+    return *h;
+  }
+  Historial* libre = &g_historiales[0];
+  for (auto& h : g_historiales) {
+    if (h.info == 0) {
+      libre = &h;
+      break;
+    }
+    if (h.usado < libre->usado) {
+      libre = &h;
+    }
+  }
+  libre->info = info;
+  libre->muestras.clear();
+  libre->usado = ahora;
+  return *libre;
+}
+
+// La posicion en el instante t, interpolada entre las dos muestras que lo rodean, y la matriz de la mas
+// cercana. false si t es anterior a la muestra mas vieja.
+bool Interpolar(const Historial& h, double t, float pos[3], const uint8_t** matriz) {
+  const auto& m = h.muestras;
+  if (m.empty() || t < m.front().t) {
+    return false;
+  }
+  for (size_t i = m.size(); i-- > 0;) {
+    if (m[i].t <= t) {
+      if (i + 1 >= m.size()) {
+        std::memcpy(pos, m[i].pos, sizeof(m[i].pos));
+        *matriz = m[i].matriz;
+        return true;
+      }
+      const Muestra& a = m[i];
+      const Muestra& b = m[i + 1];
+      const double tramo = b.t - a.t;
+      const float f = tramo > 0 ? float((t - a.t) / tramo) : 0.0f;
+      for (int k = 0; k < 3; ++k) {
+        pos[k] = a.pos[k] + (b.pos[k] - a.pos[k]) * f;
+      }
+      *matriz = f < 0.5f ? a.matriz : b.matriz;
+      return true;
+    }
+  }
+  return false;
+}
+
+void Rellenar(uint8_t* base, uint32_t info, int32_t hueco, const float pos[3], const uint8_t* matriz) {
+  const uint32_t p = info + kOffPosiciones + uint32_t(hueco) * 16;
+  for (int k = 0; k < 3; ++k) {
+    EscribirF(base, p + uint32_t(k) * 4, pos[k]);
+  }
+  std::memcpy(base + info + kOffMatrices + uint32_t(hueco) * 64, matriz, 64);
+}
+}  // namespace
+}  // namespace nfsmw::estelas_nitro
+
+REX_EXTERN(__imp__sub_824E63D8);
+REX_HOOK_RAW(sub_824E63D8) {
+  using namespace nfsmw::estelas_nitro;
+  const uint32_t vista = ctx.r3.u32;
+  const uint32_t reflejo = ctx.r4.u32;
+  const uint32_t id_vista = vista ? Leer(base, vista + 4) : 0;
+  if (!REXCVAR_GET(nfsmw_estelas_nitro_30) || reflejo != 0 || (id_vista != 1 && id_vista != 2)) {
+    __imp__sub_824E63D8(ctx, base);
+    return;
+  }
+  const double ahora =
+      std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  const uint32_t lista = Leer(base, kListaCoches + 4);
+  const uint32_t cuantos = lista ? std::min(Leer(base, kListaCoches + 12), kMaxLista) : 0;
+  std::array<uint32_t, kMaxLista> infos{};
+  std::array<int32_t, kMaxLista> indices{};
+  for (uint32_t i = 0; i < cuantos; ++i) {
+    const uint32_t conn = Leer(base, lista + i * 4);
+    const uint32_t info = conn ? Leer(base, conn + kOffInfo) : 0;
+    infos[i] = info;
+    if (!info) {
+      continue;
+    }
+    const int32_t indice = int32_t(Leer(base, info + kOffIndice));
+    indices[i] = indice;
+    Historial* h = Buscar(info);
+    if (!h || h->muestras.empty() || ahora - h->muestras.back().t > kGuardar) {
+      continue;
+    }
+    // El hueco que va a escribir la original: indice < 0 -> 0, y luego +1 dando la vuelta a 3.
+    int32_t nuevo = (indice < 0 ? 0 : indice) + 1;
+    if (nuevo > 2) {
+      nuevo = 0;
+    }
+    float pos[3];
+    const uint8_t* matriz = nullptr;
+    if (Interpolar(*h, ahora - kPaso, pos, &matriz)) {
+      Rellenar(base, info, (nuevo + 2) % 3, pos, matriz);  // el del medio: hace un fotograma de la consola
+    }
+    if (Interpolar(*h, ahora - 2 * kPaso, pos, &matriz)) {
+      Rellenar(base, info, (nuevo + 1) % 3, pos, matriz);  // el mas viejo: hace dos
+      static std::atomic<bool> anotado{false};
+      if (!anotado.exchange(true)) {
+        REXLOG_INFO("[estelas] nitro: la estela va con el largo de la Xbox 360 (posiciones de hace 1/30 s "
+                    "y 2/30 s, {} muestras del coche; {} coches en la lista)",
+                    h->muestras.size(), cuantos);
+      }
+    }
+  }
+  __imp__sub_824E63D8(ctx, base);
+  // Lo que la original acaba de guardar, al historial (solo los coches cuyo indice ha avanzado).
+  for (uint32_t i = 0; i < cuantos; ++i) {
+    const uint32_t info = infos[i];
+    if (!info) {
+      continue;
+    }
+    const int32_t indice = int32_t(Leer(base, info + kOffIndice));
+    if (indice == indices[i] || indice < 0 || indice > 2) {
+      continue;
+    }
+    Historial& h = BuscarOCrear(info, ahora);
+    h.usado = ahora;
+    Muestra m;
+    m.t = ahora;
+    const uint32_t p = info + kOffPosiciones + uint32_t(indice) * 16;
+    for (int k = 0; k < 3; ++k) {
+      m.pos[k] = LeerF(base, p + uint32_t(k) * 4);
+    }
+    std::memcpy(m.matriz, base + info + kOffMatrices + uint32_t(indice) * 64, sizeof(m.matriz));
+    h.muestras.push_back(m);
+    while (h.muestras.size() > kMaxMuestras ||
+           (h.muestras.size() > 2 && ahora - h.muestras.front().t > kGuardar)) {
+      h.muestras.pop_front();
+    }
   }
 }

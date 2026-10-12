@@ -182,6 +182,12 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
     )
 elseif(ANDROID)
     target_link_libraries(rexui PRIVATE android)
+    # PARCHE LOCAL - Turnip: drivers Vulkan propios via libadrenotools, si
+    # thirdparty/CMakeLists.txt lo ha compilado.
+    if(TARGET adrenotools)
+        target_link_libraries(rexui PUBLIC adrenotools)
+        target_compile_definitions(rexui PRIVATE REX_HAS_ADRENOTOOLS=1)
+    endif()
 elseif(APPLE)
     target_link_libraries(rexui PRIVATE "-framework CoreFoundation")
 endif()

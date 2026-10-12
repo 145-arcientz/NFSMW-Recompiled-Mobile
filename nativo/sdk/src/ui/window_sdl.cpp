@@ -448,6 +448,18 @@ void WindowSDL::RequestPaintImpl() {
   SDL_PushEvent(&event);
 }
 
+// PARCHE LOCAL - pausa
+//
+// Android destruye la superficie de la ventana al mandar la app a segundo
+// plano. OnSurfaceChanged(false) suelta al presentador de ella y deja de
+// pintar; sin eso, cada envio a la cola falla, el presentador recrea el
+// swapchain una y otra vez y el driver acaba dando el dispositivo por perdido
+// (VK_ERROR_DEVICE_LOST) y abortando.
+void WindowSDL::HandleSurfaceAvailability(bool available) {
+  REXLOG_INFO("WindowSDL: la superficie {}", available ? "vuelve" : "se va");
+  OnSurfaceChanged(available);
+}
+
 void WindowSDL::HandlePaintEvent() {
   paint_pending_.store(false, std::memory_order_release);
   OnPaint();
@@ -489,6 +501,11 @@ void WindowSDL::HandleWindowEvent(SDL_Event& event) {
     }
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
       OnFocusUpdate(true, destruction_receiver);
+#if REX_PLATFORM_ANDROID
+      if (!HasSurface()) {
+        HandleSurfaceAvailability(true);
+      }
+#endif
       break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
       OnFocusUpdate(false, destruction_receiver);
@@ -502,6 +519,9 @@ void WindowSDL::HandleWindowEvent(SDL_Event& event) {
       break;
     case SDL_EVENT_WINDOW_RESTORED:
       OnRestored(destruction_receiver);
+#if REX_PLATFORM_ANDROID
+      HandleSurfaceAvailability(true);
+#endif
       break;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       // SDL destroys nothing on its own; this is the veto point.

@@ -75,8 +75,10 @@ REXCVAR_DEFINE_INT32(nfsmw_nativo_sombras_escala, 100, "NFSMW",
                      "Renderizador nativo (19/09, build 201): dibuja los dos mapas de sombras de 1600x1600 "
                      "del juego a este porcentaje y los sube de tamano al resolverlos. 100 = como la Xbox 360 "
                      "(1600, que son 2000 de sus 2048 baldosas de EDRAM); 64 = como la version de PC de este "
-                     "mismo juego (1024). El valor se toma al crear el primer mapa y no cambia en marcha")
-    .range(50, 100);
+                     "mismo juego (1024). El valor se toma al crear el primer mapa y no cambia en marcha. "
+                     "PARCHE LOCAL (NFSMW Recompiled): hasta 250 (4000x4000), mas definicion en las sombras "
+                     "de los coches")
+    .range(50, 250);
 REXCVAR_DEFINE_BOOL(nfsmw_nativo_resolver_sin_copia, true, "NFSMW",
                     "Renderizador nativo (17/09, build 154; por defecto desde la 161, medido en consola: -2,36 ms "
                     "de los 7,41 de copias): al resolver un destino entero a una textura del mismo "
@@ -3949,12 +3951,14 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     uint32_t ancho_guest = 0, alto_guest = 0;
     if (pitch == kLadoSombras && alto == kLadoSombras) {
       if (escala_sombras_ == 0) {
-        escala_sombras_ = uint32_t(std::clamp(REXCVAR_GET(nfsmw_nativo_sombras_escala), 50, 100));
+        // PARCHE LOCAL (NFSMW Recompiled): tambien por encima de 100 %. La resuelta sigue al mapa y la
+        // copia es 1 a 1 (CopiarProfundidad), igual que al reducirlo: mas grande es mas detalle.
+        escala_sombras_ = uint32_t(std::clamp(REXCVAR_GET(nfsmw_nativo_sombras_escala), 50, 250));
         if (!blit_ || !profundidad_escalable_) {
           escala_sombras_ = 100;
         }
       }
-      if (escala_sombras_ < 100) {
+      if (escala_sombras_ != 100) {
         ancho_imagen = std::max<uint32_t>(64, ((pitch * escala_sombras_ / 100) + 15) & ~15u);
         alto_imagen = std::max<uint32_t>(64, ((alto * escala_sombras_ / 100) + 15) & ~15u);
         ancho_guest = pitch;
@@ -4622,7 +4626,14 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
   void AnotarAreaUtil(const Imagen& destino, int32_t y1) {
     if (y1 > 0) {
       auto& e = estado_destino_[&destino];
-      e.alto_usado = std::max(e.alto_usado, std::min(uint32_t(y1), destino.alto));
+      // PARCHE LOCAL (NFSMW Recompiled): y1 viene en pixeles del juego. En el mapa de sombras escalado
+      // la imagen tiene otro alto: se pasa a pixeles de la imagen, o con un mapa mas grande que 1600 la
+      // restauracion (RestaurarContenido) dejaba sin copiar lo de abajo.
+      uint32_t alto = uint32_t(y1);
+      if (destino.alto_guest && destino.alto_guest != destino.alto) {
+        alto = uint32_t((uint64_t(alto) * destino.alto + destino.alto_guest - 1) / destino.alto_guest);
+      }
+      e.alto_usado = std::max(e.alto_usado, std::min(alto, destino.alto));
     }
   }
 

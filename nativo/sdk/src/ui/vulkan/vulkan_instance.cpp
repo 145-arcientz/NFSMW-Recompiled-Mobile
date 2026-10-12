@@ -25,7 +25,42 @@
 #include "vulkan_moltenvk.h"
 #endif
 
+// PARCHE LOCAL - Turnip. REX_HAS_ADRENOTOOLS lo define src/ui/CMakeLists.txt
+// solo si libadrenotools esta clonado en thirdparty.
+#if REX_PLATFORM_ANDROID && defined(REX_HAS_ADRENOTOOLS)
+#include <dlfcn.h>
+#include <adrenotools/driver.h>
+#endif
+
 REXCVAR_DEFINE_BOOL(vulkan_log_debug_messages, true, "UI/Vulkan", "Log Vulkan debug messages");
+
+// PARCHE LOCAL - Turnip
+//
+// Los rellena la app Android por linea de comandos. kInitOnly porque el
+// libvulkan se carga una sola vez, al crear la instancia: cambiarlos despues no
+// tendria efecto. El texto va en ingles porque es lo que sale en F4.
+#if REX_PLATFORM_ANDROID
+REXCVAR_DEFINE_STRING(android_gpu_driver_dir, "", "UI/Vulkan",
+                      "Android: folder holding a custom Vulkan driver (app internal storage)")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_STRING(android_gpu_driver_name, "", "UI/Vulkan",
+                      "Android: custom Vulkan driver .so name (e.g. Turnip). Empty = system driver")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_STRING(android_native_lib_dir, "", "UI/Vulkan",
+                      "Android: the app's nativeLibraryDir, where the adrenotools hooks live")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_STRING(android_tmp_dir, "", "UI/Vulkan",
+                      "Android: writable folder adrenotools needs on Android 9 and older")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_BOOL(android_gpu_turbo, false, "UI/Vulkan",
+                    "Android (Adreno): disable KGSL GPU power control (device-wide, persistent; "
+                    "false restores it). Slower on Snapdragon 8 Elite")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_STRING(android_turnip_debug, "", "UI/Vulkan",
+                      "Android: TU_DEBUG for a Turnip driver (Mesa debug options, e.g. "
+                      "noubwc,sysmem). Empty = none")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+#endif
 
 #if REX_PLATFORM_SWITCH
 // NVK for Horizon is linked statically (Mesa's libvulkan.a) and exports the
@@ -93,7 +128,61 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
   ifn.vkDestroyInstance = &::vkDestroyInstance;
   loader_loaded = true;
 #else
+#if REX_PLATFORM_ANDROID && defined(REX_HAS_ADRENOTOOLS)
+  // PARCHE LOCAL - Turnip
+  //
+  // Si la app pidio un driver propio, se abre con adrenotools y el handle que
+  // devuelve se adopta: a partir de aqui el resto de la funcion no sabe ni le
+  // importa de donde salio el libvulkan. Si falla, se sigue con el del sistema.
+  {
+    const std::string& nombre = REXCVAR_GET(android_gpu_driver_name);
+    if (!nombre.empty()) {
+      // adrenotools concatena carpeta + nombre sin poner la barra.
+      std::string carpeta = REXCVAR_GET(android_gpu_driver_dir);
+      if (!carpeta.empty() && carpeta.back() != '/') {
+        carpeta += '/';
+      }
+      const std::string& hooks = REXCVAR_GET(android_native_lib_dir);
+      const std::string& tmp = REXCVAR_GET(android_tmp_dir);
+      // Opciones de depuracion de Turnip (Mesa las lee al crear la instancia).
+      // Se admite '+' como separador ademas de ',' (la app pasa los extras del
+      // banco de pruebas separados por comas).
+      std::string tu_debug = REXCVAR_GET(android_turnip_debug);
+      for (char& c : tu_debug) {
+        if (c == '+') {
+          c = ',';
+        }
+      }
+      if (!tu_debug.empty()) {
+        setenv("TU_DEBUG", tu_debug.c_str(), 1);
+        REXLOG_INFO("Vulkan: TU_DEBUG={}", tu_debug);
+      }
+      void* handle = adrenotools_open_libvulkan(
+          RTLD_NOW, ADRENOTOOLS_DRIVER_CUSTOM, tmp.empty() ? nullptr : tmp.c_str(),
+          hooks.c_str(), carpeta.c_str(), nombre.c_str(), nullptr, nullptr);
+      if (handle) {
+        vulkan_instance->loader_.Adopt(handle);
+        loader_loaded = true;
+        REXLOG_INFO("Vulkan: driver propio cargado con adrenotools: {}{}", carpeta, nombre);
+      } else {
+        REXLOG_WARN("Vulkan: adrenotools no pudo cargar {}{} (hooks en '{}'). "
+                    "Se usa el driver del sistema.",
+                    carpeta, nombre, hooks);
+      }
+    }
+    // Siempre, tambien con false. KGSL_PROP_PWRCTRL es un ajuste de TODO el
+    // dispositivo que dura hasta que alguien lo cambie: una partida con turbo
+    // dejaba la GPU asi para siempre (hasta reiniciar). Y en un Snapdragon 8
+    // Elite el "turbo" fija un reloj peor que el del gobernador: menu 3D a
+    // 14,6 fps con turbo frente a 42 sin el.
+    adrenotools_set_turbo(REXCVAR_GET(android_gpu_turbo));
+  }
+  if (!loader_loaded) {
+    loader_loaded = vulkan_instance->loader_.Load(platform::lib_names::kVulkanLoader);
+  }
+#else
   loader_loaded = vulkan_instance->loader_.Load(platform::lib_names::kVulkanLoader);
+#endif
   if (!loader_loaded) {
     REXLOG_ERROR("Failed to load {}", platform::lib_names::kVulkanLoader);
     return nullptr;
