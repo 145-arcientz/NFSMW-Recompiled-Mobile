@@ -1,0 +1,138 @@
+# nfsmw.toml - settings of NFSMW Android Evolved.
+#
+# Built from the tuned Switch release settings (nfsmw-nx-installer, release/nfsmw.toml): the native renderer
+# instead of the emulated Xenos GPU, and every cost reduction measured on the console. Removed: the Switch-only
+# keys (clocks, SaltyNX, nvmap, the NVK/Mesa patches, core pinning of Horizon) and the diagnostics.
+#
+# GameActivity copies it from the APK to files/nfsmw/user/nfsmw.toml. If you edit that copy, a new APK keeps
+# your version; delete it to get the new defaults.
+
+# The code only turns these on for the Switch (REX_PLATFORM_SWITCH); a phone needs them just as much.
+nfsmw_render_sin_mosaico = true      # draw the scene once: no 3-strip tiling, no MSAA
+nfsmw_cubemap_caras_siempre = 4      # the rear-view mirror face of the car cubemap, every frame
+
+# 1280x720 is what the Switch draws in handheld mode (30 FPS there). A recent phone GPU can take
+# "1920x1080": change it here or in the settings menu (it needs a restart).
+nfsmw_resolucion_interna = "1280x720"
+
+# Diagnostics off: they only write to the log.
+present_perfil_pintado = false
+nfsmw_streaming_diag = false
+
+# ---- Switch release settings ----
+input_xbox_layout = false
+nfsmw_tratamiento_visual = "original"
+nfsmw_intervalo_swap = 0
+nfsmw_sombras_corte = 150
+nfsmw_nativo_texturas_mb_max = 512
+nfsmw_sombras_sin_vegetacion = true
+nfsmw_nativo_sin_desenfoque = true
+nfsmw_retrovisor_recorte = true
+nfsmw_nativo_pase_area_util = true
+nfsmw_nativo_intercambiar_sin_borrado = true
+nfsmw_nativo_intercambiar_color = false
+nfsmw_nativo_pase_sombras_sin_load = true
+nfsmw_cubemap_caras_max = 6
+nfsmw_guardia_30 = false
+nfsmw_guardia_30_presupuesto_us = 31000
+nfsmw_nativo_enviar_tras_sombras = false
+nfsmw_sombras_mapas = 1
+nfsmw_sombras_cada = 1
+nfsmw_nativo_omitir_sombras = false
+nfsmw_limite_fps = "60"
+nfsmw_nativo_pcf_barato = true
+nfsmw_nativo_pcf_barato_alternar_s = 0
+nfsmw_nativo_zcull = true
+nfsmw_nativo_sombras_escala = 100
+nfsmw_nativo_marcas_precisas = true
+nfsmw_renderizador = "nativo"
+nfsmw_resplandor_cielo = "natural"
+nfsmw_nativo_inv_tamano_tex_alternar_s = 0
+present_hilo_propio = false
+vulkan_allow_present_mode_immediate = true
+nfsmw_sombras_lod = false
+nfsmw_nativo_z_temprana = true
+nfsmw_nativo_z_temprana_alternar_s = 0
+nfsmw_nativo_saltar_invisibles = true
+nfsmw_cubemap_detalle_minimo = 16
+nfsmw_escena_detalle_minimo = 0
+nfsmw_nativo_restaurar_area_util = true
+nfsmw_nativo_saltar_borrados_repetidos = true
+nfsmw_nativo_restaurar_por_intercambio = false
+nfsmw_io_ventana_kb = 64
+nfsmw_io_ventanas_max = 128
+nfsmw_io_aviso_ms = 8
+nfsmw_io_resumen_s = 15
+nfsmw_nativo_estadisticas_por_dibujo_s = 0
+nfsmw_mesa_entorno = ""
+nfsmw_escenario_detalle = 0
+nfsmw_nativo_texturas_pool = true
+nfsmw_nativo_texturas_pool_slab_mb = 16
+nfsmw_nativo_cache_texturas_entre_fotogramas = true
+nfsmw_io_rangos_mb = 64
+nfsmw_io_rangos_min_mb = 0
+nfsmw_io_rangos_min_kb = 256
+nfsmw_io_rangos_max_mb = 12
+nfsmw_streaming_anticipacion = 250
+nfsmw_streaming_techo_m = 160
+nfsmw_nativo_ranuras_trabajo = 3
+nfsmw_nativo_cielo_aplazado = true
+present_refresco_sellado_perezoso = false
+nfsmw_relevo_prioridad = 58
+nfsmw_d3d_registros_nativo = true
+nfsmw_d3d_efectos_nativo = true
+nfsmw_nativo_compartidas_cache = true
+nfsmw_d3d_marcador = true
+nfsmw_material_nativo = true
+nfsmw_d3d_efectos_nativo_todo = true
+nfsmw_nativo_gotas_lluvia = true
+nfsmw_visible_nativo = true
+nfsmw_matrices_nativo = true
+nfsmw_eview_nativo = true
+nfsmw_d3d_marcador_registro = true
+nfsmw_nativo_informes_diferidos = true
+nfsmw_nativo_vertices_base_cero = true
+nfsmw_nativo_pipelines_directa = true
+nfsmw_nativo_encuadre_cache = true
+nfsmw_nativo_clave_pase_rapida = true
+nfsmw_nativo_alto_util_memo = true
+nfsmw_nativo_cvars_por_fotograma = true
+nfsmw_nativo_anisotropico = 0
+nfsmw_nativo_diag_mip_minimo = 0
+nfsmw_nativo_sombras_sesgo_pendiente = 20
+nfsmw_nativo_sombras_sesgo_constante = 0
+nfsmw_nativo_profundidad_perezosa = true
+nfsmw_nativo_frontal_perezoso = true
+nfsmw_nativo_compuesta_perezosa = false
+nfsmw_nativo_diag_lectores_s = 0
+nfsmw_nativo_borrar_area_util = false
+nfsmw_nativo_diag_borrados = false
+nfsmw_nativo_sombra_minimo = true
+nfsmw_nativo_sombra_minimo_alternar_s = 0
+nfsmw_d3d_vegetacion_juego = true
+nfsmw_nativo_im_load_sin_memcmp = true
+nfsmw_nativo_im_inmediato_cache = true
+nfsmw_nativo_set4_diferencias = true
+nfsmw_nativo_set4_diferencias_alternar_s = 0
+nfsmw_nativo_clave_canonica = false
+nfsmw_nativo_pipeline_entre_pases = true
+nfsmw_nativo_estado_dinamico = false
+nfsmw_nativo_estado_dinamico3 = false
+nfsmw_nativo_contar_cambios_pipeline = false
+nfsmw_nativo_texturas_enlace_hilo = true
+nfsmw_nativo_texturas_enlace_hilo_prioridad = 45
+nfsmw_escenario_nativo = true
+nfsmw_nativo_framebuffers_olvidan_vistas = true
+nfsmw_nativo_subidas_ayuda = true
+nfsmw_nativo_texturas_huella_hilo = false
+nfsmw_efecto_pasada_nativo = true
+nfsmw_nativo_pipelines_precalentar = true
+nfsmw_nativo_diag_reutilizar = true
+nfsmw_pegamento_nativo = true
+nfsmw_nativo_indices_neon = true
+nfsmw_nativo_subidas_hilo_prioridad = 46
+nfsmw_reflejo_carretera = true
+nfsmw_reflejo_bajo_demanda = true
+nfsmw_reflejo_refresco = 4
+nfsmw_reflejo_visibilidad = true
+nfsmw_nativo_resolver_contenido_valido = true

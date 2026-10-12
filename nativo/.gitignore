@@ -1,0 +1,48 @@
+# Nothing derived from the game is ever committed: its files, the code generated from default.xex, and the
+# binaries built from that code.
+
+# --- Game files ---------------------------------------------------------------
+assets/
+game/
+game_root/
+*.xex
+*.xexp
+*.iso
+*.bin
+*.big
+*.bun
+*.viv
+*.nfsp
+
+# --- Generated from the game --------------------------------------------------
+generated/
+app*/generated/
+app*/src/copias_literales/
+app*/src/nfsmw_nativo_resplandor_*_spirv.h
+app_*/
+
+# --- Build output -------------------------------------------------------------
+out/
+build/
+android/.gradle/
+android/local.properties
+android/app/build/
+android/app/.cxx/
+*.nro
+*.nacp
+*.elf
+*.o
+*.obj
+*.a
+*.log
+*.err
+shaders/wasm/out/
+
+# --- Tools --------------------------------------------------------------------
+__pycache__/
+*.pyc
+.vs/
+.vscode/
+
+# The Android app's own assets (settings), not game data.
+!android/app/src/main/assets/
