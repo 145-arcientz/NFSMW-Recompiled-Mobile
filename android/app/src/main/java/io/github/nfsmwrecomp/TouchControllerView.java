@@ -75,6 +75,29 @@ import java.util.List;
  * clasificacion (arriba): en su lugar, un boton con el icono de la
  * clasificacion que pulsa arriba. Al volver
  * a los menus o a conducir, los de siempre.
+ *
+ * LOS MENUS CON EL DEDO (Ajustes.menusTactiles, solo con el motor nativo): en
+ * los menus y en la pausa el mando no se ve y la pantalla entera es del dedo.
+ * Deslizar pulsa la cruceta, un paso cada PASO_DESLIZAR. Un toque pregunta al
+ * juego que hay debajo (TouchControllerBridge.menuTocar, que lo lee de su motor
+ * de menus): en una indicacion de abajo ("(B) Atras", "(A) Aceptar") pulsa ese
+ * boton; en una flecha de la opcion resaltada, la cruceta hacia ese lado; en otra
+ * opcion, la cruceta hacia ella, un paso cada vez (menuRumbo), hasta elegirla.
+ * Aceptar es tocar la indicacion de A o la opcion ya elegida (se pidio asi: un toque
+ * cualquiera no puede ir aceptando cosas); donde no hay indicacion de A (videos,
+ * "Presionar START"), un toque acepta. En un dialogo (Si / No), igual: el primer
+ * toque elige la respuesta y el segundo la acepta.
+ * En una lista de opciones (menuEsLista) deslizar en horizontal cambia el valor
+ * de la resaltada en el sentido del dedo. Dos dedos, B; pellizcar, el zoom (al
+ * visualizar un coche: separar los dedos pisa RT, "Acercar zoom", y juntarlos,
+ * LT). Las indicaciones de LT y RT se pisan mientras el dedo esta encima. Donde la
+ * barra de abajo dice "Rotar" (menuRotar, al visualizar un coche), arrastrar mueve
+ * el stick derecho, que es el que gira la camara (en los dos ejes), segun la
+ * velocidad del dedo: el coche gira con el dedo, sin pasos. El juego recibe las
+ * pulsaciones como de un mando (pulsar), asi que suena y se mueve como siempre.
+ * El boton OCULTAR/TACTIL dice ahi MANDO: saca el mando en los menus (y DEDO lo
+ * vuelve a quitar). Cada toque deja en files/logs/menus.txt lo que se leyo del
+ * menu, para afinarlo.
  */
 public final class TouchControllerView extends View {
     private static final int DPAD_UP = 1 << 11;
@@ -91,6 +114,10 @@ public final class TouchControllerView extends View {
     private static final int B = 1 << 1;
     private static final int X = 1 << 2;
     private static final int Y = 1 << 3;
+    // En una pulsacion de los menus (pulsar), los gatillos: no son botones, van como LT y RT
+    // pisados del todo. Son los indices 16 y 17 que da TouchControllerBridge.menuTocar.
+    private static final int PULSO_LT = 1 << 16;
+    private static final int PULSO_RT = 1 << 17;
     private static final String PREFS = "nfsmw_touch_controller";
     // El nombre con el que venia de otro port. Se borra al arrancar.
     private static final String PREFS_VIEJAS = "skate3_touch_controller";
@@ -106,6 +133,7 @@ public final class TouchControllerView extends View {
     private static final int FONDO_BOTON = Color.argb(175, 15, 15, 18);
     private static final String PREF_VISIBLE = "visible";
     private static final String PREF_OPACIDAD = "opacidad";
+    private static final String PREF_MANDO_EN_MENUS = "mando_en_menus";
     // Lo que dura el boton OCULTAR/TACTIL en pantalla desde que aparece o se usa.
     private static final long TOGGLE_MS = 4000;
     // Editor: pasos y limites del tamano y la opacidad.
@@ -175,6 +203,8 @@ public final class TouchControllerView extends View {
     // Textos en el idioma de la app.
     private final String textoOcultar;
     private final String textoMostrar;
+    private final String textoMando;
+    private final String textoGestos;
     private final String textoTamano;
     private final String textoOpacidad;
     private final String textoRestaurar;
@@ -302,6 +332,112 @@ public final class TouchControllerView extends View {
         @Override
         public void onAccuracyChanged(Sensor sensor, int accuracy) {}
     };
+
+    // --- Los menus con el dedo.
+    private final boolean menusTactiles;
+    private final boolean deslizarInvertido;
+    // En un menu del juego o en la pausa (lo dice el contexto; con el motor de
+    // Xenos nunca, y los menus van con el mando).
+    private boolean enMenu;
+    // En los menus, el mando en vez del dedo (el boton MANDO/DEDO). Se guarda.
+    private boolean mandoEnMenus;
+    // Donde se ve el juego en la vista: el 16:9 del centro, o toda si se estira.
+    private boolean estirar;
+    private final RectF imagenJuego = new RectF();
+    // El dedo que desliza o toca: donde y cuando empezo, en que eje va (EJE_*),
+    // lo ya contado en pasos (en ese eje, desde donde empezo) y cuantos van.
+    private static final int SIN_EJE = 0;
+    private static final int EJE_X = 1;
+    private static final int EJE_Y = 2;
+    private int dedoMenu = -1;
+    private float menuX0;
+    private float menuY0;
+    private long menuT0;
+    private int ejeMenu;
+    private float contadoMenu;
+    private int pasosMenu;
+    private boolean dosDedos;
+    // Deslizando en horizontal sobre una lista de opciones: el valor, en el sentido del dedo.
+    private boolean deslizarDirecto;
+    // Lo que se pisa mientras dura un dedo (no una pulsacion de PULSO_MS): un gatillo de una
+    // indicacion con el dedo encima, o el del pellizco. Va con lo de pulsar en sendState.
+    private int mantenido;
+    private int gatilloDedo;
+    // El pellizco: la distancia entre los dos dedos con la que se cuenta, si ya se ha movido y
+    // el gatillo que pisa ahora. Se suelta cuando los dedos se quedan quietos ZOOM_QUIETO_MS.
+    private float distanciaPellizco;
+    private boolean pellizco;
+    private int gatilloPellizco;
+    private static final float PELLIZCO_DP = 14f;
+    private static final float PELLIZCO_PASO_DP = 4f;
+    private static final long ZOOM_QUIETO_MS = 140;
+    private final Runnable soltarPellizco = () -> soltarGatillo(true);
+    // Arrastrar para girar (menuRotar): el stick derecho, segun la velocidad del dedo (a
+    // VELOCIDAD_STICK_DP dp por milisegundo, entero; lo poco, al menos STICK_MINIMO, que la zona
+    // muerta del juego no se lo coma), suavizado, y donde y cuando estaba el dedo la ultima vez.
+    // Si el dedo se queda quieto ARRASTRE_QUIETO_MS, o se levanta, vuelve al centro poco a poco
+    // (FRENADA_*): el coche sigue girando un momento, como empujado, y cada deslizamiento gira mas.
+    // ROTAR_CON_EL_DEDO: el coche sigue al dedo (la camara va al reves que el); si girase al
+    // reves de lo esperado, cambiarlo.
+    private static final boolean ROTAR_CON_EL_DEDO = true;
+    private static final float VELOCIDAD_STICK_DP = .3f;
+    private static final float STICK_MINIMO = .35f;
+    private static final long ARRASTRE_QUIETO_MS = 60;
+    private static final long FRENADA_MS = 25;
+    private static final float FRENADA = .82f;
+    private boolean arrastrar;
+    private float stickArrastreX;
+    private float stickArrastreY;
+    private float arrastreX;
+    private float arrastreY;
+    private long arrastreT;
+    private final Runnable soltarArrastre = new Runnable() {
+        @Override
+        public void run() {
+            stickArrastreX *= FRENADA;
+            stickArrastreY *= FRENADA;
+            if (Math.abs(stickArrastreX) < .05f && Math.abs(stickArrastreY) < .05f) {
+                soltarStick();
+                return;
+            }
+            sendState();
+            postDelayed(this, FRENADA_MS);
+        }
+    };
+    // Lo que hay que mover el dedo para que empiece a deslizar, para el primer
+    // paso, para cada uno de los siguientes (en dp; o PASO_DESLIZAR_MARCO del
+    // ancho del juego, si es mas), y lo que dura como mucho un toque.
+    private static final float MOVER_DP = 12f;
+    private static final float PRIMER_PASO_DP = 28f;
+    private static final float PASO_DESLIZAR_DP = 56f;
+    private static final float PASO_DESLIZAR_MARCO = .07f;
+    private static final long TOQUE_MS = 450;
+    private static final long DOS_DEDOS_MS = 600;
+    // Las pulsaciones para el juego, una detras de otra: {mascara, TRAS_*}. Cada
+    // una dura PULSO_MS y deja ENTRE_PULSOS_MS sin nada, para que el juego (que
+    // mira el mando una vez por fotograma) las vea todas, y por separado.
+    private static final long PULSO_MS = 90;
+    private static final long ENTRE_PULSOS_MS = 90;
+    private static final int MAX_PULSOS = 6;
+    private static final int TRAS_NADA = 0;
+    // Al acabar, preguntar al juego el siguiente paso hacia la opcion tocada.
+    private static final int TRAS_RUMBO = 1;
+    private static final int MAX_PASOS_RUMBO = 10;
+    private final java.util.ArrayDeque<int[]> pulsos = new java.util.ArrayDeque<>();
+    private int pulso;
+    private int trasPulso;
+    private boolean pulsando;
+    private int pasosRumbo;
+    private final Runnable siguientePulso = this::siguientePulso;
+    private final Runnable soltarPulso = () -> {
+        pulso = 0;
+        sendState();
+        postDelayed(siguientePulso, ENTRE_PULSOS_MS);
+    };
+    // Diagnostico de los toques: files/logs/menus.txt.
+    private boolean menusAnotados;
+    private static final long MAX_DIAGNOSTICO_MENUS = 1 << 20;
+
     private final Runnable mirarContexto = new Runnable() {
         @Override
         public void run() {
@@ -318,6 +454,15 @@ public final class TouchControllerView extends View {
                 enPausa = pausa;
                 // El stick, al centro en cuanto se pausa.
                 sendState();
+            }
+            // Los menus y la pausa, con el dedo. Al entrar y al salir, todo suelto
+            // (un pedal que se pisaba, un deslizamiento a medias), y OCULTAR/TACTIL
+            // cambia de texto y de ancho.
+            boolean menu = contexto == TouchControllerBridge.CONTEXTO_MENUS || pausa;
+            if (menu != enMenu) {
+                enMenu = menu;
+                cancelarMenu();
+                rehacer();
             }
             if (ahora != dispJuego) {
                 dispJuego = ahora;
@@ -393,6 +538,10 @@ public final class TouchControllerView extends View {
         label.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         textoOcultar = context.getString(R.string.tactil_ocultar);
         textoMostrar = context.getString(R.string.tactil_mostrar);
+        textoMando = context.getString(R.string.tactil_mando);
+        textoGestos = context.getString(R.string.tactil_gestos);
+        menusTactiles = ajustes.menusTactiles();
+        deslizarInvertido = ajustes.deslizarInvertido();
         textoTamano = context.getString(R.string.editor_tamano);
         textoOpacidad = context.getString(R.string.editor_opacidad);
         textoRestaurar = context.getString(R.string.editor_restaurar);
@@ -411,6 +560,7 @@ public final class TouchControllerView extends View {
         int modo = Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS;
         preferences = context.getSharedPreferences(PREFS, modo);
         opacidad = preferences.getFloat(PREF_OPACIDAD, 1f);
+        mandoEnMenus = preferences.getBoolean(PREF_MANDO_EN_MENUS, false);
         inputManager = (InputManager) context.getSystemService(Context.INPUT_SERVICE);
         usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
         if (editando) {
@@ -475,6 +625,7 @@ public final class TouchControllerView extends View {
     }
 
     public void clearInput() {
+        cancelarMenu();
         for (Control control : controls) control.release();
         pointers.clear();
         sendState();
@@ -482,9 +633,16 @@ public final class TouchControllerView extends View {
     }
 
     public void disconnect() {
+        cancelarMenu();
         for (Control control : controls) control.release();
         pointers.clear();
         TouchControllerBridge.trySetState(-1, 0, 0, 0, 0, 0, 0);
+    }
+
+    /** GameActivity: si la imagen del juego llena la vista o es el 16:9 del centro. */
+    public void estirar(boolean estirar) {
+        this.estirar = estirar;
+        calcularMarco(lastWidth, lastHeight);
     }
 
     @Override
@@ -560,6 +718,7 @@ public final class TouchControllerView extends View {
     private void buildControls(float width, float height) {
         lastWidth = width;
         lastHeight = height;
+        calcularMarco(width, height);
         controls.clear();
         float unit = Math.min(width / 16f, height / 9f);
         float stickRadius = unit * 0.78f;
@@ -723,12 +882,49 @@ public final class TouchControllerView extends View {
         invalidate();
     }
 
+    /**
+     * Donde se ve el juego (GameActivity.ajustarSuperficie): la vista entera si se
+     * estira, y si no, el 16:9 mas grande que cabe, centrado.
+     */
+    private void calcularMarco(float width, float height) {
+        float w = width;
+        float h = height;
+        if (!estirar) {
+            if (width * 9 > height * 16) {
+                w = height * 16 / 9f;
+            } else {
+                h = width * 9 / 16f;
+            }
+        }
+        imagenJuego.set((width - w) * .5f, (height - h) * .5f, (width + w) * .5f, (height + h) * .5f);
+    }
+
+    /**
+     * El texto de OCULTAR/TACTIL. En los menus, con el dedo, no hay nada que
+     * ocultar: el boton cambia del dedo al mando (MANDO) y vuelta (DEDO).
+     */
+    private String textoToggle() {
+        if (!controlsVisible) return textoMostrar;
+        if (menusConDedo()) return mandoEnMenus ? textoGestos : textoMando;
+        return textoOcultar;
+    }
+
+    /** Los menus se llevan con el dedo en esta partida (aunque ahora vaya el mando). */
+    private boolean menusConDedo() {
+        return enPartida && menusTactiles && enMenu && !editando;
+    }
+
+    /** En un menu, con el dedo: sin mando a la vista y la pantalla entera para tocar. */
+    private boolean conDedo() {
+        return menusConDedo() && controlsVisible && !mandoEnMenus;
+    }
+
     /** OCULTAR/TACTIL arriba, y la barra del editor en el centro. */
     private void colocarBotones(float width, float height, float unit) {
         label.setTextSize(dp(11));
         // Lo que pida el texto, que en otros idiomas es mas largo que HIDE.
         float toggleWidth = Math.max(controlsVisible ? unit * 1.05f : unit * 1.35f,
-                label.measureText(controlsVisible ? textoOcultar : textoMostrar) + dp(24));
+                label.measureText(textoToggle()) + dp(24));
         float toggleTop = Math.max(dp(18), height * .035f);
         toggle.set(width * .5f - toggleWidth * .5f, toggleTop,
                    width * .5f + toggleWidth * .5f, toggleTop + unit * .46f);
@@ -807,13 +1003,15 @@ public final class TouchControllerView extends View {
             drawEngranaje(canvas);
         }
         if (!controlsVisible) return;
+        // Con el dedo en los menus no se dibuja nada: se toca el juego.
+        if (conDedo()) return;
         for (Control control : controls) {
             if (!control.oculto()) control.draw(canvas);
         }
     }
 
     private void drawToggle(Canvas canvas) {
-        drawBoton(canvas, toggle, controlsVisible ? textoOcultar : textoMostrar, dp(11));
+        drawBoton(canvas, toggle, textoToggle(), dp(11));
     }
 
     /** Un engranaje: un aro con ocho dientes. */
@@ -883,15 +1081,21 @@ public final class TouchControllerView extends View {
         int pointerId = event.getPointerId(index);
         float x = event.getX(index);
         float y = event.getY(index);
+        boolean bajando = action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN;
+        if (!bajando && conDedo()) return tocarMenu(event);
 
-        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+        if (bajando) {
             if (toggleVisible && engranaje.contains(x, y)) {
                 abrirEditor();
                 return true;
             }
             boolean enToggle = toggle.contains(x, y) || engranaje.contains(x, y);
             if (toggleVisible && toggle.contains(x, y)) {
-                setControlsVisible(!controlsVisible);
+                if (controlsVisible && menusConDedo()) {
+                    cambiarMandoEnMenus();
+                } else {
+                    setControlsVisible(!controlsVisible);
+                }
                 return true;
             }
             // Oculto: tocar donde esta lo saca, sin pulsarlo. Con mando fisico
@@ -902,6 +1106,7 @@ public final class TouchControllerView extends View {
                 return true;
             }
             if (!controlsVisible) return false;
+            if (conDedo()) return tocarMenu(event);
             for (int i = controls.size() - 1; i >= 0; --i) {
                 Control control = controls.get(i);
                 if (!control.inUse && !control.oculto() && control.contains(x, y)) {
@@ -946,6 +1151,352 @@ public final class TouchControllerView extends View {
             return true;
         }
         return false;
+    }
+
+    // ------------------------------------------------------------------------
+    //  Los menus con el dedo
+    // ------------------------------------------------------------------------
+
+    /**
+     * Un dedo: si se mueve, desliza (un paso de cruceta cada tanto, en el eje en
+     * que empezo); si no, al levantarlo es un toque. Un segundo dedo antes de
+     * moverse lo convierte en el toque de dos dedos, B.
+     */
+    private boolean tocarMenu(MotionEvent e) {
+        int i = e.getActionIndex();
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                pararRumbo();
+                gatilloDedo = gatilloBajo(e.getX(i), e.getY(i));
+                if (gatilloDedo != 0) {
+                    mantenido |= gatilloDedo;
+                    sendState();
+                }
+                dedoMenu = e.getPointerId(i);
+                menuX0 = e.getX(i);
+                menuY0 = e.getY(i);
+                menuT0 = e.getEventTime();
+                ejeMenu = SIN_EJE;
+                contadoMenu = 0;
+                pasosMenu = 0;
+                dosDedos = false;
+                arrastrar = false;
+                return true;
+            case MotionEvent.ACTION_POINTER_DOWN:
+                if (dedoMenu != -1 && ejeMenu == SIN_EJE && gatilloDedo == 0 && e.getPointerCount() >= 2) {
+                    dosDedos = true;
+                    pellizco = false;
+                    distanciaPellizco = distancia(e);
+                }
+                return true;
+            case MotionEvent.ACTION_MOVE: {
+                if (dosDedos) {
+                    pellizcar(e);
+                    return true;
+                }
+                int j = dedoMenu == -1 ? -1 : e.findPointerIndex(dedoMenu);
+                if (j < 0 || gatilloDedo != 0) return true;
+                float dx = e.getX(j) - menuX0;
+                float dy = e.getY(j) - menuY0;
+                if (ejeMenu == SIN_EJE) {
+                    if (Math.hypot(dx, dy) < dp(MOVER_DP)) return true;
+                    ejeMenu = Math.abs(dx) >= Math.abs(dy) ? EJE_X : EJE_Y;
+                    deslizarDirecto = ejeMenu == EJE_X && TouchControllerBridge.tryMenuEsLista();
+                    arrastrar = TouchControllerBridge.tryMenuRotar();
+                    arrastreX = e.getX(j);
+                    arrastreY = e.getY(j);
+                    arrastreT = e.getEventTime();
+                }
+                if (arrastrar) {
+                    arrastrarStick(e.getX(j), e.getY(j), e.getEventTime());
+                    return true;
+                }
+                float d = (ejeMenu == EJE_X ? dx : dy) - contadoMenu;
+                float paso = pasosMenu == 0 ? dp(PRIMER_PASO_DP) : pasoDeslizar();
+                while (Math.abs(d) >= paso) {
+                    float signo = Math.signum(d);
+                    darPaso(signo > 0);
+                    contadoMenu += signo * paso;
+                    d -= signo * paso;
+                    paso = pasoDeslizar();
+                }
+                return true;
+            }
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_POINTER_UP: {
+                if (dosDedos && e.getActionMasked() == MotionEvent.ACTION_POINTER_UP) {
+                    // Al levantar uno de los dos dedos, se acabo el pellizco.
+                    soltarGatillo(true);
+                }
+                if (e.getPointerId(i) != dedoMenu) return true;
+                dedoMenu = -1;
+                long dura = e.getEventTime() - menuT0;
+                if (arrastrar) {
+                    // Sigue girando un momento y frena (soltarArrastre).
+                    arrastrar = false;
+                    removeCallbacks(soltarArrastre);
+                    postDelayed(soltarArrastre, FRENADA_MS);
+                } else if (gatilloDedo != 0) {
+                    soltarGatillo(false);
+                } else if (dosDedos) {
+                    soltarGatillo(true);
+                    if (!pellizco && dura <= DOS_DEDOS_MS) pulsar(B, TRAS_NADA);
+                } else if (ejeMenu == SIN_EJE) {
+                    if (dura <= TOQUE_MS) tocarEn(menuX0, menuY0);
+                } else if (pasosMenu == 0) {
+                    // Un golpe corto que no llego al primer paso: tambien cuenta.
+                    if (ejeMenu == EJE_X) deslizarDirecto = TouchControllerBridge.tryMenuEsLista();
+                    float d = ejeMenu == EJE_X ? e.getX(i) - menuX0 : e.getY(i) - menuY0;
+                    if (dura <= TOQUE_MS) darPaso(d > 0);
+                }
+                return true;
+            }
+            case MotionEvent.ACTION_CANCEL:
+                dedoMenu = -1;
+                soltarGatillo(false);
+                soltarGatillo(true);
+                arrastrar = false;
+                soltarStick();
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    /**
+     * El gatillo de la indicacion de LT o RT que hay debajo de (x, y), para pisarlo mientras
+     * dure el dedo (el zoom al visualizar un coche va mientras se pisa). 0 si no es eso.
+     */
+    private int gatilloBajo(float x, float y) {
+        if (!imagenJuego.contains(x, y)) return 0;
+        int r = TouchControllerBridge.tryMenuTocar((x - imagenJuego.left) / imagenJuego.width(),
+                (y - imagenJuego.top) / imagenJuego.height());
+        if (r < 0 || (r & TouchControllerBridge.MENU_TIPO) != TouchControllerBridge.MENU_INDICACION) return 0;
+        int mascara = 1 << (r & 0xFF);
+        return mascara == PULSO_LT || mascara == PULSO_RT ? mascara : 0;
+    }
+
+    /**
+     * Arrastrando para girar: el stick derecho, segun lo rapido que va el dedo en cada eje (la
+     * camara gira mas deprisa cuanto mas se inclina), suavizado para que no tiemble.
+     */
+    private void arrastrarStick(float x, float y, long t) {
+        long dt = t - arrastreT;
+        if (dt <= 0) return;
+        float lleno = dp(VELOCIDAD_STICK_DP);
+        float vx = curvaStick((x - arrastreX) / dt / lleno);
+        float vy = curvaStick((y - arrastreY) / dt / lleno);
+        arrastreX = x;
+        arrastreY = y;
+        arrastreT = t;
+        // El coche con el dedo: la camara, al reves (los dos ejes del stick, como en SDL, con la
+        // Y positiva hacia abajo).
+        float signo = ROTAR_CON_EL_DEDO ? -1f : 1f;
+        stickArrastreX = stickArrastreX * .6f + signo * vx * .4f;
+        stickArrastreY = stickArrastreY * .6f + signo * vy * .4f;
+        sendState();
+        removeCallbacks(soltarArrastre);
+        postDelayed(soltarArrastre, ARRASTRE_QUIETO_MS);
+    }
+
+    /** De la velocidad del dedo (1 = entera) al stick: lo poco, por encima de la zona muerta. */
+    private static float curvaStick(float v) {
+        float a = Math.abs(v);
+        if (a < .02f) return 0f;
+        return Math.signum(v) * Math.min(1f, STICK_MINIMO + (1f - STICK_MINIMO) * a);
+    }
+
+    private void soltarStick() {
+        removeCallbacks(soltarArrastre);
+        if (stickArrastreX != 0 || stickArrastreY != 0) {
+            stickArrastreX = 0;
+            stickArrastreY = 0;
+            sendState();
+        }
+    }
+
+    private static float distancia(MotionEvent e) {
+        return (float) Math.hypot(e.getX(0) - e.getX(1), e.getY(0) - e.getY(1));
+    }
+
+    /**
+     * Dos dedos que se separan pisan RT ("Acercar zoom"), y que se juntan, LT: mientras se
+     * muevan. El primer paso pide PELLIZCO_DP, para que un toque con dos dedos (B) no cuente.
+     */
+    private void pellizcar(MotionEvent e) {
+        if (e.getPointerCount() < 2) return;
+        float d = distancia(e);
+        float cambio = d - distanciaPellizco;
+        if (Math.abs(cambio) < dp(pellizco ? PELLIZCO_PASO_DP : PELLIZCO_DP)) return;
+        pellizco = true;
+        distanciaPellizco = d;
+        int gatillo = cambio > 0 ? PULSO_RT : PULSO_LT;
+        if (gatillo != gatilloPellizco) {
+            mantenido = (mantenido & ~gatilloPellizco) | gatillo;
+            gatilloPellizco = gatillo;
+            sendState();
+        }
+        removeCallbacks(soltarPellizco);
+        postDelayed(soltarPellizco, ZOOM_QUIETO_MS);
+    }
+
+    /** Suelta el gatillo del pellizco o el de la indicacion bajo el dedo. */
+    private void soltarGatillo(boolean delPellizco) {
+        int gatillo = delPellizco ? gatilloPellizco : gatilloDedo;
+        if (delPellizco) {
+            removeCallbacks(soltarPellizco);
+            gatilloPellizco = 0;
+        } else {
+            gatilloDedo = 0;
+        }
+        if (gatillo != 0) {
+            mantenido &= ~gatillo;
+            sendState();
+        }
+    }
+
+    /** Lo que hay que deslizar para cada paso despues del primero. */
+    private float pasoDeslizar() {
+        return Math.max(dp(PASO_DESLIZAR_DP), imagenJuego.width() * PASO_DESLIZAR_MARCO);
+    }
+
+    /**
+     * Un paso de cruceta en el eje del deslizamiento: positivo, el dedo a la derecha o
+     * abajo. Como al pasar paginas, la opcion sigue al dedo: deslizar a la izquierda va a
+     * la de la derecha (probado en el movil: al reves se sentia invertido). Con
+     * Ajustes.deslizarInvertido, deslizar a la derecha va a la derecha. En una lista de
+     * opciones, en horizontal se cambia el valor de la resaltada: siempre en el sentido del
+     * dedo (a la derecha, mas volumen).
+     */
+    private void darPaso(boolean positivo) {
+        boolean directo = deslizarInvertido || (ejeMenu == EJE_X && deslizarDirecto);
+        if (!directo) positivo = !positivo;
+        pasosMenu++;
+        pulsar(ejeMenu == EJE_X ? (positivo ? DPAD_RIGHT : DPAD_LEFT)
+                                : (positivo ? DPAD_DOWN : DPAD_UP), TRAS_NADA);
+    }
+
+    /** Un toque: lo que diga el juego que hay debajo (TouchControllerBridge.menuTocar). */
+    private void tocarEn(float x, float y) {
+        // En las bandas negras, a los lados del 16:9, no hay juego.
+        if (!imagenJuego.contains(x, y)) return;
+        float u = (x - imagenJuego.left) / imagenJuego.width();
+        float v = (y - imagenJuego.top) / imagenJuego.height();
+        int r = TouchControllerBridge.tryMenuTocar(u, v);
+        int tipo = r < 0 ? r : r & TouchControllerBridge.MENU_TIPO;
+        if (tipo == TouchControllerBridge.MENU_INDICACION) {
+            // Una indicacion de abajo (A incluida) o una flecha.
+            pulsar(1 << (r & 0xFF), TRAS_NADA);
+        } else if (tipo == TouchControllerBridge.MENU_IR) {
+            pasosRumbo = 1;
+            pulsar(1 << (r & 0xFF), TRAS_RUMBO);
+        } else if (tipo == TouchControllerBridge.MENU_ACEPTAR || r == TouchControllerBridge.MENU_DESCONOCIDO) {
+            // Sin indicacion de A en pantalla (o sin poder leer el menu): el toque acepta.
+            pulsar(A, TRAS_NADA);
+        }
+        // Lo demas (la opcion ya elegida, nada debajo, una opcion a la que no se sabe
+        // llegar), nada: aceptar es tocar la indicacion de A.
+        anotarMenus(u, v);
+    }
+
+    /** Despues de cada paso hacia la opcion tocada: el siguiente, hasta que este elegida. */
+    private void seguirRumbo() {
+        int r = TouchControllerBridge.tryMenuRumbo();
+        if (r == TouchControllerBridge.MENU_ACEPTAR) {
+            pulsar(A, TRAS_NADA);
+        } else if (r >= 0 && (r & TouchControllerBridge.MENU_TIPO) == TouchControllerBridge.MENU_IR
+                && pasosRumbo < MAX_PASOS_RUMBO) {
+            pasosRumbo++;
+            pulsar(1 << (r & 0xFF), TRAS_RUMBO);
+        }
+    }
+
+    /** Pulsa `mascara` (botones del mando) cuando acaben las de antes. */
+    private void pulsar(int mascara, int tras) {
+        if (pulsos.size() >= MAX_PULSOS) return;
+        pulsos.add(new int[] {mascara, tras});
+        if (!pulsando) siguientePulso();
+    }
+
+    private void siguientePulso() {
+        // Lo que pedia la anterior, ya soltada y con su pausa: puede pedir otra.
+        int tras = trasPulso;
+        trasPulso = TRAS_NADA;
+        if (tras == TRAS_RUMBO) seguirRumbo();
+        int[] p = pulsos.poll();
+        if (p == null) {
+            pulsando = false;
+            return;
+        }
+        pulsando = true;
+        pulso = p[0];
+        trasPulso = p[1];
+        sendState();
+        postDelayed(soltarPulso, PULSO_MS);
+    }
+
+    /**
+     * Un dedo nuevo para el camino hacia la opcion tocada antes. Lo que ya se
+     * esta pulsando acaba: cortado a medias, el juego podria no verlo.
+     */
+    private void pararRumbo() {
+        trasPulso = TRAS_NADA;
+        pulsos.removeIf(p -> p[1] == TRAS_RUMBO);
+    }
+
+    /** Sin pulsaciones pendientes ni deslizamiento a medias. */
+    private void cancelarMenu() {
+        removeCallbacks(soltarPulso);
+        removeCallbacks(siguientePulso);
+        pulsos.clear();
+        pulsando = false;
+        trasPulso = TRAS_NADA;
+        dedoMenu = -1;
+        removeCallbacks(soltarPellizco);
+        removeCallbacks(soltarArrastre);
+        gatilloDedo = 0;
+        gatilloPellizco = 0;
+        stickArrastreX = 0;
+        stickArrastreY = 0;
+        arrastrar = false;
+        if (pulso != 0 || mantenido != 0) {
+            pulso = 0;
+            mantenido = 0;
+            sendState();
+        }
+    }
+
+    /** MANDO/DEDO: en los menus, el mando o el dedo. Se queda para las siguientes partidas. */
+    private void cambiarMandoEnMenus() {
+        mandoEnMenus = !mandoEnMenus;
+        preferences.edit().putBoolean(PREF_MANDO_EN_MENUS, mandoEnMenus).apply();
+        cancelarMenu();
+        rehacer();
+        mostrarToggle();
+    }
+
+    /**
+     * Diagnostico: files/logs/menus.txt, con cada toque lo que se leyo del menu
+     * (nativo_android.cpp, menuDiagnostico). La primera vez de la partida empieza
+     * el fichero de nuevo, y no pasa de MAX_DIAGNOSTICO_MENUS.
+     */
+    private void anotarMenus(float u, float v) {
+        String leido = TouchControllerBridge.tryMenuDiagnostico();
+        if (leido == null) return;
+        java.io.File carpeta = getContext().getExternalFilesDir("logs");
+        if (carpeta == null) return;
+        java.io.File f = new java.io.File(carpeta, "menus.txt");
+        boolean seguir = menusAnotados && f.length() < MAX_DIAGNOSTICO_MENUS;
+        menusAnotados = true;
+        try (java.io.FileWriter w = new java.io.FileWriter(f, seguir)) {
+            w.write(new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.ROOT)
+                    .format(new java.util.Date())
+                    + String.format(java.util.Locale.ROOT, " u=%.3f v=%.3f ctx=%s%s marco=%.0fx%.0f ",
+                            u, v, NOMBRES_DISP[dispJuego], enPausa ? "+pausa" : "", imagenJuego.width(), imagenJuego.height())
+                    + leido + "\n");
+        } catch (java.io.IOException ignorada) {
+            // Solo es diagnostico.
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -1163,7 +1714,8 @@ public final class TouchControllerView extends View {
             TouchControllerBridge.trySetState(-1, 0, 0, 0, 0, 0, 0);
             return;
         }
-        int buttons = 0;
+        int pisado = pulso | mantenido;
+        int buttons = pisado & ~(PULSO_LT | PULSO_RT);
         for (Control control : controls) buttons |= control.buttons();
         float lx = leftStick == null ? 0 : leftStick.xValue;
         float ly = leftStick == null ? 0 : leftStick.yValue;
@@ -1180,10 +1732,10 @@ public final class TouchControllerView extends View {
             buttons,
             lx,
             ly,
-            rightStick == null ? 0 : rightStick.xValue,
-            rightStick == null ? 0 : rightStick.yValue,
-            leftTrigger != null && leftTrigger.inUse ? 1 : 0,
-            rightTrigger != null && rightTrigger.inUse ? 1 : 0);
+            stickArrastreX != 0 || stickArrastreY != 0 ? stickArrastreX : rightStick == null ? 0 : rightStick.xValue,
+            stickArrastreX != 0 || stickArrastreY != 0 ? stickArrastreY : rightStick == null ? 0 : rightStick.yValue,
+            (leftTrigger != null && leftTrigger.inUse) || (pisado & PULSO_LT) != 0 ? 1 : 0,
+            (rightTrigger != null && rightTrigger.inUse) || (pisado & PULSO_RT) != 0 ? 1 : 0);
     }
 
     /**

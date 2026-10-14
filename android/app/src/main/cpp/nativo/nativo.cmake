@@ -19,8 +19,8 @@
 #  lanzador.
 # =============================================================================
 
-set(NFSMW_NATIVO "${NFSMW_REPO}/../nfsmw-android" CACHE PATH
-    "Arbol de nfsmw-android preparado (tools/android/preparar_nativo.py)")
+set(NFSMW_NATIVO "${NFSMW_REPO}/nativo" CACHE PATH
+    "Arbol del motor nativo: nativo/ en el repositorio, preparado con tools/android/preparar_nativo.py")
 get_filename_component(NFSMW_NATIVO "${NFSMW_NATIVO}" ABSOLUTE)
 # La app de la edicion del juego: app (PAL Espana, para la que esta escrita) o
 # app_<edicion>, la copia con las direcciones de otra edicion

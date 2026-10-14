@@ -48,10 +48,14 @@ public class GameActivity extends SDLActivity {
     /** Llenar la pantalla entera en vez de 16:9 con barras. */
     static final String EXTRA_ESTIRAR = "io.github.nfsmwrecomp.ESTIRAR";
     static final String EXTRA_MOSTRAR_FPS = "io.github.nfsmwrecomp.MOSTRAR_FPS";
+    /** El id de la edicion del juego de la ISO (Ediciones); sin el, la principal. */
+    static final String EXTRA_EDICION = "io.github.nfsmwrecomp.EDICION";
 
     private static final String TAG = "nfsmw";
 
     private String[] argumentos = new String[0];
+    /** Cual libmain cargar: la de la edicion de la ISO. */
+    private Ediciones.Edicion edicion = Ediciones.principal();
 
     private final Handler reloj = new Handler(Looper.getMainLooper());
     private TextView textoFps;
@@ -96,10 +100,15 @@ public class GameActivity extends SDLActivity {
         // mandando.
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
 
+        String idEdicion = intent.getStringExtra(EXTRA_EDICION);
+        if (idEdicion != null) {
+            edicion = Ediciones.porId(idEdicion);
+        }
+
         // Motor nativo: sus carpetas, sus ajustes y sus shaders, antes de que
         // super.onCreate cargue las librerias.
         if (MotorNativo.ACTIVO) {
-            MotorNativo.preparar(this);
+            MotorNativo.preparar(this, edicion);
         }
 
         argumentos = lista.toArray(new String[0]);
@@ -123,6 +132,9 @@ public class GameActivity extends SDLActivity {
         if (vibrador != null && !vibrador.hasVibrator()) vibrador = null;
 
         touchController = new TouchControllerView(this);
+        // Los toques en los menus van a la imagen del juego, que sin estirar es el
+        // 16:9 del centro (ajustarSuperficie).
+        touchController.estirar(intent.getBooleanExtra(EXTRA_ESTIRAR, false));
         mLayout.addView(touchController, new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
@@ -297,14 +309,15 @@ public class GameActivity extends SDLActivity {
      * metodos JNI (nativeSetupJNI y compania). Java solo los encuentra en
      * librerias cargadas con System.loadLibrary, no en las que arrastra el
      * enlazador como dependencia, asi que rexruntime va explicita. La ultima
-     * de la lista es la que tiene SDL_main.
+     * de la lista es la que tiene SDL_main: la libmain de la edicion de la ISO
+     * (libmain.so, o libmain_usa.so... en un APK con varias; ver Ediciones).
      */
     @Override
     protected String[] getLibraries() {
         // Con el motor nativo SDL3 va en su propia libreria, como espera SDLActivity.
         return MotorNativo.ACTIVO
-                ? new String[] {"SDL3", "main"}
-                : new String[] {"rexruntime", "main"};
+                ? new String[] {"SDL3", edicion.libreria}
+                : new String[] {"rexruntime", edicion.libreria};
     }
 
     /**

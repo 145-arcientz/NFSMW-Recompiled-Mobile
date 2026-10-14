@@ -201,7 +201,7 @@ def leer(f):
 def main():
     raiz = pathlib.Path(__file__).resolve().parents[2]
     p = argparse.ArgumentParser()
-    p.add_argument("--arbol", default=str(raiz.parent / "nfsmw-android"),
+    p.add_argument("--arbol", default=str(raiz / "nativo"),
                    help="el arbol del motor nativo (con app/)")
     p.add_argument("--estado", action="store_true")
     p.add_argument("--revertir", action="store_true")

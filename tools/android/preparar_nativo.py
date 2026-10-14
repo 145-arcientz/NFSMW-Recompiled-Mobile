@@ -5,7 +5,7 @@ juego con Vulkan sin imitar la GPU de la Xbox 360.
 
     python tools/android/preparar_nativo.py --iso "D:\\dumps\\NFSMW.iso"
     python tools/android/preparar_nativo.py --juego D:\\juego_extraido
-    python tools/android/preparar_nativo.py --rexglue ..\\nfsmw-android\\sdk\\out\\win-amd64\\rexglue.exe
+    python tools/android/preparar_nativo.py --rexglue nativo\\sdk\\out\\win-amd64\\rexglue.exe
 
 Despues:
 
@@ -22,19 +22,22 @@ Ver docs/motor-nativo.md.
 QUE DEJA
 ========
 
-Un arbol al lado de este repositorio, ..\\nfsmw-android, que es otro programa
-nativo entero: su SDK (un ReXGlue v0.10.0 modificado), su app y su codigo
-generado. Ese arbol NO se copia a este repositorio; el APK se compila contra el.
+El arbol del motor nativo, nativo/, es otro programa nativo entero: su SDK (un
+ReXGlue v0.10.0 modificado), su app y su codigo generado. Su codigo viene en el
+repositorio: https://github.com/codepdbh/nfsmw-android en un commit fijo (el
+port a Android de nfsmw-nx, de StevensND; GPL-3.0), con los parches de este
+proyecto ya aplicados. Lo que sale del juego y las librerias de terceros no se
+versionan: los deja este script, y el APK se compila contra todo ello.
 
-  1. Clona https://github.com/codepdbh/nfsmw-android en un commit fijo. Es el
-     port a Android de nfsmw-nx (StevensND), GPL-3.0.
+  1. Comprueba que esta nativo/.
   2. Rellena sdk/thirdparty: los submodulos del SDK. Si ya esta el SDK de
      Android de este proyecto (..\\rexglue-sdk-android) y son los mismos commits,
      los copia de ahi; si no, los baja con su tools/fetch_thirdparty.py, que
      tarda.
   3. Pone libadrenotools en su thirdparty (de ..\rexglue-sdk-android si esta,
-     o clonado en el mismo commit que preparar_sdk.py) y aplica los parches de
-     este proyecto a su SDK: tools/parche_iso.py (leer la ISO sin copiarla),
+     o clonado en el mismo commit que preparar_sdk.py) y pasa los parches de
+     este proyecto, que ya vienen aplicados (dicen que cada bloque ya estaba;
+     siguen sirviendo para el SDK del motor de Xenos): tools/parche_iso.py (leer la ISO sin copiarla),
      tools/parche_gamertag.py, tools/parche_turnip.py (drivers propios),
      tools/parche_pausa.py (soltar la superficie al minimizar) y
      tools/android/parche_nativo.py (abrir la URI, la sonda y el audio).
@@ -64,12 +67,22 @@ otra edicion (la USA o la japonesa), en vez de los pasos 5 a 7 sobre app/:
   c. Comprueba que las funciones que usa el codigo de la app son las mismas en
      las dos ediciones, enteras (emparejar.comparar_funcion), y que cada
      direccion que calculan es la traducida (emparejar.comprobar_parejas).
-  d. Crea app_<edicion> con su tools/editions/crear_arbol.py: la app con las
+  d. Genera su biblioteca de shaders en out/<edicion> y saca de ella las
+     huellas de los tres shaders que el renderizador reconoce (resplandor, cielo
+     y composicion): el contenedor con el mismo microcodigo que el de la PAL,
+     como su tools/editions/shaders_especiales.py. Si ediciones.json ya las
+     tiene ("nativo"), tienen que coincidir.
+  e. Crea app_<edicion> con su tools/editions/crear_arbol.py: la app con las
      direcciones traducidas, sus parejas corregidas a mano
-     (tools/editions/<edicion>/parejas_corregidas.json) y las huellas de los
-     shaders que cambian en esa edicion (ediciones.json, "nativo").
-  e. Codegen, llamadas directas y copias literales sobre app_<edicion>, y la
-     biblioteca de shaders y edicion.json en out/<edicion>.
+     (tools/editions/<edicion>/parejas_corregidas.json) y esas huellas.
+  f. Codegen, llamadas directas y copias literales sobre app_<edicion>, y
+     edicion.json en out/<edicion>.
+
+Las PAL alemana, italiana y francesa son la misma compilacion que la espanola
+con otro idioma (cinco instrucciones): su tabla sale identica, pero son otro
+XEX, y tambien van en su app_<edicion>. Las ediciones que se reconocen estan en
+tools/ediciones/ediciones.json (las de nfsmw-nx: PAL Espana, Alemania, Italia,
+Francia y Reino Unido, la polaca de fans, USA, Japon, Corea y Asia).
 
 Necesita la PAL Espana ya preparada: su ejecutable y su codigo generado son el
 punto de partida de la traduccion.
@@ -91,10 +104,13 @@ import pathlib
 import platform
 import re
 import shutil
+import struct
 import subprocess
 import sys
 
 RAIZ = pathlib.Path(__file__).resolve().parents[2]
+# De donde viene nativo/: ese repositorio en ese commit, con los parches de este
+# proyecto ya aplicados (ver docs/motor-nativo.md).
 REPO = "https://github.com/codepdbh/nfsmw-android.git"
 COMMIT = "6df1501"   # android: native renderer on Vulkan 1.1 and without shaderInt64
 # Resumen de "git ls-tree HEAD thirdparty/" (solo los submodulos, ordenados) del
@@ -125,15 +141,13 @@ def git(*args, cwd):
 # 1. El arbol
 # ---------------------------------------------------------------------------
 
-def clonar(arbol):
-    if (arbol / "app" / "CMakeLists.txt").is_file():
-        print(f"[ok] ya hay un arbol en {arbol}")
-        actual = git("rev-parse", "--short=7", "HEAD", cwd=arbol).stdout.strip()
-        if actual != COMMIT:
-            print(f"     aviso: esta en {actual}, este proyecto se probo con {COMMIT}")
-        return
-    correr("git", "clone", REPO, arbol, que="git clone")
-    correr("git", "checkout", "-q", COMMIT, cwd=arbol, que="git checkout")
+def comprobar_arbol(arbol):
+    """Su codigo viene en el repositorio (nativo/): aqui no se clona nada."""
+    if not (arbol / "app" / "CMakeLists.txt").is_file() or not (arbol / "sdk" / "CMakeLists.txt").is_file():
+        fallar(f"No esta el motor nativo en {arbol}.\n"
+               f"        Viene en el repositorio, en nativo/ ({REPO} en {COMMIT}, con los parches de este "
+               "proyecto): recupera la carpeta con git (git checkout -- nativo).")
+    print(f"[ok] motor nativo en {arbol}")
 
 
 # ---------------------------------------------------------------------------
@@ -218,7 +232,9 @@ def parches(arbol):
 # ---------------------------------------------------------------------------
 
 def es_referencia(ficha):
-    return ficha["tabla"] == ediciones.datos()["referencia"]
+    # Por la edicion y no por su tabla: la PAL alemana usa la tabla de la
+    # espanola (es la misma compilacion), pero es otro XEX con su propio codigo.
+    return ficha["id"] == ediciones.datos()["referencia"]
 
 
 def game_root(arbol, ficha):
@@ -364,6 +380,10 @@ def referencia_preparada(arbol):
                "        Antes: python tools/android/preparar_nativo.py --iso <tu ISO PAL Espana>")
     if not es_referencia(ediciones.detectar(str(xex))):
         fallar(f"{xex} no es el de la PAL Espana.")
+    if not (arbol / "out" / "nfsmw_shaders.nfsp").is_file():
+        fallar("Falta la biblioteca de shaders de la PAL Espana (out/nfsmw_shaders.nfsp): de ella salen las "
+               "huellas de los shaders de otra edicion.\n"
+               "        Antes: python tools/android/preparar_nativo.py --iso <tu ISO PAL Espana>")
     return xex
 
 
@@ -441,19 +461,70 @@ def comprobar_funciones(e, en_codigo):
             print(f"       {aviso}")
 
 
-def datos_nativos(ficha):
-    """Lo que la edicion necesita ademas de la tabla (ediciones.json, "nativo")."""
-    if ficha.get("nativo") is None:
-        fallar(f"El motor nativo no esta montado para {ficha['nombre']}: faltan sus datos en "
-               "tools/ediciones/ediciones.json (\"nativo\"). Ver docs/ediciones.md.\n"
-               "        Con el motor de Xenos si se puede: python tools/android/generar_codigo.py")
-    return ficha["nativo"]
+# Los tres shaders que el renderizador reconoce por la huella (XXH3) de su
+# contenedor original. En otra edicion el mismo microcodigo puede venir en un
+# contenedor distinto, y entonces con otra huella (el resplandor y el cielo de la
+# USA, y ademas la composicion en la japonesa).
+HUELLAS_ESPECIALES = ("kHuellaBrightPass", "kHuellaCielo", "kHuellaComposicion")
 
 
-def arbol_de_edicion(arbol, ficha, carpeta_juego):
+def _biblioteca(ruta):
+    """{huella: contenedor original} de una biblioteca NFSSPV (su nfsmw_shader_library.cpp)."""
+    datos = ruta.read_bytes()
+    if datos[:8] != b"NFSSPV\0\0":
+        fallar(f"{ruta} no es una biblioteca de shaders.")
+    _version, cantidad = struct.unpack_from("<II", datos, 8)
+    pos, contenedores = 24, {}
+    for _ in range(cantidad):
+        original, palabras, huella = struct.unpack_from("<IIQ", datos, pos)
+        pos += 16
+        contenedores[huella] = datos[pos:pos + original]
+        pos += original + palabras * 4
+    return contenedores
+
+
+def huellas_shaders(arbol, ficha, biblioteca):
+    """
+    Las huellas de los shaders especiales que cambian en esa edicion, {PAL: suya}:
+    en su biblioteca, el contenedor con el mismo microcodigo que el de la PAL
+    (como su tools/editions/shaders_especiales.py, que lo saca de los
+    contenedores del disco). Si ediciones.json ya las tiene ("nativo"), tienen
+    que coincidir.
+    """
+    fuente = (arbol / "app" / "src" / "nfsmw_nativo_dibujos.cpp").read_text(encoding="utf-8")
+    pal = _biblioteca(arbol / "out" / "nfsmw_shaders.nfsp")
+    suya = _biblioteca(biblioteca)
+    cambian = {}
+    for nombre in HUELLAS_ESPECIALES:
+        m = re.search(rf"constexpr uint64_t {nombre} = 0x([0-9A-Fa-f]{{16}})ull;", fuente)
+        if not m:
+            fallar(f"No encuentro {nombre} en app/src/nfsmw_nativo_dibujos.cpp.")
+        huella = int(m.group(1), 16)
+        if huella not in pal:
+            fallar(f"{nombre} ({huella:016X}) no esta en la biblioteca de la PAL Espana.")
+        b = pal[huella]
+        # La palabra 1 del contenedor (big-endian) dice donde empieza el microcodigo.
+        inicio = int.from_bytes(b[4:8], "big")
+        iguales = sorted(h for h, u in suya.items() if u[4:8] == b[4:8] and u[inicio:] == b[inicio:])
+        if len(iguales) != 1:
+            fallar(f"{nombre}: en la biblioteca de {ficha['nombre']} hay {len(iguales)} contenedores con su "
+                   "microcodigo, y tiene que haber uno.\n"
+                   "        Esa edicion trae otro shader: hay que mirarlo a mano (ver "
+                   "tools/editions/shaders_especiales.py).")
+        if iguales[0] != huella:
+            cambian["%016X" % huella] = "%016X" % iguales[0]
+    anotadas = (ficha.get("nativo") or {}).get("huellas_shaders")
+    if anotadas is not None and anotadas != cambian:
+        fallar(f"Las huellas de shaders de {ficha['nombre']} no son las de tools/ediciones/ediciones.json: "
+               f"salen {cambian or 'las de la PAL'}, y alli dice {anotadas or 'las de la PAL'}.")
+    print("[ok] huellas de los shaders especiales: "
+          + (", ".join(f"{v} -> {n}" for v, n in cambian.items()) if cambian else "las mismas que en la PAL"))
+    return cambian
+
+
+def arbol_de_edicion(arbol, ficha, carpeta_juego, huellas):
     """Crea app_<edicion>. Devuelve (app, tabla)."""
     ident = ficha["id"]
-    nativo = datos_nativos(ficha)
     xex_ref = referencia_preparada(arbol)
     # Su manifiesto quiere el XEX dentro de game_root.
     xex = game_root(arbol, ficha) / "default.xex"
@@ -473,7 +544,7 @@ def arbol_de_edicion(arbol, ficha, carpeta_juego):
         extra += ["--parejas", parejas]
     # Las huellas de los shaders que el renderizador reconoce y que en esta
     # edicion cambian (el resplandor y el cielo de la USA).
-    extra += [f"{vieja}={nueva}" for vieja, nueva in nativo.get("huellas_shaders", {}).items()]
+    extra += [f"{vieja}={nueva}" for vieja, nueva in huellas.items()]
     correr(sys.executable, "tools/editions/crear_arbol.py", ident, tabla,
            f"../assets/{xex.parent.name}/default.xex", *extra, cwd=arbol, que="crear_arbol.py")
     return arbol / f"app_{ident}", tabla
@@ -502,8 +573,8 @@ def shaders(arbol, carpeta_juego, salida):
 
 def main():
     ap = argparse.ArgumentParser(description="Prepara el motor nativo (nfsmw-android).")
-    ap.add_argument("--arbol", default=str(RAIZ.parent / "nfsmw-android"),
-                    help="donde va el arbol del motor nativo (por defecto, ..\\nfsmw-android)")
+    ap.add_argument("--arbol", default=str(RAIZ / "nativo"),
+                    help="el arbol del motor nativo (por defecto, nativo/ en este repositorio)")
     ap.add_argument("--sdk", default=str(RAIZ.parent / "rexglue-sdk-android"),
                     help="el SDK de Android de este proyecto, de donde copiar los submodulos")
     ap.add_argument("--iso", help="tu ISO del juego: se extraen default.xex y NFS/")
@@ -512,7 +583,7 @@ def main():
     args = ap.parse_args()
     arbol = pathlib.Path(args.arbol).resolve()
 
-    clonar(arbol)
+    comprobar_arbol(arbol)
     terceros(arbol, pathlib.Path(args.sdk).resolve())
     adrenotools(arbol, pathlib.Path(args.sdk).resolve())
     parches(arbol)
@@ -521,7 +592,6 @@ def main():
     print(f"== Edicion del juego: {ficha['nombre']} ({ficha['id']})")
     if not referencia:
         # Antes de compilar nada: que se pueda.
-        datos_nativos(ficha)
         referencia_preparada(arbol)
 
     if args.rexglue:
@@ -540,11 +610,14 @@ def main():
             shutil.copy2(carpeta_juego / "default.xex", xex)
         codegen(arbol, rexglue, arbol / "app")
         salida = arbol / "out"
+        shaders(arbol, carpeta_juego, salida / "nfsmw_shaders.nfsp")
     else:
-        app, tabla = arbol_de_edicion(arbol, ficha, carpeta_juego)
-        codegen(arbol, rexglue, app, enganchadas=app / "enganchadas.txt", tabla=tabla)
+        # La biblioteca primero: de ella salen las huellas que crear_arbol.py cambia.
         salida = arbol / "out" / ficha["id"]
-    shaders(arbol, carpeta_juego, salida / "nfsmw_shaders.nfsp")
+        shaders(arbol, carpeta_juego, salida / "nfsmw_shaders.nfsp")
+        huellas = huellas_shaders(arbol, ficha, salida / "nfsmw_shaders.nfsp")
+        app, tabla = arbol_de_edicion(arbol, ficha, carpeta_juego, huellas)
+        codegen(arbol, rexglue, app, enganchadas=app / "enganchadas.txt", tabla=tabla)
 
     with open(salida / "edicion.json", "w", encoding="utf-8", newline="\n") as fh:
         json.dump({"id": ficha["id"], "nombre": ficha["nombre"], "tabla": ficha["tabla"],

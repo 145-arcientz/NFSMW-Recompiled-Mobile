@@ -34,6 +34,58 @@
           "19C0C358044A29BF": "BDA897AD5D6FF1D7"
         }
       }
+    },
+    "pal_de": {
+      "nombre": "PAL Alemania",
+      "nota": "La misma compilacion que la espanola con otro idioma (nfsmw-nx). SHA-256 de su instalador; sin probar aqui.",
+      "sha256": ["23ece29d18724ea28971d52f936964d127148bd2359ff24795da7442b9069bf4"],
+      "tabla": "pal_es",
+      "idioma": 3,
+      "pais": 24
+    },
+    "pal_it": {
+      "nombre": "PAL Italia",
+      "nota": "La misma compilacion que la espanola con otro idioma (nfsmw-nx). SHA-256 de su instalador; sin probar aqui.",
+      "sha256": ["acb09332bcafc15e8e21dc15062f1963804a3176fa4db48fea7f6c8afbdff066"],
+      "tabla": "pal_es",
+      "idioma": 6,
+      "pais": 50
+    },
+    "pal_fr": {
+      "nombre": "PAL Francia",
+      "nota": "La misma compilacion que la espanola con otro idioma (nfsmw-nx). SHA-256 de su instalador; sin probar aqui.",
+      "sha256": ["229c5ed5dcc67871982000fb923acfd59494f21f30996b25f36b30a8d85c9b7b"],
+      "tabla": "pal_es",
+      "idioma": 4,
+      "pais": 34
+    },
+    "pal_en": {
+      "nombre": "PAL Reino Unido",
+      "nota": "Otra compilacion, parecida a la USA (nfsmw-nx). La traduccion rusa de fans usa este mismo XEX. Sin probar aqui.",
+      "sha256": ["e2ea2ff11bf84cb30430d824d7bfe699a3acf3e7400d21b9a7c938e3d7a10474"],
+      "idioma": 1,
+      "pais": 35
+    },
+    "pal_pl": {
+      "nombre": "PAL Polonia (fans)",
+      "nota": "Traduccion de fans sobre la PAL inglesa: su XEX va sin cifrar ni comprimir y cambia un salto (0x8228753C, beq -> nop). El juego sigue en ingles: sus textos sustituyen a los ingleses. Sin probar aqui.",
+      "sha256": ["a2dd0156c26603cf32e33b52fa906422bde74e5065da87115d5b747aa5d90ff8"],
+      "idioma": 1,
+      "pais": 82
+    },
+    "kor": {
+      "nombre": "Corea",
+      "nota": "Otra compilacion (nfsmw-nx). Sin probar aqui.",
+      "sha256": ["47683b515e5461a2e356c45a4417f30fe69c3f6c6ea0d3352829f35f1fb33abe"],
+      "idioma": 7,
+      "pais": 56
+    },
+    "cht": {
+      "nombre": "Asia (chino tradicional)",
+      "nota": "Otra compilacion (nfsmw-nx). Sin probar aqui.",
+      "sha256": ["0cd7b9fa3957de085e298c91faa726116ad0079abaefead82c2f3337ee432e64"],
+      "idioma": 8,
+      "pais": 101
     }
   },
   "europeas": {

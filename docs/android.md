@@ -405,11 +405,20 @@ El cvar `thread_affinity` admite:
 | Valor | Qué hace |
 |---|---|
 | vacío | no tocar nada (lo que pasa si se apaga el ajuste) |
-| `auto` | los núcleos de más `cpu_capacity` son los prime: `GPU Commands` y `Main XThread` van ahí y **todo lo demás a los otros**. Si todos valen lo mismo, no se toca nada |
+| `auto` | los núcleos de más `cpu_capacity` son los prime: `GPU Commands` y `Main XThread` van ahí y **todo lo demás a los otros**. Con **un solo** prime, `Main XThread` se lo queda y el de la GPU baja al escalón siguiente. Sin `cpu_capacity`, o si vale lo mismo en todos, se mira `cpufreq/cpuinfo_max_freq`; si eso también es igual, no se toca nada |
 | reglas | `GPU Commands=6-7;Main XThread=6+7;*=0-5`. Casan por el principio del nombre (el kernel lo corta a 15 caracteres), gana la primera, `*` es el resto |
 
 Lo que aplica queda en el log: `[afinidad] 'auto' -> GPU Commands=6+7; ...` y
 una línea por hilo.
+
+**Un solo prime.** En el 8 Gen 2 y 3, el 865 o los 7 Gen x hay un único núcleo
+de más capacidad, y el hilo principal y el de la GPU se lo quitarían uno a otro.
+La ganancia medida venía del hilo principal (el de la GPU ya corría en un prime
+sin fijar), así que ese núcleo es para él, y el de la GPU va al escalón
+siguiente, que comparte con el resto de hilos. En el 865: `Main XThread=7`,
+`GPU anillo=4+5+6`, `*=0-6`. Se comprobó con topologías falsas de cada caso,
+pero no se ha medido en un móvil así. La línea `[afinidad] auto: segun ...`
+dice de dónde salió la topología y el valor de cada núcleo.
 
 **Medido** con el banco de pruebas, en una escena de 2.700–4.200 dibujos por
 fotograma, en dos rondas en orden inverso (sin, con, con, sin) y partiendo de

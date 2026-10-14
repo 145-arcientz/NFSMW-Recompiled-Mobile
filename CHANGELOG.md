@@ -10,6 +10,44 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Añadido
 
+- Las demás ediciones que soporta nfsmw-nx, con el motor nativo: PAL Alemania, Italia,
+  Francia y Reino Unido, la traducción polaca de fans, Corea y Asia (chino tradicional).
+  Se reconocen por el SHA-256 de su `default.xex` (los del instalador de nfsmw-nx) y llevan
+  su idioma y su país. **La alemana, la italiana y la inglesa ya compilan** (2026-10-13), con
+  los controles táctiles y los menús con el dedo como las demás, y entran en el APK de
+  varias ediciones, que con seis pasa a 118 MB; sin probar en el móvil. Las otras cuatro
+  esperan su ISO.
+  `preparar_nativo.py` saca solo, de la biblioteca de shaders de cada edición, las huellas
+  de los tres shaders que el renderizador reconoce (de ellas salen igual las de la USA y la
+  japonesa que estaban anotadas), y las PAL europeas van en su propio `app_<edición>` en vez
+  de pisar la española. `apk_ediciones.py` mete todas las que estén preparadas.
+- Un APK con las tres ediciones (motor nativo, 0.4.2): `python tools/android/apk_ediciones.py`
+  saca `out/apk/nfsmw-ediciones-<versión>-release.apk`, que juega la ISO PAL España, USA o
+  japonesa. Lleva una `libmain` por edición (`libmain.so`, `libmain_usa.so`,
+  `libmain_jpn.so`) y su biblioteca de shaders, y una sola vez lo que no depende de la
+  edición: el SDK, SDL, libc++ y los hooks de Turnip (el script comprueba que el SDK de
+  cada una exporta lo mismo). Al jugar, el SHA-256 del `default.xex` de la ISO decide qué
+  `libmain` se carga, qué shaders se instalan y qué idioma y país se le pasan al juego.
+  Las partidas son las mismas para todas. El APK pasa de unos 33 MB a unos 67 MB. Los APK
+  de una edición siguen saliendo como siempre. Ver
+  [docs/motor-nativo.md](docs/motor-nativo.md#las-tres-en-un-apk).
+- Menús con el dedo (motor nativo, 0.4.2): en los menús y en la pausa no hay mando; deslizar
+  mueve como al pasar páginas (la cruceta), tocar una opción la elige (el juego va
+  hasta ella con la cruceta) y tocarla otra vez, o tocar «Ⓐ Aceptar», acepta; tocar una
+  indicación de abajo (Atrás, X, Y, RB, START, LT y RT) pulsa ese botón, y dos dedos van
+  atrás. Donde no hay indicación de A (vídeos, «Pulsa START»), un toque acepta. En un
+  diálogo Sí/No, el primer toque elige y el segundo acepta. En las listas de opciones, las
+  flechas y los «−»/«+» del juego cambian el valor, y deslizar en horizontal también; en EA
+  Trax, sus flechas suben y bajan. Al ver un coche, arrastrar gira la cámara (el stick
+  derecho), pellizcar hace zoom y LT/RT se pisan mientras se tocan. Esa pantalla se reconoce
+  por la etiqueta del texto «Rotar», que es la misma en todas las ediciones, o por su icono:
+  la cruceta en la española y el stick derecho en la italiana («Ruota»), que al principio no
+  se reconocía. En las carreras, los
+  controles de siempre. Lo que hay en pantalla se lee del motor de menús del juego (FEng) sin tocarlo,
+  con sus textos (cada indicación es un texto con el icono del botón dentro), comprobando
+  antes 16 de sus funciones (iguales en PAL, USA y japonesa). El botón de
+  arriba dice MANDO para volver al mando en los menús. Opciones en Controles táctiles:
+  apagarlo y deslizar al revés. Cada toque deja en `files/logs/menus.txt` lo que se leyó.
 - Calidad de las sombras en Gráficos (motor nativo, 0.4.1): Rápida (como venía: un solo muestreo
   del mapa de sombras y sin la sombra de la vegetación), Bordes suaves (el patrón 3x3 de la
   Xbox 360, que difumina el contorno; cuesta GPU) y Como la Xbox 360 (además, árboles,
@@ -285,6 +323,20 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Cambiado
 
+- El motor nativo, dentro del repositorio: [`nativo/`](nativo) es el código de
+  codepdbh/nfsmw-android en `6df1501` (GPL-3.0, con su licencia), en un commit tal cual y
+  otro con nuestros cambios a 25 de sus ficheros, en vez de una copia al lado
+  (`../nfsmw-android`) que `preparar_nativo.py` clonaba y parcheaba. Gradle, CMake y los
+  scripts lo buscan ahí; los parches dicen que ya estaban. Lo que sale del juego y las
+  librerías de terceros de su SDK siguen sin versionarse. La primera compilación de cada
+  edición, entera otra vez (cambian las rutas).
+- "Fijar hilos a núcleos" con un solo núcleo prime (0.4.2; Snapdragon 8 Gen 2 y 3, 865, 7 Gen x;
+  la AYN Thor y la Thor Lite, entre otros): el hilo principal y el de la GPU iban los dos a
+  ese núcleo y se lo quitaban uno a otro. Ahora el principal se queda el prime y el de la
+  GPU baja al escalón siguiente (en el 865, cpu7 y cpu4–6). Y si el kernel no da
+  `cpu_capacity`, o da lo mismo en todos los núcleos, se mira la frecuencia máxima de cada
+  uno. Con dos prime o más (el 8 Elite) no cambia nada. Comprobado con una topología falsa
+  de cada caso; falta medirlo en un móvil con un solo prime.
 - Controles táctiles conduciendo (0.4.1; el resto de carreras, la conducción libre y las
   persecuciones): el stick derecho vuelve a ser un stick, como antes de esa disposición. La
   palanca de cambios queda solo en las carreras de aceleración. Nueva disposición de fábrica

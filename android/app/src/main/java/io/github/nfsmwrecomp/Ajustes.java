@@ -53,6 +53,17 @@ final class Ajustes {
                 / (double) (SENSIBILIDAD_MAX - SENSIBILIDAD_MIN)));
     }
 
+    /**
+     * Mando tactil: en los menus y en la pausa, sin mando, con el dedo
+     * (TouchControllerView, "LOS MENUS CON EL DEDO"). Solo con el motor nativo,
+     * que sabe en que parte del juego se esta y que hay en el menu. Deslizar va
+     * como al pasar paginas (a la izquierda, la opcion de la derecha); invertido,
+     * deslizar a la derecha va a la de la derecha.
+     */
+    boolean menusTactiles() { return p.getBoolean("menus_tactiles", true); }
+    void menusTactiles(boolean v) { p.edit().putBoolean("menus_tactiles", v).apply(); }
+    boolean deslizarInvertido() { return false; }
+
     String iso() { return p.getString("iso", null); }
     void iso(String uri) { p.edit().putString("iso", uri).apply(); }
 
@@ -61,8 +72,8 @@ final class Ajustes {
 
     /**
      * Lo que IsoXex ha leido de la ISO elegida. xexIso: el SHA-256 de su
-     * default.xex, que dice de que edicion del juego es (el APK solo vale para
-     * una); null si aun no se ha mirado y "" si no se pudo leer. isoFaltan:
+     * default.xex, que dice de que edicion del juego es (y cual de las del APK
+     * cargar, ver Ediciones); null si aun no se ha mirado y "" si no se pudo leer. isoFaltan:
      * los bytes que le faltan al fichero, 0 si esta entero.
      */
     String xexIso() { return p.getString("iso_xex", null); }
@@ -71,6 +82,9 @@ final class Ajustes {
         p.edit().putString("iso_xex", sha).putLong("iso_faltan", faltan).apply();
     }
     void isoSinMirar() { p.edit().remove("iso_xex").remove("iso_faltan").apply(); }
+
+    /** La edicion con la que se juega la ISO elegida (ver Ediciones). */
+    Ediciones.Edicion edicion() { return Ediciones.paraJugar(xexIso()); }
 
     /** Nombre del driver importado, o null para el del sistema. */
     String driver() { return p.getString("driver", null); }
@@ -254,7 +268,8 @@ final class Ajustes {
      * procesador de comandos ("GPU Commands") y el hilo principal del juego a
      * los nucleos prime, y todo lo demas a los otros, para que nadie les quite
      * el nucleo. En el Snapdragon 8 Elite: cpu6-7 a 4,32 GHz frente a cpu0-5 a
-     * 3,53 GHz.
+     * 3,53 GHz. Con un solo prime (8 Gen 2 y 3, 865, 7 Gen x) el hilo
+     * principal se lo queda y el de la GPU baja al escalon siguiente.
      *
      * ENCENDIDO de fabrica. Medido el 2026-09-23, dos tandas en orden inverso
      * en la carrera de demostracion: coste por dibujo de 8,85 a 7,15 us (-19 %)
@@ -449,9 +464,9 @@ final class Ajustes {
         a.add("--audio_maxqframes=64");
         // El idioma y el pais de la consola, los de la edicion del juego con la
         // que se compilo el APK (PAL Espana: 5 y 31; USA: 1 y 103). Salen de
-        // app/generated-android/edicion.json, via build.gradle.kts.
-        a.add("--user_language=" + BuildConfig.JUEGO_IDIOMA);
-        a.add("--user_country=" + BuildConfig.JUEGO_PAIS);
+        // app/generated-android/edicion.json, via build.gradle.kts (Ediciones).
+        a.add("--user_language=" + edicion().idioma);
+        a.add("--user_country=" + edicion().pais);
         // Un solo argumento aunque lleve espacios: va en el array, sin shell.
         String gamertag = gamertag();
         if (gamertagValido(gamertag) && !gamertag.isEmpty()) {

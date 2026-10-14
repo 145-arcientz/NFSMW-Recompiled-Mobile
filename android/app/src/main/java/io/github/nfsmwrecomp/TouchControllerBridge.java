@@ -13,6 +13,25 @@ final class TouchControllerBridge {
     // En el mundo, con el juego en pausa (su menu, un mensaje...).
     static final int CONTEXTO_PAUSA = 3;
 
+    /**
+     * Lo que devuelven menuTocar() y menuRumbo() (nativo_android.cpp, seccion 10):
+     * el tipo en MENU_TIPO y, en una indicacion o un rumbo, el boton (el indice de
+     * SDL_GamepadButton) en los 8 bits de abajo.
+     */
+    static final int MENU_DESCONOCIDO = -1;
+    static final int MENU_NADA = 0;
+    static final int MENU_INDICACION = 0x100;
+    static final int MENU_RESALTADA = 0x200;
+    static final int MENU_IR = 0x300;
+    static final int MENU_SIN_RUMBO = 0x400;
+    // El camino a la opcion tocada ha llegado: ya esta elegida.
+    static final int MENU_LLEGADA = 0x500;
+    // Pulsar A: en esa pantalla no hay indicacion de A con la que hacerlo.
+    static final int MENU_ACEPTAR = 0x600;
+    static final int MENU_TIPO = 0xF00;
+    // Solo el motor nativo sabe leer el menu.
+    private static volatile boolean menusDisponibles = true;
+
     private TouchControllerBridge() {}
 
     static native void setState(int buttons,
@@ -27,6 +46,71 @@ final class TouchControllerBridge {
 
     /** El juego quieto (o en marcha otra vez) mientras se edita el mando en la partida. */
     static native void pausarJuego(boolean pausa);
+
+    /** Que hay en (u, v) del menu, de 0 a 1 sobre la imagen del juego (MENU_*). */
+    static native int menuTocar(float u, float v);
+
+    /** Tras pulsar la cruceta hacia la opcion tocada: el siguiente paso (MENU_*). */
+    static native int menuRumbo();
+
+    /** Diagnostico: lo leido del menu y el ultimo toque, en varias lineas. */
+    static native String menuDiagnostico();
+
+    /** Si la pantalla gira algo con la cruceta mantenida ("Rotar" al visualizar un coche). */
+    static native boolean menuRotar();
+
+    static boolean tryMenuRotar() {
+        if (!nativeAvailable || !menusDisponibles) return false;
+        try {
+            return menuRotar();
+        } catch (UnsatisfiedLinkError error) {
+            return false;
+        }
+    }
+
+    /** Si lo que hay en pantalla es una lista de opciones (una debajo de otra). */
+    static native boolean menuEsLista();
+
+    static boolean tryMenuEsLista() {
+        if (!nativeAvailable || !menusDisponibles) return false;
+        try {
+            return menuEsLista();
+        } catch (UnsatisfiedLinkError error) {
+            return false;
+        }
+    }
+
+    /** MENU_DESCONOCIDO si la libreria no lo sabe (el motor de Xenos). */
+    static int tryMenuTocar(float u, float v) {
+        if (!nativeAvailable || !menusDisponibles) return MENU_DESCONOCIDO;
+        try {
+            return menuTocar(u, v);
+        } catch (UnsatisfiedLinkError error) {
+            menusDisponibles = false;
+            return MENU_DESCONOCIDO;
+        }
+    }
+
+    static int tryMenuRumbo() {
+        if (!nativeAvailable || !menusDisponibles) return MENU_SIN_RUMBO;
+        try {
+            return menuRumbo();
+        } catch (UnsatisfiedLinkError error) {
+            menusDisponibles = false;
+            return MENU_SIN_RUMBO;
+        }
+    }
+
+    /** null si la libreria no lo sabe. */
+    static String tryMenuDiagnostico() {
+        if (!nativeAvailable || !menusDisponibles) return null;
+        try {
+            return menuDiagnostico();
+        } catch (UnsatisfiedLinkError error) {
+            menusDisponibles = false;
+            return null;
+        }
+    }
 
     /** Con el motor de Xenos no esta: el juego sigue mientras se edita. */
     static void tryPausarJuego(boolean pausa) {

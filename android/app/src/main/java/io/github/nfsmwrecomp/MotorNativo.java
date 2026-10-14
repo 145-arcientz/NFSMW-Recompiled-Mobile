@@ -61,7 +61,7 @@ final class MotorNativo {
      * carpetas, la variable que le dice al motor cual es "la carpeta del
      * ejecutable" (en Android seria /system/bin), sus ajustes y sus shaders.
      */
-    static void preparar(Context ctx) {
+    static void preparar(Context ctx, Ediciones.Edicion edicion) {
         File usuario = carpetaUsuario(ctx);
         boolean nueva = !usuario.isDirectory();
         //noinspection ResultOfMethodCallIgnored
@@ -77,7 +77,7 @@ final class MotorNativo {
             Log.w(TAG, "REX_APP_FOLDER", e);
         }
         instalarAjustes(ctx, usuario);
-        instalarShaders(ctx, usuario);
+        instalarShaders(ctx, usuario, edicion);
     }
 
     /**
@@ -144,17 +144,21 @@ final class MotorNativo {
         }
     }
 
-    /** La biblioteca de shaders: se copia si falta o si el APK trae otra. */
-    private static void instalarShaders(Context ctx, File usuario) {
+    /**
+     * La biblioteca de shaders de esa edicion (cada una tiene la suya): se
+     * copia si falta, si el APK trae otra o si se juega con otra edicion.
+     */
+    private static void instalarShaders(Context ctx, File usuario, Ediciones.Edicion edicion) {
         File destino = new File(usuario, SHADERS);
         SharedPreferences p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         // Cambia con cada instalacion del APK: basta para saber si hay que mirar.
         long apk = new File(ctx.getApplicationInfo().sourceDir).lastModified();
-        if (destino.isFile() && p.getLong("shaders_apk", -1) == apk) {
+        if (destino.isFile() && p.getLong("shaders_apk", -1) == apk
+                && edicion.id.equals(p.getString("shaders_edicion", edicion.id))) {
             return;
         }
         File temporal = new File(usuario, SHADERS + ".tmp");
-        try (InputStream in = ctx.getAssets().open("nativo/" + SHADERS);
+        try (InputStream in = ctx.getAssets().open(edicion.shaders);
              OutputStream out = new FileOutputStream(temporal)) {
             volcar(in, out);
         } catch (IOException e) {
@@ -164,7 +168,9 @@ final class MotorNativo {
             return;
         }
         if (temporal.renameTo(destino)) {
-            p.edit().putLong("shaders_apk", apk).apply();
+            // commit y no apply: el proceso del juego muere al salir, y lo
+            // pendiente de apply podria no llegar a escribirse.
+            p.edit().putLong("shaders_apk", apk).putString("shaders_edicion", edicion.id).commit();
         }
     }
 
@@ -221,8 +227,10 @@ final class MotorNativo {
         if (ajustes.fijarHilos()) {
             a.add("--thread_affinity=auto");
         }
-        a.add("--user_language=" + BuildConfig.JUEGO_IDIOMA);
-        a.add("--user_country=" + BuildConfig.JUEGO_PAIS);
+        // Los de la edicion de la ISO, que con varias en el APK puede no ser la principal.
+        Ediciones.Edicion edicion = ajustes.edicion();
+        a.add("--user_language=" + edicion.idioma);
+        a.add("--user_country=" + edicion.pais);
         String gamertag = ajustes.gamertag();
         if (Ajustes.gamertagValido(gamertag) && !gamertag.isEmpty()) {
             a.add("--user_gamertag=" + gamertag);

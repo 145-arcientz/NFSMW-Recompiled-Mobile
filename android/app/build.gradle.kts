@@ -29,7 +29,7 @@ val motor: String = (findProperty("nfsmw.motor") as String?) ?: "xenos"
 val esNativo = motor == "nativo"
 require(motor == "xenos" || esNativo) { "nfsmw.motor tiene que ser xenos o nativo (es '$motor')" }
 val nativo: File = (findProperty("nfsmw.nativo") as String?)?.let { file(it) }
-    ?: File(repo.parentFile, "nfsmw-android")
+    ?: File(repo, "nativo")
 // La edicion del juego con el motor nativo. Su app esta escrita para PAL Espana
 // (app/ de su arbol); otra edicion es otra copia de la app con las direcciones
 // traducidas, app_<edicion>, con su biblioteca de shaders en out/<edicion>.
@@ -47,6 +47,31 @@ val conJuego = if (esNativo) File(appNativa, "generated/default/sources.cmake").
 // ediciones: PAL Espana.
 val edicion: Map<*, *> = (if (esNativo) File(outNativo, "edicion.json") else File(generado, "edicion.json")).let {
     if (it.isFile) groovy.json.JsonSlurper().parse(it) as Map<*, *> else emptyMap<String, Any>()
+}
+
+// Varias ediciones en un APK (motor nativo): la de arriba es la principal, la que
+// compila CMake en libmain.so; las demas las deja tools/android/apk_ediciones.py
+// en esta carpeta, ya compiladas, cada una en su libmain_<id>.so y con su
+// biblioteca de shaders en assets/nativo/<id>, y su ficha en ediciones.json:
+//     python tools/android/apk_ediciones.py
+// (por debajo, gradlew assembleRelease -Pnfsmw.motor=nativo -Pnfsmw.ediciones=<carpeta>).
+// Todas comparten el SDK, SDL y los hooks de Turnip: no dependen de la edicion.
+val carpetaEdiciones: File? = (findProperty("nfsmw.ediciones") as String?)?.let { file(it) }
+require(carpetaEdiciones == null || esNativo) { "nfsmw.ediciones solo va con -Pnfsmw.motor=nativo" }
+@Suppress("UNCHECKED_CAST")
+val otrasEdiciones: List<Map<*, *>> = carpetaEdiciones?.let {
+    groovy.json.JsonSlurper().parse(File(it, "ediciones.json")) as List<Map<*, *>>
+} ?: emptyList()
+// BuildConfig.EDICIONES (Ediciones.java): una ficha por edicion separada por
+// ';', con id|nombre|sha256|idioma|pais|libreria|shaders. Sin edicion.json, el
+// codigo es de antes de las ediciones: PAL Espana.
+fun fichaEdicion(e: Map<*, *>, libreria: String, shaders: String): String =
+    listOf(e["id"] ?: "pal_es", e["nombre"] ?: "PAL España", e["sha256"] ?: "", e["idioma"] ?: 5,
+        e["pais"] ?: 31, libreria, shaders).joinToString("|")
+val fichasEdiciones: List<String> = listOf(fichaEdicion(edicion, "main", "nativo/nfsmw_shaders.nfsp")) +
+    otrasEdiciones.map { fichaEdicion(it, "main_${it["id"]}", "nativo/${it["id"]}/nfsmw_shaders.nfsp") }
+require(otrasEdiciones.none { it["id"] == (edicion["id"] ?: "pal_es") }) {
+    "La edicion principal (${edicion["id"]}) esta tambien en ${carpetaEdiciones}/ediciones.json"
 }
 
 // Motor nativo: sus ajustes (nfsmw.toml) y su biblioteca de shaders, que sale de
@@ -74,18 +99,16 @@ android {
         // de nombres que necesita. Por debajo no hay Snapdragon que merezca la pena.
         minSdk = 29
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.4.1"
+        versionCode = 8
+        versionName = "0.4.2"
 
         buildConfigField("boolean", "CON_JUEGO", conJuego.toString())
         buildConfigField("String", "MOTOR", "\"$motor\"")
-        // Un APK lleva el codigo de UNA edicion: su nombre, el SHA-256 de su
-        // default.xex (para avisar si se elige la ISO de otra) y el idioma y el
-        // pais de Xbox 360 que se le pasan al juego.
-        buildConfigField("String", "EDICION", "\"${edicion["nombre"] ?: "PAL España"}\"")
-        buildConfigField("String", "EDICION_XEX", "\"${edicion["sha256"] ?: ""}\"")
-        buildConfigField("int", "JUEGO_IDIOMA", "${edicion["idioma"] ?: 5}")
-        buildConfigField("int", "JUEGO_PAIS", "${edicion["pais"] ?: 31}")
+        // Las ediciones cuyo codigo lleva el APK (una, o varias con
+        // -Pnfsmw.ediciones): su nombre, el SHA-256 de su default.xex (para
+        // saber cual cargar, o avisar si se elige la ISO de otra), el idioma y
+        // el pais de Xbox 360 que se le pasan al juego, su libmain y sus shaders.
+        buildConfigField("String", "EDICIONES", "\"${fichasEdiciones.joinToString(";")}\"")
         // El log del juego tambien en release, para diagnosticar un movil:
         //     gradlew assembleRelease -Pnfsmw.registro=true
         buildConfigField("boolean", "REGISTRO", ((findProperty("nfsmw.registro") as String?) == "true").toString())
@@ -168,6 +191,10 @@ android {
             )
             if (esNativo) {
                 assets.directories.add(assetsNativo.get().asFile.absolutePath)
+            }
+            if (carpetaEdiciones != null) {
+                jniLibs.directories.add(File(carpetaEdiciones, "jniLibs").absolutePath)
+                assets.directories.add(File(carpetaEdiciones, "assets").absolutePath)
             }
         }
     }

@@ -17,11 +17,15 @@
 // LAS REGLAS (cvar thread_affinity)
 //
 //   ""        no tocar nada (por defecto)
-//   "auto"    los nucleos de mas capacidad (/sys/.../cpu_capacity) son los
+//   "auto"    los nucleos de mas capacidad (/sys/.../cpu_capacity, o la
+//             frecuencia maxima si falta o vale lo mismo en todos) son los
 //             prime: "GPU Commands" (o "GPU anillo nativo" con el motor
 //             nativo) y "Main XThread" van ahi, y TODO lo demas a
 //             los otros, para que nadie les quite el nucleo. En el Snapdragon 8
-//             Elite: cpu6-7 (4,32 GHz) frente a cpu0-5 (3,53 GHz).
+//             Elite: cpu6-7 (4,32 GHz) frente a cpu0-5 (3,53 GHz). Con UN solo
+//             prime (8 Gen 2 y 3, 865, 7 Gen x...) los dos se lo quitarian uno a
+//             otro: "Main XThread" se lo queda y el de la GPU baja al escalon
+//             siguiente (en el 865: cpu7 frente a cpu4-6).
 //   reglas    "GPU Commands=6-7;Main XThread=6+7;*=0-5". Casan por el PRINCIPIO
 //             del nombre (el kernel lo corta a 15 caracteres: "GPU Commands
 //             (F"), gana la primera que case, y "*" es el resto.
@@ -161,54 +165,105 @@ std::vector<Regla> LeerReglas(const std::string& texto) {
   return reglas;
 }
 
+// Un valor por nucleo de /sys/devices/system/cpu/cpuN/<fichero>, o -1 donde no
+// esta (un nucleo apagado pierde su cpufreq en algunos kernels): ese nucleo no
+// entra en ninguna mascara. Devuelve true si distingue unos nucleos de otros.
+bool LeerPorNucleo(const char* fichero, int nucleos, long* valor) {
+  long mayor = -1;
+  long menor = -1;
+  for (int c = 0; c < nucleos; ++c) {
+    char ruta[96];
+    char buf[32];
+    std::snprintf(ruta, sizeof(ruta), "/sys/devices/system/cpu/cpu%d/%s", c, fichero);
+    valor[c] = LeerFichero(ruta, buf, sizeof(buf)) ? std::atol(buf) : -1;
+    if (valor[c] <= 0) {
+      valor[c] = -1;
+      continue;
+    }
+    mayor = mayor < 0 ? valor[c] : std::max(mayor, valor[c]);
+    menor = menor < 0 ? valor[c] : std::min(menor, valor[c]);
+  }
+  return mayor > menor;
+}
+
+Regla ReglaDe(const char* nombre, const cpu_set_t& nucleos) {
+  Regla r;
+  r.prefijo = nombre;
+  r.nucleos = nucleos;
+  r.texto = std::string(nombre) + "=" + TextoNucleos(nucleos);
+  return r;
+}
+
 // Los prime son los de mas capacidad. Si todos valen lo mismo no hay nada que
 // repartir y no se toca nada.
 std::vector<Regla> ReglasAuto() {
-  int capacidad[kMaxNucleos];
-  int mayor = 0;
-  int menor = 0;
-  int nucleos = 0;
-  for (int c = 0; c < kMaxNucleos; ++c) {
-    char ruta[96];
-    char buf[32];
-    std::snprintf(ruta, sizeof(ruta), "/sys/devices/system/cpu/cpu%d/cpu_capacity", c);
-    if (!LeerFichero(ruta, buf, sizeof(buf))) {
-      break;
+  const long configurados = sysconf(_SC_NPROCESSORS_CONF);
+  const int nucleos =
+      configurados > 0 ? std::min(static_cast<int>(configurados), kMaxNucleos) : kMaxNucleos;
+  long valor[kMaxNucleos];
+  // cpu_capacity es la escala del planificador. Hay kernels sin ella y otros que
+  // dan 1024 a todos: entonces, la frecuencia maxima de cada nucleo.
+  const char* fuente = "cpu_capacity";
+  if (!LeerPorNucleo(fuente, nucleos, valor)) {
+    fuente = "cpufreq/cpuinfo_max_freq";
+    if (!LeerPorNucleo(fuente, nucleos, valor)) {
+      REXLOG_INFO("[afinidad] auto: todos los nucleos valen lo mismo, no se toca nada");
+      return {};
     }
-    capacidad[c] = std::atoi(buf);
-    mayor = nucleos == 0 ? capacidad[c] : std::max(mayor, capacidad[c]);
-    menor = nucleos == 0 ? capacidad[c] : std::min(menor, capacidad[c]);
-    ++nucleos;
-  }
-  if (nucleos == 0 || mayor == menor) {
-    REXLOG_INFO("[afinidad] auto: todos los nucleos valen lo mismo, no se toca nada");
-    return {};
   }
 
+  // Los dos escalones de arriba.
+  long primero = -1;
+  long segundo = -1;
+  for (int c = 0; c < nucleos; ++c) {
+    primero = std::max(primero, valor[c]);
+  }
+  for (int c = 0; c < nucleos; ++c) {
+    if (valor[c] < primero) {
+      segundo = std::max(segundo, valor[c]);
+    }
+  }
   cpu_set_t prime;
+  cpu_set_t medios;
   cpu_set_t resto;
   CPU_ZERO(&prime);
+  CPU_ZERO(&medios);
   CPU_ZERO(&resto);
+  std::string valores;
   // Con if y no con ?: dentro de CPU_SET: es una macro que hace (set)->__bits,
   // y el ?: sin parentesis se asociaria mal.
   for (int c = 0; c < nucleos; ++c) {
-    if (capacidad[c] == mayor) {
+    if (valor[c] < 0) {
+      continue;
+    }
+    valores += (valores.empty() ? "" : " ") + std::to_string(c) + ':' + std::to_string(valor[c]);
+    if (valor[c] == primero) {
       CPU_SET(c, &prime);
     } else {
       CPU_SET(c, &resto);
+      if (valor[c] == segundo) {
+        CPU_SET(c, &medios);
+      }
     }
   }
+  REXLOG_INFO("[afinidad] auto: segun {}: {}", fuente, valores);
 
   std::vector<Regla> reglas;
   // "GPU Commands" es el procesador de comandos del motor de Xenos; "GPU anillo"
   // ("GPU anillo nativo", cortado a 15 caracteres), el hilo del anillo del
   // motor nativo, que hace su mismo papel.
-  for (const char* nombre : {"GPU Commands", "GPU anillo", "Main XThread"}) {
-    Regla r;
-    r.prefijo = nombre;
-    r.nucleos = prime;
-    r.texto = std::string(nombre) + "=" + TextoNucleos(prime);
-    reglas.push_back(r);
+  if (CPU_COUNT(&prime) >= 2) {
+    for (const char* nombre : {"GPU Commands", "GPU anillo", "Main XThread"}) {
+      reglas.push_back(ReglaDe(nombre, prime));
+    }
+  } else {
+    // Un solo prime: los dos hilos se lo quitarian uno a otro. El principal se
+    // lo queda (la ganancia medida venia de el: el de la GPU ya corria en un
+    // prime sin fijar) y el de la GPU, al escalon siguiente, que comparte con
+    // los demas hilos.
+    reglas.push_back(ReglaDe("GPU Commands", medios));
+    reglas.push_back(ReglaDe("GPU anillo", medios));
+    reglas.push_back(ReglaDe("Main XThread", prime));
   }
   Regla comodin;
   comodin.nucleos = resto;

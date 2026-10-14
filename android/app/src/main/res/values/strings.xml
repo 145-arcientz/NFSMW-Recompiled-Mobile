@@ -85,6 +85,9 @@
     <string name="escalado_cas">AMD CAS · sharpening only</string>
     <string name="iso_incompleta">This ISO is incomplete: %1$s of game data are missing at the end of the file, as after a download or an extraction that was cut short. The game will not load with it.</string>
     <string name="iso_otra_edicion">This ISO is a different edition of the game. This APK was built for the %1$s edition and will not start with another one: choose the %1$s ISO, or build the APK from this ISO.</string>
+    <string name="ediciones_apk">This APK includes the %1$s editions of the game.</string>
+    <string name="edicion_iso">ISO of the %1$s edition. This APK includes %2$s.</string>
+    <string name="iso_edicion_no_incluida">This ISO is an edition of the game that this APK does not include (it includes %1$s): the game will not start with it.</string>
     <string name="iso_elegida">ISO: %1$s</string>
     <string name="elegir_iso">Choose ISO…</string>
     <string name="iso_sin_permiso">Android did not grant permanent access to that ISO. Pick it from the phone\'s storage.</string>
@@ -181,6 +184,8 @@
     <!-- Touch controller -->
     <string name="tactil_ocultar">HIDE</string>
     <string name="tactil_mostrar">TOUCH</string>
+    <string name="tactil_mando">PAD</string>
+    <string name="tactil_gestos">FINGER</string>
     <string name="seccion_perfil">Xbox 360 profile</string>
     <string name="gamertag" translatable="false">Gamertag</string>
     <string name="gamertag_resumen">The name the game sees for your profile. Your saves are kept if you change it: they go by the profile ID, not by the name.</string>
@@ -197,6 +202,10 @@
     <string name="vibracion_sin_mandos">No controller connected: the phone vibrates.</string>
     <string name="girar_inclinando">Steer by tilting the phone</string>
     <string name="girar_inclinando_resumen">In races and free roam, tilt the phone like a steering wheel instead of using the left stick, which is hidden. Drag races keep the lane arrows.</string>
+    <string name="menus_tactiles">Menus by touch</string>
+    <string name="menus_tactiles_resumen">In menus and in the pause menu there is no pad: swipe to move (in a list of options, sideways changes the value), tap an option to pick it, tap the arrows to change its value and tap the hints at the bottom, like “Ⓐ Accept” or “Ⓑ Back”, to press them. Two fingers, back. The PAD button at the top brings the pad back.</string>
+    <string name="deslizar_invertido">Reverse swipe in menus</string>
+    <string name="deslizar_invertido_resumen">Off: like turning pages, swiping left goes to the option on the right. On: swiping right goes to the one on the right.</string>
     <string name="sensibilidad_giro">Steering sensitivity</string>
     <string name="sensibilidad_giro_resumen">Further right, less tilt is needed to steer all the way.</string>
     <string name="sensibilidad_valor">%1$d · full lock at %2$d°</string>

@@ -197,10 +197,13 @@ cd android
 gradlew assembleRelease -Pnfsmw.motor=nativo                            :: PAL Spain
 gradlew assembleRelease -Pnfsmw.motor=nativo -Pnfsmw.edicion=usa        :: USA
 gradlew assembleRelease -Pnfsmw.motor=nativo -Pnfsmw.edicion=jpn        :: Japan
+gradlew assembleRelease -Pnfsmw.motor=nativo -Pnfsmw.edicion=pal_de     :: PAL Germany
+gradlew assembleRelease -Pnfsmw.motor=nativo -Pnfsmw.edicion=pal_it     :: PAL Italy
+gradlew assembleRelease -Pnfsmw.motor=nativo -Pnfsmw.edicion=pal_en     :: PAL English ("Europe")
 ```
 
 - `preparar_nativo.py` recognises the edition from the ISO itself and keeps each one
-  apart, next to this repository: `..\nfsmw-android\app_<edition>`,
+  apart, inside `nativo\`: `nativo\app_<edition>`,
   `assets\game_root_<edition>` and `out\<edition>`.
 - **Before building another edition it checks the translation, and stops if anything
   fails:**

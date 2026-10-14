@@ -33,7 +33,7 @@ Lo que hace ese renderizador está contado en su `docs/native-renderer.md`. En c
 ## Es otro programa
 
 El motor nativo no es un parche sobre nuestro SDK. Es **otro árbol nativo entero**, que
-se queda al lado de este repositorio, en `..\nfsmw-android`:
+va dentro de este repositorio, en [`nativo/`](../nativo):
 
 - su SDK: un ReXGlue v0.10.0 con sus propios cambios (presentador, audio, ficheros) y su
   propio port a Android, que no es el de hells-gate;
@@ -41,11 +41,20 @@ se queda al lado de este repositorio, en `..\nfsmw-android`:
 - su código generado, con **su** generador (los registros del PowerPC como variables de
   C++ y llamadas directas entre funciones).
 
-Nada de eso se copia aquí. De este repositorio entran en `libmain.so`
+Su código es el de [codepdbh/nfsmw-android](https://github.com/codepdbh/nfsmw-android) en el
+commit `6df1501`, GPL-3.0 como este proyecto, con su licencia y sus avisos de terceros. Entró
+en dos commits: el suyo tal cual (los mismos blobs que su commit) y encima nuestros cambios
+a 25 de sus ficheros, los que antes aplicaban los scripts de parche sobre una copia al lado
+del repositorio (`../nfsmw-android`). Esos scripts se quedan: sobre `nativo/` dicen que cada
+bloque ya estaba, y siguen parcheando el SDK del motor de Xenos. Lo que sale del juego
+(`assets/`, `app*/generated/`, `app_<edición>/`, `out/`) y las librerías de terceros de su
+SDK (`sdk/thirdparty`, que copia o baja `preparar_nativo.py`) no se versionan.
+
+De este repositorio entran en `libmain.so`
 [`nativo_android.cpp`](../android/app/src/main/cpp/nativo/nativo_android.cpp), con los
 puentes JNI de nuestro lanzador, y dos ficheros que ya usaba el motor de Xenos:
-`sonda_vulkan.cpp` y `afinidad.cpp`. A su SDK se le aplican nuestros parches de ISO,
-gamertag y Turnip, que entran tal cual.
+`sonda_vulkan.cpp` y `afinidad.cpp`. Su SDK lleva nuestros parches de ISO, gamertag y
+Turnip, los mismos que el del motor de Xenos.
 
 Lo que **sí** es nuestro con los dos motores es la app de Java: la pantalla de inicio, el
 mando táctil y su editor, los idiomas, elegir la ISO sin copiarla, los drivers propios y la
@@ -53,13 +62,14 @@ sonda de Vulkan.
 
 ```
 android/app/src/main/cpp/CMakeLists.txt     motor xenos
-android/app/src/main/cpp/nativo/nativo.cmake    motor nativo: compila ..\nfsmw-android\app
+android/app/src/main/cpp/nativo/nativo.cmake    motor nativo: compila nativo\app
 android/app/src/main/cpp/nativo/nativo_android.cpp   táctil, fps, ISO, sonda y afinidad
 android/app/src/main/cpp/sonda_vulkan.cpp       la sonda de Vulkan (los dos motores)
 android/app/src/main/cpp/afinidad.cpp           hilos fijados a núcleos (los dos motores)
 android/app/src/main/cpp/audio/aaudio_driver.cpp   salida de audio AAudio (los dos motores)
 android/app/src/main/java/.../MotorNativo.java  carpetas, ajustes y shaders del motor nativo
-tools/android/preparar_nativo.py                deja ..\nfsmw-android listo
+tools/android/preparar_nativo.py                deja nativo/ listo (juego, código, shaders)
+nativo/                                         el motor nativo: su SDK, su app, sus herramientas
 tools/android/parche_nativo.py                  parche a su SDK: abrir una URI y la sonda
 ```
 
@@ -76,12 +86,12 @@ gradlew assembleRelease -Pnfsmw.motor=nativo
 
 `preparar_nativo.py`:
 
-1. clona nfsmw-android en un commit fijo;
+1. comprueba que está `nativo/`;
 2. rellena los submódulos de su SDK. Si `..\rexglue-sdk-android` ya está y son los mismos
    commits (lo son: los dos parten del SDK v0.10.0), los copia de ahí; bajarlos tarda
    mucho;
-3. pone libadrenotools en su `thirdparty` y le aplica a su SDK los mismos parches que al
-   nuestro para la ISO, el gamertag y Turnip ([`parche_iso.py`](../tools/parche_iso.py),
+3. pone libadrenotools en su `thirdparty` y pasa los mismos parches que al SDK de Xenos
+   para la ISO, el gamertag y Turnip (en `nativo/` ya vienen aplicados) ([`parche_iso.py`](../tools/parche_iso.py),
    `parche_gamertag.py`, `parche_turnip.py`), más `parche_nativo.py`;
 4. extrae de la ISO `default.xex` y `NFS/` (los vídeos no hacen falta para compilar);
 5. compila su generador y traduce el juego;
@@ -158,6 +168,76 @@ traducidas. Con `-Pnfsmw.edicion=<edición>`, Gradle compila `app_<edición>` en
 `app` (`NFSMW_NATIVO_APP`), en su propia carpeta `.cxx`, y empaqueta `out/<edición>`. El
 idioma y el país que se pasan al juego salen de la edición: inglés y EE. UU. (1 y 103),
 japonés y Japón (2 y 53).
+
+**Las huellas de los shaders especiales salen solas.** El renderizador reconoce tres
+shaders por la huella de su contenedor (resplandor, cielo y composición), y en otra edición
+el mismo microcódigo puede venir en otro contenedor. `preparar_nativo.py` genera primero
+la biblioteca de shaders de la edición y busca en ella el contenedor con el mismo microcódigo
+que el de la PAL (lo que hace `shaders_especiales.py` de nfsmw-nx con los contenedores del
+disco). Así salen, sin datos previos, las de la USA y la japonesa que había en
+`ediciones.json` (comprobado). Si una edición ya las tiene anotadas ahí, tienen que
+coincidir; si un shader no aparece o aparece dos veces, se para y lo dice.
+
+**Las demás ediciones de nfsmw-nx** se reconocen por el SHA-256 de su `default.xex` (los
+de su instalador, en `ediciones.json`), con su idioma y su país: PAL Alemania (3 y 24),
+Italia (6 y 50), Francia (4 y 34) y Reino Unido (1 y 35), la traducción polaca de fans
+(sobre la inglesa: el juego sigue en inglés con sus textos; 1 y 82), Corea (7 y 56) y Asia
+en chino tradicional (8 y 101). Cada una se prepara igual (`--iso`), después de la PAL.
+
+**Preparadas y compiladas (2026-10-13), sin probar en el móvil:** la alemana, la italiana y
+la inglesa (la ISO "Europe" es la PAL inglesa). Las tres coinciden con el instalador de
+nfsmw-nx en el SHA-256 de su `default.xex` y en el tamaño de `NFS/ZZDATA0.BIN`; las
+funciones que toca la app (914 direcciones calculadas, con las de los menús con el dedo y
+las del contexto de los controles táctiles) son las mismas, y sus shaders especiales, los de
+la PAL. Las PAL alemana e italiana son la misma compilación que la española: su tabla sale
+idéntica (56.805 de 56.805 direcciones seguras), pero van en su propio `app_<edición>`,
+porque su `default.xex` cambia cinco instrucciones, las que cargan el idioma (`li r3,…`),
+y el código traducido las lleva dentro: son justo cinco líneas en cinco ficheros del
+código generado. La inglesa es otra compilación y se traduce como la USA (56.796 seguras).
+La francesa, la polaca, la coreana y la asiática siguen sin ISO. La traducción rusa usa el mismo XEX que la PAL inglesa:
+se reconoce como ella, y no caben las dos a la vez en el árbol.
+
+### Las tres en un APK
+
+Con las ediciones preparadas (la PAL primero):
+
+```
+python tools/android/apk_ediciones.py              (todas las preparadas)
+python tools/android/apk_ediciones.py --ediciones usa
+```
+
+Sale `out/apk/nfsmw-ediciones-<versión>-release.apk` (la `versionName` de la app), que juega la ISO de cualquiera de
+ellas. Entran todas las preparadas, no solo la USA y la japonesa: cada una añade unos
+16 MB al APK (40 MB instalada). Lo que cambia entre ediciones es solo el código traducido, `libmain.so`: las apps
+de cada una (`app`, `app_usa`, `app_jpn`) solo difieren en direcciones y comentarios,
+y nada de la edición llega al SDK (el PGO, que sí iría por edición, está apagado en
+Android). Así que el APK lleva una vez el SDK (`librexruntime.so`), SDL, libc++ y los
+hooks de Turnip, y una `libmain` por edición, como el fork Evolved:
+
+| | |
+|---|---|
+| `lib/arm64-v8a/libmain.so` | la principal, la PAL: la que compila CMake |
+| `lib/arm64-v8a/libmain_usa.so`, `libmain_jpn.so` | las demás, ya compiladas |
+| `assets/nativo/nfsmw_shaders.nfsp` | la biblioteca de shaders de la PAL |
+| `assets/nativo/usa/…`, `assets/nativo/jpn/…` | las de las demás: cada edición tiene la suya |
+
+El script compila la parte nativa de cada edición en su carpeta `.cxx` (gradle
+`externalNativeBuildRelease`, la primera vez unos 15 minutos por edición y luego
+incremental) y comprueba que el `librexruntime.so` de cada una exporta exactamente lo
+mismo que el de la PAL. Después deja las demás en `android/app/build/ediciones` y hace
+el APK con `-Pnfsmw.ediciones=<esa carpeta>`. `build.gradle.kts` añade las librerías y
+los shaders, y escribe la tabla de ediciones en `BuildConfig.EDICIONES`.
+
+Al jugar, la app mira el SHA-256 del `default.xex` de la ISO ([`IsoXex`](../android/app/src/main/java/io/github/nfsmwrecomp/IsoXex.java))
+y [`Ediciones`](../android/app/src/main/java/io/github/nfsmwrecomp/Ediciones.java) dice
+qué `libmain` carga `GameActivity`, qué biblioteca de shaders instala `MotorNativo` (se
+reinstala al cambiar de edición) y qué idioma y país le pasa al juego. Si la ISO es de
+una edición que el APK no lleva, se avisa como antes y se juega con la principal. Las
+partidas guardadas son las mismas para todas, como al instalar el APK de una edición
+encima del de otra.
+
+Cuesta espacio: el APK pasa de unos 33 MB a unos 67 MB, e instalado ocupa unos 120 MB de
+librerías en vez de 40.
 
 ## La ISO, sin copiarla
 
@@ -288,6 +368,55 @@ ejecutable". En Android esa es `REX_APP_FOLDER`, que `MotorNativo.java` pone en
   `Ajustes.anguloGiro`) y una zona muerta del 3 %. Como solo mira la componente lateral, vale con el móvil vertical o
   recostado. Ese valor es el eje X del stick izquierdo, que no se ve. En aceleración siguen las
   flechas de carril; en los menús y editando, nada.
+- **Menús con el dedo** (opción de la pantalla de inicio, encendida por defecto). Probado en el
+  RedMagic el 2026-10-11: deslizar, tocar opciones y la posición de los toques van bien; las
+  indicaciones no se reconocían (eran texto con el icono dentro, no imágenes) y el deslizar se
+  sentía al revés. En los menús y en la pausa (contexto `MENUS` o `PAUSA`) `TouchControllerView`
+  quita el mando: deslizar pulsa la cruceta como al pasar páginas, la opción sigue al dedo (el
+  primer paso a 28 dp, luego uno cada 56 dp o el 7 % del ancho; «Deslizar al revés» lo
+  cambia), dos dedos pulsan B y un toque pregunta al juego qué hay debajo
+  (`TouchControllerBridge.menuTocar`, sección 10 de `nativo_android.cpp`):
+  - una **indicación** de abajo («Ⓑ Atrás», «Ⓐ Elegir»…): su botón. En casi todas las pantallas
+    es una imagen de 32×32 con el icono y, a su derecha, un texto. Se reconoce por la
+    textura del icono (`kTexturasIndicacion`, sacadas del móvil: A `02959349`, B `6851AAF5`,
+    Y `54A68051`, RB `79AD657F`, X `03B7F86D` sin confirmar) o por la etiqueta del texto
+    (`kEtiquetasIndicacion`: «Atrás» `61D596D7`, «Aceptar» `159D2F37`/`2B65A216`…), y su zona
+    llega hasta el icono de la siguiente de su fila. Un icono de ese tamaño en la barra de
+    abajo con otra textura es una indicación de un botón desconocido: tocarlo no hace nada.
+    El texto de cada objeto se lee de su etiqueta (`+0x60`), buscada como la busca el juego
+    (`sub_822BCE60`: una tabla de pares {hash, texto en bytes} ordenada por hash), o el suyo
+    (`+0x64`, UTF-16) si tiene la bandera 2 (`FEngSetLanguageHash`, `sub_822824E0`, la quita).
+    También se reconocen los textos con el icono dentro, `$NOMBRE$` (los pinta
+    `FEngFont::HandleJoyEventTexture` con la textura `NOMBRE`), y las imágenes con la textura
+    1468 (A) o 1666 (B) que pone `FEMenuScreen::FEMenuScreen` (`sub_822D8CE8`), que usa por
+    ejemplo EA Trax;
+  - la **opción resaltada**: A. Otra opción: la cruceta hacia ella, una pulsación cada vez,
+    preguntando el rumbo tras cada una (`menuRumbo`), y A al llegar. Si la resaltada no
+    cambia en dos pulsaciones, se para;
+  - lo demás: A.
+
+  Todo se lee del FEng del juego, sin escribir nada: `cFEng::mInstance` → `FEngine` →
+  paquetes (`+0xE0`, siguiente `+4`), sus objetos (`+0x4C`) y grupos (`+0x64`), con la
+  posición y el tamaño de sus datos (`+0x2C` → `+0x1C`, `+0x38`). Opción es un botón del FEng
+  o un objeto con el guion `HIGHLIGHT` (`0x249DB7B7`), de un paquete que atiende al mando;
+  resaltada, la que tiene puesto ese guion o uno de los que le siguen (`+0x54`, `+0x18`).
+  Los desplazamientos son los de la descompilación de GameCube con los `bool` a 1 byte, y
+  `nativo_android.cpp` los comprueba en 16 funciones del juego antes de fiarse
+  (`g_nfsmw_android_menus`, que `parche_nativo.py` pone en su app para que `crear_arbol.py`
+  las traduzca: las 16 son iguales en la USA y en la japonesa; `ProcessPadsForPackage` y
+  `FEngGetCenter`, no, y por eso se comprueba en `FEngGetCurrentButton` y `FEngSetTopLeft`). El menú es de 640×480 con el
+  centro en (0, 0) y en el 16:9 ocupa el 4:3 del centro (el icono redondo de «Ⓑ Atrás» sale
+  redondo en una captura sin estirar). Cada toque deja en `files/logs/menus.txt` lo leído:
+  paquetes, indicaciones, opciones con su caja y cuál está resaltada, los textos con su
+  etiqueta y lo que dicen, los iconos de texto que no se sabe qué botón son e imágenes
+  pequeñas con otras texturas. El botón OCULTAR/TÁCTIL dice ahí MANDO, que saca el
+  mando en los menús (DEDO lo quita; se guarda). Con el motor de Xenos no hay contexto y
+  los menús van con el mando, como siempre.
+
+  Lo que se sabe del ratón del FEng, por si sirve: el 360 conserva `FEngine::UpdateMouseState`
+  (`sub_822FE1F8`) y su llamada en `FEngine::Update` (`sub_822FD0D0`, si `FEngine+1`), pero
+  `cFEngGameInterface::GetMouseInfo` (vtable `0x82079838`, `+0x44`) está vacío y los menús de
+  listas no hacen nada con `FEMSG_MOUSE_CHANGED`: no vale de puntero.
 - **Editar el mando en la partida.** Un engranaje junto a OCULTAR/TÁCTIL abre el editor de
   la pantalla de inicio sobre el juego. El juego se para con la misma pausa que al
   minimizar (`TouchControllerBridge.pausarJuego`): la pausa guarda sus motivos (segundo

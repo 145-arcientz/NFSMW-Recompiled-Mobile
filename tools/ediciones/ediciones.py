@@ -146,7 +146,9 @@ def cargar_tabla(edicion):
     """{(direccion, uso): (destino o None, estado, huella)}"""
     ruta = ruta_tabla(edicion)
     if not ruta.is_file():
-        fallar("No hay tabla de direcciones para la edicion '%s' (%s)." % (edicion, ruta))
+        fallar("No hay tabla de direcciones para la edicion '%s' (%s).\n"
+               "        Con el motor nativo se traduce sola: python tools/android/preparar_nativo.py "
+               "--iso <su ISO>" % (edicion, ruta))
     tabla = {}
     for linea in ruta.read_text(encoding="utf-8").splitlines()[1:]:
         ref, uso, _seccion, otra, estado, huella = linea.split("\t")

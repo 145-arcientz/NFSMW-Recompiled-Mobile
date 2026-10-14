@@ -104,6 +104,7 @@ public class SetupActivity extends AppCompatActivity {
             return;
         }
         String driver = in.getStringExtra("nfsmw.driver");
+        Ediciones.Edicion edicion = edicionAlJugar();
         List<String> args = ajustes.argumentos(this, false, driver != null ? driver : ajustes.driver());
         String[] extra = in.getStringArrayExtra("nfsmw.args");
         if (extra != null) {
@@ -121,6 +122,7 @@ public class SetupActivity extends AppCompatActivity {
         Intent i = new Intent(this, GameActivity.class);
         i.putExtra(GameActivity.EXTRA_ARGUMENTOS, args.toArray(new String[0]));
         i.putExtra(GameActivity.EXTRA_ISO, ajustes.iso());
+        i.putExtra(GameActivity.EXTRA_EDICION, edicion.id);
         i.putExtra(GameActivity.EXTRA_RESOLUCION, resolucion);
         i.putExtra(GameActivity.EXTRA_ESTIRAR, ajustes.estirar());
         i.putExtra(GameActivity.EXTRA_MOSTRAR_FPS, true);
@@ -276,6 +278,8 @@ public class SetupActivity extends AppCompatActivity {
             espacio(8),
             editarTactil,
             soloNativo(filaVibracion),
+            soloNativo(interruptor(R.string.menus_tactiles, R.string.menus_tactiles_resumen,
+                    ajustes.menusTactiles(), ajustes::menusTactiles)),
             interruptor(R.string.girar_inclinando, R.string.girar_inclinando_resumen,
                     ajustes.girarInclinando(), ajustes::girarInclinando),
             deslizador(R.string.sensibilidad_giro, R.string.sensibilidad_giro_resumen,
@@ -893,24 +897,32 @@ public class SetupActivity extends AppCompatActivity {
     private void refrescar() {
         String nombre = ajustes.nombreIso();
         textoIso.setText(ajustes.iso() == null
-                ? getString(R.string.sin_iso, BuildConfig.EDICION)
+                ? getString(R.string.sin_iso, Ediciones.nombres())
                 : getString(R.string.iso_elegida, nombre != null ? nombre : ajustes.iso()));
-        // El APK lleva el codigo de una sola edicion del juego: se dice cual y,
-        // si el default.xex de la ISO elegida es otro o a la ISO le falta el
-        // final, se avisa. No se impide jugar: lo que no se ha podido leer no
-        // demuestra nada.
+        // El APK lleva el codigo de una edicion del juego (o de varias, ver
+        // Ediciones): se dice cual y, si el default.xex de la ISO elegida es
+        // de otra o a la ISO le falta el final, se avisa. No se impide jugar:
+        // lo que no se ha podido leer no demuestra nada.
         String xex = ajustes.xexIso();
         boolean mirada = ajustes.iso() != null && xex != null;
         boolean incompleta = mirada && ajustes.isoFaltan() > 0;
-        boolean otraEdicion = mirada && !xex.isEmpty()
-                && !BuildConfig.EDICION_XEX.isEmpty() && !xex.equals(BuildConfig.EDICION_XEX);
+        boolean otraEdicion = mirada && Ediciones.ajena(xex);
         if (incompleta) {
             textoEdicion.setText(getString(R.string.iso_incompleta,
                     Formatter.formatShortFileSize(this, ajustes.isoFaltan())));
         } else {
-            String texto = getString(
-                    otraEdicion ? R.string.iso_otra_edicion : R.string.edicion_apk,
-                    BuildConfig.EDICION);
+            String texto;
+            Ediciones.Edicion deLaIso = Ediciones.deXex(xex);
+            if (otraEdicion) {
+                texto = getString(Ediciones.varias() ? R.string.iso_edicion_no_incluida
+                        : R.string.iso_otra_edicion, Ediciones.nombres());
+            } else if (!Ediciones.varias()) {
+                texto = getString(R.string.edicion_apk, Ediciones.principal().nombre);
+            } else if (mirada && deLaIso != null) {
+                texto = getString(R.string.edicion_iso, deLaIso.nombre, Ediciones.nombres());
+            } else {
+                texto = getString(R.string.ediciones_apk, Ediciones.nombres());
+            }
             if (MotorNativo.ACTIVO && !otraEdicion) {
                 texto += " " + getString(R.string.motor_nativo);
             }
@@ -993,9 +1005,12 @@ public class SetupActivity extends AppCompatActivity {
         if (sonda) {
             Ajustes.informeSonda(this).delete();
         }
+        // La sonda no carga el juego: le vale la libmain principal.
+        Ediciones.Edicion edicion = sonda ? Ediciones.principal() : edicionAlJugar();
         Intent i = new Intent(this, GameActivity.class);
         i.putExtra(GameActivity.EXTRA_ARGUMENTOS,
                 ajustes.argumentos(this, sonda).toArray(new String[0]));
+        i.putExtra(GameActivity.EXTRA_EDICION, edicion.id);
         if (!sonda) {
             i.putExtra(GameActivity.EXTRA_ISO, ajustes.iso());
             i.putExtra(GameActivity.EXTRA_RESOLUCION, ajustes.resolucion());
@@ -1036,6 +1051,21 @@ public class SetupActivity extends AppCompatActivity {
             }
         }
         refrescar();
+    }
+
+    /**
+     * La edicion con la que jugar la ISO elegida: decide la libmain, los
+     * shaders, el idioma y el pais (Ediciones). Con varias en el APK, si al
+     * pulsar Jugar aun no se habia mirado la ISO (mirarIso va en otro hilo), se
+     * mira ahora: son unos megas.
+     */
+    private Ediciones.Edicion edicionAlJugar() {
+        String iso = ajustes.iso();
+        if (Ediciones.varias() && iso != null && ajustes.xexIso() == null) {
+            IsoXex.Info info = IsoXex.mirar(getApplicationContext(), Uri.parse(iso));
+            ajustes.isoMirada(info != null ? info.xex : "", info != null ? info.faltan : 0);
+        }
+        return ajustes.edicion();
     }
 
     /**

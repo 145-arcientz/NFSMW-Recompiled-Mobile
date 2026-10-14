@@ -32,6 +32,14 @@ android/.kotlin/
 android/app/.cxx/
 android/local.properties
 
+# --- Motor nativo (nativo/) --------------------------------------------------
+# Lo sacado del juego ya lo deja fuera su propio nativo/.gitignore (assets/,
+# el codigo generado, app_<edicion>/, out/). Sus librerias de terceros (FFmpeg,
+# SDL...) las copia o las baja preparar_nativo.py: solo se versionan los pocos
+# ficheros suyos que ya venian en el arbol.
+nativo/sdk/thirdparty/*
+!nativo/sdk/thirdparty/CMakeLists.txt
+
 # --- Compilacion -------------------------------------------------------------
 out/
 build/

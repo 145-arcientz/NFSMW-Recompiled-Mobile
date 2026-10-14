@@ -18,9 +18,10 @@ import java.security.NoSuchAlgorithmException;
  * del juego es y si esta entera.
  *
  * La edicion. Cada una (PAL Espana, USA...) lleva un default.xex distinto, y
- * el APK lleva dentro el codigo traducido de UNO solo. Con la ISO de otra
- * edicion el juego no arranca, sin mas explicacion que una pantalla en negro.
- * El SHA-256 del default.xex dice cual es.
+ * el APK lleva dentro el codigo traducido de una (o de varias: Ediciones). Con
+ * la ISO de otra edicion el juego no arranca, sin mas explicacion que una
+ * pantalla en negro. El SHA-256 del default.xex dice cual es, y con varias en
+ * el APK, cual cargar.
  *
  * Si esta entera. Una descarga o una extraccion cortada deja una ISO que
  * empieza bien -el ejecutable esta al principio- y a la que le falta el final:

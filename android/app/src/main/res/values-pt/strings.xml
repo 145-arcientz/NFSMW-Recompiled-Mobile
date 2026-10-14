@@ -78,6 +78,9 @@
     <string name="escalado_cas">AMD CAS · só nitidez</string>
     <string name="iso_incompleta">Esta ISO está incompleta: faltam %1$s de dados do jogo no fim do arquivo, como após um download ou uma extração interrompida. O jogo não carrega com ela.</string>
     <string name="iso_otra_edicion">Esta ISO é de outra edição do jogo. Este APK foi compilado para a edição %1$s e não inicia com outra: escolha a ISO %1$s ou compile o APK com esta ISO.</string>
+    <string name="ediciones_apk">Este APK inclui as edições %1$s do jogo.</string>
+    <string name="edicion_iso">ISO da edição %1$s. Este APK inclui %2$s.</string>
+    <string name="iso_edicion_no_incluida">Esta ISO é de uma edição do jogo que este APK não inclui (inclui %1$s): com ela o jogo não inicia.</string>
     <string name="iso_elegida">ISO: %1$s</string>
     <string name="elegir_iso">Escolher ISO…</string>
     <string name="iso_sin_permiso">O Android não deu permissão permanente para essa ISO. Escolha-a no armazenamento do celular.</string>
@@ -163,6 +166,8 @@
     <!-- Controle de toque -->
     <string name="tactil_ocultar">OCULTAR</string>
     <string name="tactil_mostrar">TOQUE</string>
+    <string name="tactil_mando">CONTROLE</string>
+    <string name="tactil_gestos">DEDO</string>
     <string name="seccion_perfil">Perfil do Xbox 360</string>
     <string name="gamertag_resumen">O nome que o jogo vê no seu perfil. Se você mudar, seus jogos salvos são mantidos: eles vão pelo ID do perfil, não pelo nome.</string>
     <string name="gamertag_error">Até 15 letras, números e espaços, começando com uma letra.</string>
@@ -178,6 +183,10 @@
     <string name="vibracion_sin_mandos">Nenhum controle conectado: o celular vibra.</string>
     <string name="girar_inclinando">Virar inclinando o celular</string>
     <string name="girar_inclinando_resumen">Nas corridas e dirigindo livre, incline o celular como um volante em vez de usar o analógico esquerdo, que fica oculto. Nas de arrancada continuam as setas de faixa.</string>
+    <string name="menus_tactiles">Menus com o dedo</string>
+    <string name="menus_tactiles_resumen">Nos menus e na pausa não há controle: deslize para se mover (numa lista de opções, para os lados muda o valor), toque numa opção para escolhê-la, toque nas setas para mudar o valor e toque nas indicações de baixo, como “Ⓐ Aceitar” ou “Ⓑ Voltar”, para apertá-las. Dois dedos, voltar. O botão CONTROLE de cima traz o controle de volta.</string>
+    <string name="deslizar_invertido">Deslizar ao contrário nos menus</string>
+    <string name="deslizar_invertido_resumen">Desligado: como ao virar páginas, deslizar para a esquerda vai para a opção da direita. Ligado: deslizar para a direita vai para a da direita.</string>
     <string name="sensibilidad_giro">Sensibilidade do volante</string>
     <string name="sensibilidad_giro_resumen">Mais à direita, menos é preciso inclinar o celular para virar tudo.</string>
     <string name="sensibilidad_valor">%1$d · vira tudo a %2$d°</string>

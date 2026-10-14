@@ -7,8 +7,12 @@ Motor nativo: lo que nuestra app de Android necesita del SDK de nfsmw-android.
     python tools/android/parche_nativo.py --revertir
     python tools/android/parche_nativo.py --arbol D:\\otra\\ruta\\nfsmw-android
 
-Toca tres ficheros del SDK del motor nativo (..\\nfsmw-android\\sdk) y tres de su
-app (..\\nfsmw-android\\app):
+Desde que el motor nativo esta en el repositorio (nativo/), sus bloques ya vienen
+aplicados ahi: este script dice que ya estaban, y sigue sirviendo para otro arbol
+de nfsmw-android (--arbol) o para ver que bloque toca cada cosa.
+
+Toca tres ficheros del SDK del motor nativo (nativo\\sdk) y tres de su app
+(nativo\\app):
 
     sdk/include/rex/filesystem.h            SetAndroidContentOpener
     sdk/src/core/filesystem_posix.cpp       OpenAndroidContentFileDescriptor
@@ -16,7 +20,7 @@ app (..\\nfsmw-android\\app):
     app/src/nfsmw_app.h                     la salida de audio de la app (AAudio)
     app/src/nfsmw_nativo_sistema.cpp        parar el anillo en segundo plano
     app/src/nfsmw_ajustes_graficos.cpp      fps sin limite
-    app/src/nfsmw_recortes_carrera.cpp      las direcciones del contexto del juego
+    app/src/nfsmw_recortes_carrera.cpp      las direcciones del contexto del juego y de sus menus
     sdk/src/input/sdl/sdl_input_driver.cpp  la vibracion del mando tactil
 
 Los demas que necesita ese SDK son los mismos que el nuestro y se aplican tal
@@ -190,6 +194,21 @@ posicion de hace 1/30 s y 2/30 s, interpoladas de un historial propio por
 coche, y la original pone la de ahora en el tercero: el mismo largo a 30, 60,
 90, 120 fps o sin limite, y pegada al coche. nfsmw_estelas_nitro_30 = false lo
 quita.
+
+
+13. LOS MENUS CON EL DEDO
+=========================
+
+En los menus, los controles tactiles se quitan: deslizar mueve por el menu y un
+toque va a lo que hay debajo, una indicacion ("(B) Atras") o una opcion.
+nativo_android.cpp (seccion 10) lo lee del motor de menus del juego (FEng): sus
+paquetes, sus objetos, el guion de resaltado de cada opcion y las texturas de
+los iconos de A y B, y los textos del idioma (las indicaciones llevan su icono
+dentro: "$NOMBRE$ Atras"). Como en el 6, las funciones de las que salen los
+desplazamientos van en su app, en otro array (g_nfsmw_android_menus), para que
+crear_arbol.py las lleve a la USA y a la japonesa; las direcciones de datos
+(cFEng::mInstance, la lista de fuentes) las saca la app del codigo de esas
+funciones.
 """
 
 import argparse
@@ -380,6 +399,29 @@ namespace nfsmw::recortes_carrera {
 namespace {
 
 constexpr uint32_t kBaseVistas = 0x82A38070;
+'''
+
+MENUS_ANCLA = '''}  // namespace nfsmw::reflejo_demanda
+'''
+
+MENUS_NUEVO = '''}  // namespace nfsmw::reflejo_demanda
+
+// PARCHE LOCAL (NFSMW Recompiled): las funciones del motor de menus (FEng) que lee la app de
+// Android (nativo_android.cpp, seccion 10) para saber que hay debajo de un toque en un menu. Como
+// g_nfsmw_android_contexto, aqui para que crear_arbol.py las traduzca a la edicion del juego y su
+// comprobacion las compare en las dos. La app comprueba sus instrucciones antes de fiarse.
+//   [0]  FEngFindImage: cFEng::mInstance          [7]  FEngSetTopLeft: posicion, tamano, textos
+//   [1]  cFEng::QueuePackageMessage: mFEng         [8]  FEngSetScript: los guiones
+//   [2]  FEngine::Update: la lista de paquetes     [9]  FEObject::SetCurrentScript
+//   [3]  FEngine::ProcessMouseForPackage           [10] FEPackage: el guion que sigue a otro
+//   [4]  FEngGetCurrentButton                      [11] FEMenuScreen::FEMenuScreen: iconos de A y B
+//   [5]  FEPackage::ForAllObjects                  [12] FindFont
+//   [6]  FEPackage: los objetos de un grupo        [13] FEngFont::GetTextHeight
+//   [14] el texto de una etiqueta en el idioma     [15] FEngSetLanguageHash: la etiqueta de un texto
+extern "C" const uint32_t g_nfsmw_android_menus[16] = {0x8227FD70, 0x82284E88, 0x822FD0D0, 0x822FE558,
+                                                       0x82282BC0, 0x82302510, 0x82302480, 0x82280910,
+                                                       0x8227FF78, 0x82301B70, 0x82302A40, 0x822D8CE8,
+                                                       0x822D7720, 0x822D8AB0, 0x822BCE60, 0x822824E0};
 '''
 
 VIBRAR_DECL_ANCLA = '''
@@ -1098,6 +1140,7 @@ BLOQUES = [
      SOMBRAS_AREA_ANCLA, SOMBRAS_AREA_NUEVO),
     ("app/src/nfsmw_recortes_carrera.cpp", "estelas del nitro del largo de la Xbox 360", ESTELAS_ANCLA,
      ESTELAS_NUEVO),
+    ("app/src/nfsmw_recortes_carrera.cpp", "funciones de los menus con el dedo", MENUS_ANCLA, MENUS_NUEVO),
 ]
 
 
@@ -1121,7 +1164,7 @@ def escribir(f, txt, eol):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--arbol", default=str(RAIZ.parent / "nfsmw-android"),
+    p.add_argument("--arbol", default=str(RAIZ / "nativo"),
                    help="el arbol del motor nativo (con sdk/ y app/)")
     p.add_argument("--estado", action="store_true")
     p.add_argument("--revertir", action="store_true")

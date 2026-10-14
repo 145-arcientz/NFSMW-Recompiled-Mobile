@@ -27,9 +27,8 @@ nfsmw-android, con el mismo `emparejar.py` y las herramientas de nfsmw-nx: ver
 |---|---|---|
 | PAL España (`pal_es`) | referencia | todas las direcciones de los fuentes son suyas |
 | USA (`usa`) | compila; ver "Qué se ha comprobado" | otra compilación: `.text` y `.rdata` se mueven, `.data` no |
-| PAL Alemania, Italia | sin probar: no se ha tenido el XEX | según nfsmw-nx, la **misma** compilación que la española con otro idioma; se reconocen por el PDB y se comprueban contra la tabla española |
-| PAL Francia | sin probar | probablemente como las dos anteriores; se trata igual |
-| PAL inglesa, Japón | sin soporte | otras compilaciones; hace falta su tabla |
+| PAL Alemania, Italia, Francia (`pal_de`, `pal_it`, `pal_fr`) | sin probar: no se ha tenido el XEX | según nfsmw-nx, la **misma** compilación que la española con otro idioma (cinco instrucciones). Se reconocen por el SHA-256 que da su instalador o, si es otro XEX, por el PDB, y se comprueban contra la tabla española |
+| PAL Reino Unido (`pal_en`), PAL Polonia de fans (`pal_pl`), Japón (`jpn`), Corea (`kor`), Asia en chino tradicional (`cht`) | se reconocen (SHA-256 de nfsmw-nx) pero, con este motor, sin soporte | otras compilaciones (la polaca es la inglesa con un salto cambiado); hace falta su tabla. Con el motor nativo se traducen solas: ver [motor-nativo.md](motor-nativo.md#otras-ediciones-usa-y-japón) |
 
 Solo en Android. El build de Windows (`CONSTRUIR.bat`) sigue siendo para PAL España.
 
@@ -79,6 +78,10 @@ cd android && gradlew assembleRelease -Pnfsmw.generado=<repo>/app/generated-andr
 
 Cada carpeta lleva su propia compilación nativa (la primera vez compila el SDK entero otra
 vez). Los dos APK tienen el mismo identificador: instalar uno sustituye al otro.
+
+Con el motor nativo, un solo APK puede llevar todas: `python tools/android/apk_ediciones.py`
+(ver [motor-nativo.md](motor-nativo.md#las-tres-en-un-apk)). Elige la edición al jugar,
+por el `default.xex` de la ISO.
 
 ## Cómo se reconoce una edición
 
