@@ -48,6 +48,18 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
   antes 16 de sus funciones (iguales en PAL, USA y japonesa). El botón de
   arriba dice MANDO para volver al mando en los menús. Opciones en Controles táctiles:
   apagarlo y deslizar al revés. Cada toque deja en `files/logs/menus.txt` lo que se leyó.
+- Ajustes de partida para GPU debiles (Adreno 5xx y hasta la 620, Mali hasta la G68, PowerVR; p. ej.
+  Snapdragon 650, 660, 695): la primera vez que se abre la app, y solo en lo que el usuario no haya
+  elegido nunca, se ponen 1024x576, 30 fps, sin suavizado, bufer de pantalla a 720p, anisotropico 2x,
+  sombras cada 2 fotogramas y de cerca, un solo reflejo del coche y sin reflejo del asfalto. Despues
+  manda lo que se cambie en la pantalla de inicio. Sin medir en un movil: `Gpu.debil`,
+  `Ajustes.aplicarPerfilGpuDebil`.
+- `thread_affinity=auto` con pocos nucleos grandes (2+4 del 650 y 2+6 del 695): solo se fijan el
+  hilo del anillo y el principal; ya no se manda todo lo demas a los nucleos pequenos, que dejaba
+  el audio y el driver en nucleos de menos de la mitad de capacidad. Si el kernel no da
+  `cpu_capacity` (kernels antiguos), se usa la frecuencia maxima. Sin medir en un movil.
+  Junto con el reparto para un solo prime (en Cambiado): con un solo prime y el resto
+  pequenos, el hilo de la GPU comparte el prime en vez de bajar a un nucleo pequeno.
 - Calidad de las sombras en Gráficos (motor nativo, 0.4.1): Rápida (como venía: un solo muestreo
   del mapa de sombras y sin la sombra de la vegetación), Bordes suaves (el patrón 3x3 de la
   Xbox 360, que difumina el contorno; cuesta GPU) y Como la Xbox 360 (además, árboles,

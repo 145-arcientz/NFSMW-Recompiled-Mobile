@@ -25,7 +25,10 @@
 //             Elite: cpu6-7 (4,32 GHz) frente a cpu0-5 (3,53 GHz). Con UN solo
 //             prime (8 Gen 2 y 3, 865, 7 Gen x...) los dos se lo quitarian uno a
 //             otro: "Main XThread" se lo queda y el de la GPU baja al escalon
-//             siguiente (en el 865: cpu7 frente a cpu4-6).
+//             siguiente (en el 865: cpu7 frente a cpu4-6). Con pocos grandes
+//             (2 o menos) y el resto pequenos (menos del 60 %), como en el
+//             695, el 660 o el 650, solo se fijan esos hilos: lo demas queda
+//             libre en vez de ir a los pequenos.
 //   reglas    "GPU Commands=6-7;Main XThread=6+7;*=0-5". Casan por el PRINCIPIO
 //             del nombre (el kernel lo corta a 15 caracteres: "GPU Commands
 //             (F"), gana la primera que case, y "*" es el resto.
@@ -196,13 +199,19 @@ Regla ReglaDe(const char* nombre, const cpu_set_t& nucleos) {
 
 // Los prime son los de mas capacidad. Si todos valen lo mismo no hay nada que
 // repartir y no se toca nada.
+//
+// Con pocos nucleos grandes y muchos pequenos (2+6 del Snapdragon 695, 2+4 del
+// 650 y el 660), mandar TODO lo demas a los pequenos es peor que no tocar: el
+// audio, la compilacion de shaders y los hilos del driver quedarian en nucleos
+// que rinden menos de la mitad. Ahi solo se fijan los hilos criticos.
 std::vector<Regla> ReglasAuto() {
   const long configurados = sysconf(_SC_NPROCESSORS_CONF);
   const int nucleos =
       configurados > 0 ? std::min(static_cast<int>(configurados), kMaxNucleos) : kMaxNucleos;
   long valor[kMaxNucleos];
-  // cpu_capacity es la escala del planificador. Hay kernels sin ella y otros que
-  // dan 1024 a todos: entonces, la frecuencia maxima de cada nucleo.
+  // cpu_capacity es la escala del planificador. Hay kernels sin ella (los 3.18 y
+  // 4.4 del Snapdragon 650 o el 660) y otros que dan 1024 a todos: entonces, la
+  // frecuencia maxima de cada nucleo.
   const char* fuente = "cpu_capacity";
   if (!LeerPorNucleo(fuente, nucleos, valor)) {
     fuente = "cpufreq/cpuinfo_max_freq";
@@ -247,12 +256,17 @@ std::vector<Regla> ReglasAuto() {
     }
   }
   REXLOG_INFO("[afinidad] auto: segun {}: {}", fuente, valores);
+  const int numPrime = CPU_COUNT(&prime);
+  // Los demas, "pequenos": el mejor no llega al 60 % de un prime.
+  const bool pocosGrandes = numPrime <= 2 && segundo * 10 < primero * 6;
 
   std::vector<Regla> reglas;
   // "GPU Commands" es el procesador de comandos del motor de Xenos; "GPU anillo"
   // ("GPU anillo nativo", cortado a 15 caracteres), el hilo del anillo del
   // motor nativo, que hace su mismo papel.
-  if (CPU_COUNT(&prime) >= 2) {
+  if (numPrime >= 2 || pocosGrandes) {
+    // Con un solo prime y el resto pequenos, el de la GPU tambien va al prime:
+    // compartirlo es mejor que irse a un nucleo de menos de la mitad.
     for (const char* nombre : {"GPU Commands", "GPU anillo", "Main XThread"}) {
       reglas.push_back(ReglaDe(nombre, prime));
     }
@@ -264,6 +278,12 @@ std::vector<Regla> ReglasAuto() {
     reglas.push_back(ReglaDe("GPU Commands", medios));
     reglas.push_back(ReglaDe("GPU anillo", medios));
     reglas.push_back(ReglaDe("Main XThread", prime));
+  }
+  if (pocosGrandes) {
+    REXLOG_INFO("[afinidad] auto: {} nucleos grandes y el resto pequenos; solo se fijan "
+                "los hilos del anillo y principal",
+                numPrime);
+    return reglas;
   }
   Regla comodin;
   comodin.nucleos = resto;
