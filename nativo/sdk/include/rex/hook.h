@@ -24,6 +24,15 @@
 #include <rex/system/thread_state.h>
 #include <rex/types.h>
 
+// PARCHE LOCAL (red): rastro de las llamadas del juego al sistema (cvar
+// rastro_sistema, apagado por defecto). Esta definido en xam_net.cpp. Sirve para
+// ver en que espera el juego cuando no lo dice ningun log, como en "Conectando a
+// los servidores de EA".
+namespace rex {
+bool& RastroSistemaActivo();
+void RastroSistema(const char* nombre, uint32_t r3, uint32_t r4, uint32_t r5);
+}  // namespace rex
+
 //=============================================================================
 // Hook Macros
 //=============================================================================
@@ -69,8 +78,13 @@
   }
 
 // Export: hook + register in global registry for kernel ordinal lookup.
-#define REX_EXPORT(name, function) \
-  REX_HOOK(name, function)         \
+#define REX_EXPORT(name, function)                                                  \
+  extern "C" REX_FUNC(name) {                                                       \
+    if (rex::RastroSistemaActivo()) {                                               \
+      rex::RastroSistema(#name, ctx.r3.u32, ctx.r4.u32, ctx.r5.u32);                \
+    }                                                                               \
+    rex::ppc::HostToGuestFunction<function>(ctx, base);                             \
+  }                                                                                 \
   static rex::ppc::detail::PPCFuncRegistrar _ppc_reg_##name(#name, &name);
 
 #define REX_EXPORT_STUB(name) \

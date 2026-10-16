@@ -464,6 +464,12 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Arreglado
 
+- Pantalla dividida (motor nativo): las sombras del jugador 2, la mitad de abajo, salían
+  congeladas. El juego dibuja un mapa de sombras por jugador (vistas 13 y 14, de las vistas 1 y
+  2), y `nfsmw_sombras_mapas = 1` le hacía dibujar solo el primero. Ahora ese recorte solo vale
+  con un jugador, mientras la vista 2 está apagada (`nfsmw_recorte_sombras.cpp`). Comprobado en
+  el móvil con la PAL España. Y `preparar_nativo.py --juego` con una ruta relativa ya no falla al
+  generar la biblioteca de shaders.
 - Las estelas de luz de los pilotos con el nitro salían la mitad de largas que en la Xbox 360
   a 60 fps: el juego las dibuja entre las 3 últimas posiciones del coche, una por fotograma, y
   la consola va a 30. `parche_nativo.py` (sección 12) le da las posiciones de hace 1/30 s y

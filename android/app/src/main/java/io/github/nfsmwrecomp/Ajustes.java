@@ -110,6 +110,28 @@ final class Ajustes {
     void gamertag(String v) { p.edit().putString("gamertag", v).apply(); }
 
     /**
+     * IP del PC con el servidor de EA de la LAN (tools/red/servidor_ea.py). Vacia,
+     * el juego va como siempre; con una IP, Xbox Live del juego va a ese servidor:
+     * ver MotorNativo.argumentos y docs/diario/red-y-privilegios.md.
+     */
+    String servidorLan() { return p.getString("servidor_lan", ""); }
+    void servidorLan(String v) { p.edit().putString("servidor_lan", v).apply(); }
+
+    static boolean ipValida(String ip) {
+        String[] partes = ip.split("\\.", -1);
+        if (partes.length != 4) {
+            return false;
+        }
+        for (String parte : partes) {
+            if (parte.isEmpty() || parte.length() > 3 || !parte.matches("[0-9]+")
+                    || Integer.parseInt(parte) > 255) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Lo que acepta Xbox 360: hasta 15 letras, numeros y espacios, empezando
      * por letra. Vacio tambien vale (el de fabrica).
      */

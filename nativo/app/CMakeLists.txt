@@ -39,6 +39,9 @@ set(NFSMW_SOURCES
     # Recursive filter of the sound engine (sub_825CD088) in native code, bit-identical
     # (cvar nfsmw_audio_filtro_nativo).
     src/nfsmw_audio_filtro.cpp
+    # Probe of EA's network connection (NetConnStatus) for LAN play; it only measures (cvar
+    # nfsmw_red_sonda). See docs/diario/red-y-privilegios.md.
+    src/nfsmw_red_sonda.cpp
     # Gain-scaled sum of the sound engine (sub_825FDFB0) in native code, bit-identical
     # (cvar nfsmw_audio_suma_nativa).
     src/nfsmw_audio_suma.cpp

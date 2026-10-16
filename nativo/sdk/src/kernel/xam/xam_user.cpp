@@ -30,6 +30,27 @@
 
 REXCVAR_DEFINE_UINT32(user_language, 1, "Kernel", "User's language ID");
 
+// PARCHE LOCAL - privilegios de Xbox Live, el mismo que tools/parche_privilegios.py
+// pone en el SDK de Xenos. Apagado por defecto: encendido cambia lo que el juego
+// cree poder hacer. Ver docs/diario/red-y-privilegios.md.
+REXCVAR_DEFINE_BOOL(grant_user_privileges, false, "Kernel",
+                    "Tell the game it has every Xbox Live privilege. Off by default, which "
+                    "makes the game refuse to open its multiplayer menus. Turning it on only "
+                    "opens the door: system link also needs the XNet layer, which is only "
+                    "half implemented here.")
+    .lifecycle(rex::cvar::Lifecycle::kHotReload);
+
+// PARCHE LOCAL (red): el perfil siempre dice signin_state 1, "sesion local".
+// Most Wanted, al entrar en Xbox Live, llama a XamShowSigninUI y espera a que el
+// jugador este conectado a Live (estado 2); con 1 se queda en "Conectando a los
+// servidores de EA" sin tocar la red. Con esto el jugador 0 esta en Live.
+REXCVAR_DEFINE_BOOL(red_live, false, "Kernel",
+                    "Report player 0 as signed in to Xbox Live (signin state 2)");
+
+static uint32_t EstadoSesion(uint32_t estado) {
+  return (REXCVAR_GET(red_live) && estado == 1) ? 2 : estado;
+}
+
 namespace rex {
 namespace kernel {
 namespace xam {
@@ -70,7 +91,7 @@ u32 XamUserGetSigninState_entry(u32 user_index) {
   if (user_index < 4) {
     if (user_index == 0) {
       const auto& user_profile = REX_KERNEL_STATE()->user_profile();
-      signin_state = user_profile->signin_state();
+      signin_state = EstadoSesion(user_profile->signin_state());
     }
   }
   return signin_state;
@@ -98,7 +119,7 @@ i32 XamUserGetSigninInfo_entry(u32 user_index, u32 flags, ppc_ptr_t<X_USER_SIGNI
 
   const auto& user_profile = REX_KERNEL_STATE()->user_profile();
   info->xuid = user_profile->xuid();
-  info->signin_state = user_profile->signin_state();
+  info->signin_state = EstadoSesion(user_profile->signin_state());
   rex::string::copy_truncating(info->name, user_profile->name(), rex::countof(info->name));
   return X_E_SUCCESS;
 }
@@ -382,8 +403,10 @@ u32 XamUserCheckPrivilege_entry(u32 user_index, u32 mask, mapped_u32 out_value) 
     }
   }
 
-  // If we deny everything, games should hopefully not try to do stuff.
-  *out_value = 0;
+  // De Xenia: lo deniega todo, y en Most Wanted eso es el cartel "Los privilegios
+  // que tienes en Xbox Live no te permiten acceder a esta funcion" al tocar el
+  // multijugador. grant_user_privileges abre esa puerta y nada mas.
+  *out_value = REXCVAR_GET(grant_user_privileges) ? 1 : 0;
   return X_ERROR_SUCCESS;
 }
 

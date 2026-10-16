@@ -246,7 +246,9 @@ def game_root(arbol, ficha):
 def juego(arbol, iso, carpeta):
     """Devuelve (carpeta del juego extraido, ficha de su edicion)."""
     if carpeta:
-        carpeta = pathlib.Path(carpeta)
+        # Absoluta: la biblioteca de shaders se genera desde el arbol (cwd=arbol),
+        # y una ruta relativa a este repositorio no valdria alli.
+        carpeta = pathlib.Path(carpeta).resolve()
         if not (carpeta / "default.xex").is_file() or not (carpeta / "NFS").is_dir():
             fallar(f"{carpeta} no parece el juego extraido: faltan default.xex o NFS/.")
         return carpeta, ediciones.detectar(str(carpeta / "default.xex"))

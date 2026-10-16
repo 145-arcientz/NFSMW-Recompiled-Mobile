@@ -1,6 +1,77 @@
 # El multijugador: hasta dónde llega y dónde se para
 
-Estado corto: **no funciona.** La puerta está abierta; detrás falta media capa de red.
+Estado corto (2026-10-15, noche): **dos móviles llegan a la misma sala de juego** con un
+servidor de EA propio en el PC; **la carrera todavía no**: falta la conexión directa
+entre los dos juegos. Lo de abajo de "Muro 1" en adelante es la historia de cómo se
+llegó; el estado y el protocolo están en esta primera sección.
+
+## Estado: servidor de EA propio en la LAN (motor nativo, APK PAL)
+
+### Cómo se prueba
+
+1. En el PC: `python tools/red/servidor_ea.py --ip <IP del PC>` (directorio 30960, salas
+   10901; todo al log `out/red/servidor.log`).
+2. En cada móvil, ajustes de la app → "Servidor LAN (multijugador)": la IP del PC. Con eso
+   el motor nativo arranca con `--grant_user_privileges --red_lan --red_live
+   --red_dns=<IP>` (`MotorNativo.argumentos`). Gamertag distinto en cada uno.
+3. Uno: Xbox Live → Partida rápida → Crear partida. El otro: Xbox Live → Partida rápida.
+
+Diagnóstico: lanzar con el banco y `--red_registro=true` (cada llamada de red al log,
+`[red]`), `--rastro_sistema=true` (llamadas a exportaciones, `[rastro]`) y
+`--nfsmw_red_sonda=true` (gancho de `NetConnStatus` y volcados de cadenas/tablas del
+juego, `[red_sonda]`; solo PAL).
+
+### Los muros que había, en orden, y qué los quita
+
+| Síntoma | Causa | Arreglo |
+|---|---|---|
+| Ningún socket; IP 127.0.0.1 | la app no tenía permiso `INTERNET` | manifiesto |
+| Sockets que nunca dejan de bloquear, `select` ciego, errores 0 | xsocket/xam_net venían de Windows: `FIONBIO`, `setsockopt`, `nfds`, errno→WSA, orden de bytes de `sendto`/`recvfrom`, SIGPIPE | `xam_net.cpp`, `xsocket.cpp` |
+| Se queda en "Conectando a los servidores de EA" sin tocar la red | espera a que el jugador esté en Live tras `XamShowSigninUI` (signin_state siempre 1) | `red_live` (estado 2) |
+| "Has perdido tu conexión a Xbox Live" tras iniciar sesión en EA | `XOnlineGetServiceInfo(0x45410004)` (mensaje xlivebase 0x58007) daba error → NetConn en `-svc` | contesta la IP de `red_dns` (`xlivebase_app.cpp`) |
+| Vuelve al menú a los 60 s | el servidor no mandaba `~png` | latido cada 20 s |
+| Crear partida no sigue | `ucre` sin dueño (`O`) | ficha de sala completa |
+| "Esperando a que se conecten…" repitiendo `XNetQosLookup` | stub | QoS completa al momento |
+| "Comenzando sesión de juego" | xlivebase `0x5000D` desconocido → error | con `red_lan`, lo desconocido va bien y se apunta |
+
+### El protocolo (salas de EA 2005, "Aries"; `PROD=nfs-xbox-2006`)
+
+Cabecera de 12 bytes (orden de 4 letras, subcódigo de 4, largo total big-endian) y texto
+`CLAVE=valor\n`, acabado en 0. Lo que pide el cliente, en orden: `@tic` (cifrado, sin
+respuesta), `@dir` → `ADDR PORT SESS MASK`; en el servidor de salas `addr`, `skey`,
+`news`, `auth`, `pers`, `sele` (y el servidor manda `+who`), `user`, `usea`, `auxi`.
+
+Partida rápida: `usea` → `COUNT=n` y luego `n` mensajes `+uss` con la ficha de sala. Crear:
+`ucre` → ficha de sala `I T SF CF O S C N D P` (`sub_82825B28`), luego `gcre` → ficha de
+partida (`sub_82825C90`): `IDENT NAME SELF HOST PARAMS PLATPARAMS ROOM CUSTFLAGS SYSFLAGS
+COUNT PRIV MINSIZE MAXSIZE NUMPART SEED WHEN AUTH SESS` y por jugador `OPID%d`, un nombre
+(clave en `0x820A1B30`, sin leer aún; se manda `OPPO%d`), `ADDR%d LADDR%d` (IP con
+puntos), `MADDR%d` (la XNADDR que el cliente manda en `auth`), `OPPART%d OPPARAM%d
+OPFLAG%d PRES%d`, más `PARTSIZE%d PARTPARAMS%d`. Unirse: `ujoi`, `gjoi`. Otros: `gset`,
+`uadm`, `mesg`, `glea`, `gdel`, `gsta`.
+
+Mensajes que el servidor manda sin que se los pidan: la tabla del juego en `0x828F2264`
+es `+ses +mgm +msg +who +rom +pop +usr +uss +ust +usm +snp +agm +gam +sst +bud +mlg +koh`
+(cada uno con su función). Las claves se leyeron de la memoria del juego en marcha con la
+sonda (`.rdata` no sale en el código traducido).
+
+### Dónde está
+
+Los dos móviles en la misma sala: el que entra ve la carrera elegida por el anfitrión;
+`gjoi` → `+mgm` al anfitrión y `+ses` a los dos. Pero **la lista de jugadores sale vacía
+en los dos y ninguno abre un socket UDP hacia el otro** (ni `XNetXnAddrToInAddr`). Lo
+siguiente es averiguar por qué no dan por buenos a los jugadores de la ficha: candidatos
+el nombre por jugador (`0x820A1B30`), la ficha `+who` (sin `I`, el id que debería
+coincidir con `OPID`), y que los dos móviles mandan el mismo XUID (`0xB13EBABEBABEBABE`,
+fijo en `user_profile.cpp`).
+
+**Y la versión de 360 no tiene System Link (comprobado el 2026-10-15).** El carrusel del
+menú principal solo trae "Xbox Live"; recorrido opción por opción en el móvil, no hay
+LAN ni enlace de sistema. Con `grant_user_privileges` se pasa el cartel y el juego se
+queda en "Conectando a los servidores de EA…" sin llamar a ningún stub de XNet ni a
+ningún mensaje de sesión (log en debug, motor nativo). Lo que este documento dice abajo
+de que la única vía es el System Link queda corregido así: **para jugar en LAN habría que
+sustituir el servidor de EA**, no basta con completar XNet.
 
 Esta entrada documenta qué se probó y qué se midió, para que quien quiera intentarlo no
 repita el camino.
@@ -75,8 +146,8 @@ Aquí está el fondo del asunto. Cruzando la tabla de ordinales del SDK
 - **114** sin implementar
 
 Lo que hay funciona y no es poco: sockets de verdad (`socket`, `bind`, `connect`,
-`send`/`recv`, `sendto`/`recvfrom`, `select`), `XNetGetTitleXnAddr` devolviendo la IP
-local, `XNetSetSystemLinkPort`.
+`send`/`recv`, `sendto`/`recvfrom`, `select`) y `XNetSetSystemLinkPort`.
+`XNetGetTitleXnAddr` está, pero devuelve 127.0.0.1, no la IP local (ver abajo).
 
 Lo que falta es justo el System Link:
 
@@ -111,6 +182,67 @@ cero — y como le contestan "correcto", no tiene motivo para rendirse. **Un stu
 miente es peor que uno que falla.** Es la explicación más probable del bucle del muro 2.
 
 Igual con `XSessionCreate`, `XSessionJoinRemote`, `XSessionModify` y el resto.
+
+## Lo que llama Most Wanted de verdad (2026-10-15)
+
+De las 158 no hacen falta todas. El código traducido trae la tabla de importaciones
+entera, pero cada importación pasa por una función puente (`sub_827C67xx` para XNet,
+`sub_82810xxx` para los sockets), y contar quién llama a cada puente dice qué usa el
+juego. Sale del código generado, sin arrancarlo; la cuenta es de sitios de llamada, no
+de veces en marcha.
+
+**XNet: 15 funciones con llamadas.** Del trío de claves, el juego llama él mismo a
+`XNetCreateKey` (1 sitio). Eso **no** prueba que haya System Link: los juegos de EA
+usaban su propio servidor de salas en vez de las sesiones de Xbox Live, y el anfitrión
+creaba la clave a mano para repartirla por ese servidor.
+
+| Función | Sitios | SDK Xenos | Qué hace hoy |
+|---|---|---|---|
+| `XNetStartup` / `XNetCleanup` | 2 / 1 | sí | |
+| `XNetGetTitleXnAddr` | 7 | sí | **127.0.0.1** y MAC `CC:CC:…` |
+| `XNetGetEthernetLinkStatus` | 3 | sí | **0: "no hay cable"** |
+| `XNetXnAddrToInAddr` | 2 | sí | **devuelve 1 (error) sin escribir nada** |
+| `XNetCreateKey` | 1 | stub | |
+| `XNetRegisterKey` | 2 | stub | |
+| `XNetUnregisterKey` | 1 | stub | |
+| `XNetConnect` | 1 | stub | |
+| `XNetGetConnectStatus` | 1 | stub | |
+| `XNetQosLookup` | 2 | stub | sondea a los anfitriones |
+| `XNetQosRelease` / `XNetQosServiceLookup` | 3 / 2 | sí | |
+| `XNetDnsLookup` / `XNetDnsRelease` | 1 / 2 | sí | falla rápido (lo de EA) |
+| `XnpLogonGetStatus` | 1 | stub | |
+
+`XNetQosListen`, `XNetInAddrToXnAddr` y `XNetGetBroadcastVersionStatus` se importan
+pero nadie las llama.
+
+**Sockets:** TCP (`listen`/`accept`/`connect`) y UDP (`sendto`/`recvfrom`), más
+E/S solapada (`WSARecv`, `WSARecvFrom`, `WSAGetOverlappedResult`, eventos). Faltan
+`WSARecv`, `WSAGetOverlappedResult`, `getsockname`, `getpeername` y `getsockopt`.
+
+Las tres "implementadas" que mienten (dirección de bucle, sin cable y una conversión
+que falla) bastan por sí solas para que el juego no vea a nadie en la red. Una 360
+devuelve en `XNADDR.ina` su IP de la LAN; las funciones de abajo traducen esa XNADDR a
+una dirección con la que abrir sockets.
+
+**Sesiones:** mensajes XGI (app 0xFB) que manda el juego, sacados de las llamadas a
+`XMsgStartIORequest`:
+
+```
+0xB0006 0xB0007 0xB0008                   contexto, propiedades, logros
+0xB0010 0xB0011 0xB0012 0xB0013           crear, borrar, unirse, salir
+0xB0014 0xB0015 0xB0016 0xB0018           empezar, acabar, buscar, modificar
+0xB001A 0xB001B 0xB001C                   arbitraje, buscar por ID, buscar (Ex)
+0xB0019 0xB0020 0xB0021 0xB0025 0xB0026   invitación y estadísticas
+```
+
+Todos menos `0xB0013` tienen manejador, y todos son de adorno. `0xB0013` (salir de la
+sesión) ni eso: devuelve `X_E_FAIL` con "Unimplemented XGI message".
+`XamSessionCreateHandle` da siempre el mismo asa (`0xCAFEDEAD`), y el objeto de sesión
+es `0xDEADF00D`.
+
+El motor nativo (`nativo/sdk`) es el mismo SDK v0.10.0 y está igual en todo esto.
+Hasta el 2026-10-15 le faltaba además `grant_user_privileges`, porque
+`parche_privilegios.py` solo parchea el SDK de Xenos: ya lo tiene, a mano.
 
 ## Qué haría falta
 

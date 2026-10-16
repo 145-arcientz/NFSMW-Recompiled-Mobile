@@ -13,6 +13,16 @@
 
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Red del juego en LAN (opciones red_lan / red_dns del motor nativo; ver
+         docs/diario/red-y-privilegios.md). Sin INTERNET, Android no deja abrir
+         ningun socket; el multicast es para que dos aparatos se encuentren por
+         broadcast en la Wi-Fi. Todo esto lo usa solo el juego, y solo si se piden
+         esas opciones. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
     <!-- Es un juego: appCategory es lo que leen Android 12+ (modo de juego y
          panel de juegos) y los lanzadores; isGame, el indicador de antes, lo
          siguen mirando los lanzadores de juegos de algunos fabricantes. -->

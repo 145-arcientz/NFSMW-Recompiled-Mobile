@@ -187,13 +187,16 @@ int XSocket::RecvFrom(uint8_t* buf, uint32_t buf_len, uint32_t flags, N_XSOCKADD
   */
 
   sockaddr_in nfrom;
+  std::memset(&nfrom, 0, sizeof(nfrom));
   socklen_t nfromlen = sizeof(sockaddr_in);
   int ret = recvfrom(native_handle_, reinterpret_cast<char*>(buf), buf_len, flags,
                      (sockaddr*)&nfrom, &nfromlen);
-  if (from) {
+  // PARCHE LOCAL (red): el puerto, como la direccion, pasa por ntohs; antes se
+  // guardaba al reves. Y si fallo, nfrom no trae nada que copiar.
+  if (from && ret >= 0) {
     from->sin_family = nfrom.sin_family;
     from->sin_addr = ntohl(nfrom.sin_addr.s_addr);  // BE <- BE
-    from->sin_port = nfrom.sin_port;
+    from->sin_port = ntohs(nfrom.sin_port);
     std::memset(from->x_sin_zero, 0, sizeof(from->x_sin_zero));
   }
 
@@ -204,8 +207,17 @@ int XSocket::RecvFrom(uint8_t* buf, uint32_t buf_len, uint32_t flags, N_XSOCKADD
   return ret;
 }
 
+// PARCHE LOCAL (red): en Linux/Android, escribir en un socket que el otro lado ya
+// cerro manda SIGPIPE y mata el proceso. MSG_NOSIGNAL lo cambia por EPIPE, que es
+// lo que espera un juego hecho para Winsock.
+#if REX_PLATFORM_WIN32
+static constexpr int kSinSigpipe = 0;
+#else
+static constexpr int kSinSigpipe = MSG_NOSIGNAL;
+#endif
+
 int XSocket::Send(const uint8_t* buf, uint32_t buf_len, uint32_t flags) {
-  return send(native_handle_, reinterpret_cast<const char*>(buf), buf_len, flags);
+  return send(native_handle_, reinterpret_cast<const char*>(buf), buf_len, flags | kSinSigpipe);
 }
 
 int XSocket::SendTo(uint8_t* buf, uint32_t buf_len, uint32_t flags, N_XSOCKADDR_IN* to,
@@ -221,15 +233,19 @@ int XSocket::SendTo(uint8_t* buf, uint32_t buf_len, uint32_t flags, N_XSOCKADDR_
   }
   */
 
+  // PARCHE LOCAL (red): to->sin_addr y to->sin_port son rex::be, que al leerlos dan
+  // el valor del host; el original los copiaba tal cual al sockaddr nativo y salian
+  // al reves (10.0.0.4 se iba a 4.0.0.10). htonl/htons los dejan en orden de red.
   sockaddr_in nto;
+  std::memset(&nto, 0, sizeof(nto));
   if (to) {
-    nto.sin_addr.s_addr = to->sin_addr;
+    nto.sin_addr.s_addr = htonl(to->sin_addr);
     nto.sin_family = to->sin_family;
-    nto.sin_port = to->sin_port;
+    nto.sin_port = htons(to->sin_port);
   }
 
-  return sendto(native_handle_, reinterpret_cast<char*>(buf), buf_len, flags,
-                to ? (sockaddr*)&nto : nullptr, to_len);
+  return sendto(native_handle_, reinterpret_cast<char*>(buf), buf_len, flags | kSinSigpipe,
+                to ? (sockaddr*)&nto : nullptr, to ? sizeof(nto) : 0);
 }
 
 bool XSocket::QueuePacket(uint32_t src_ip, uint16_t src_port, const uint8_t* buf, size_t len) {

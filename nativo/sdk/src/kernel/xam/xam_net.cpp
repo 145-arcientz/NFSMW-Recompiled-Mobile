@@ -41,8 +41,90 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <unistd.h>
 #endif
+
+#include <algorithm>
+#include <atomic>
+#include <cerrno>
+#include <string>
+
+#include <rex/cvar.h>
+
+// PARCHE LOCAL (red) - ver docs/diario/red-y-privilegios.md
+//
+// red_lan: que el juego vea una red de verdad. Sin esto, XNetGetEthernetLinkStatus
+// dice "sin cable" y XNetGetTitleXnAddr da 127.0.0.1, y el juego no sale de casa.
+// red_dns: responder esa IP a cualquier nombre que pida el juego (los servidores de
+// EA), para poner en su lugar un servidor propio en la LAN.
+// red_registro: cada llamada de red al log, con "[red]" delante.
+REXCVAR_DEFINE_BOOL(red_lan, false, "Network",
+                    "Report a working network link and the device's LAN IP to the game");
+REXCVAR_DEFINE_STRING(red_ip, "", "Network",
+                      "LAN IP to report to the game (empty = detect it)");
+REXCVAR_DEFINE_STRING(red_dns, "", "Network",
+                      "Answer every DNS lookup of the game with this IPv4 (empty = fail them)");
+REXCVAR_DEFINE_BOOL(red_registro, false, "Network", "Log every network call of the game");
+REXCVAR_DEFINE_BOOL(rastro_sistema, false, "Kernel",
+                    "Log the first calls the game makes to each system export (diagnosis)");
+
+#include <mutex>
+#include <ctime>
+#include <unordered_map>
+
+namespace rex {
+bool& RastroSistemaActivo() {
+  return REXCVAR_GET(rastro_sistema);
+}
+
+// El ruido del kernel (esperas, cerrojos, audio, video) va con las 3 primeras
+// llamadas y luego una de cada 2000. Lo demas (Xam, XNotify, red...) sale
+// siempre, hasta 8 llamadas por segundo de cada una: asi se ve lo ultimo que
+// consulto el juego antes de decidir algo, aunque lo lleve llamando un rato.
+static bool RastroRuido(const char* n) {
+  static const char* kRuido[] = {"Ke", "Kf", "Rtl", "Nt", "Ob", "Mm", "Ex", "XMA", "XAudio",
+                                 "Vd", "XamInputGetState", "XNotifyGetNext"};
+  for (const char* p : kRuido) {
+    if (std::strncmp(n, p, std::strlen(p)) == 0) return true;
+  }
+  return false;
+}
+
+void RastroSistema(const char* nombre, uint32_t r3, uint32_t r4, uint32_t r5) {
+  struct Cuenta {
+    uint64_t total = 0;
+    uint64_t segundo = 0;
+    uint32_t en_segundo = 0;
+  };
+  static std::mutex m;
+  static std::unordered_map<const char*, Cuenta> cuentas;
+  const char* corto = nombre + 7;  // sin "__imp__"
+  uint64_t ahora = static_cast<uint64_t>(std::time(nullptr));
+  uint64_t n;
+  bool sale;
+  {
+    std::lock_guard<std::mutex> l(m);
+    Cuenta& c = cuentas[nombre];
+    n = ++c.total;
+    if (RastroRuido(corto)) {
+      sale = n <= 3 || n % 2000 == 0;
+    } else {
+      if (c.segundo != ahora) {
+        c.segundo = ahora;
+        c.en_segundo = 0;
+      }
+      sale = ++c.en_segundo <= 8;
+    }
+  }
+  if (sale) {
+    REXKRNL_INFO("[rastro] {} #{} (r3={:08X} r4={:08X} r5={:08X})", corto, n, r3, r4, r5);
+  }
+}
+}  // namespace rex
 
 namespace rex {
 namespace kernel {
@@ -163,6 +245,149 @@ void StoreSockaddr(const sockaddr& addr, uint8_t* ptr) {
   }
 }
 
+// PARCHE LOCAL (red): apoyo para el registro y para Android.
+
+static std::atomic<uint32_t> g_red_lineas{0};
+// Tope de lineas: un juego sondeando un socket cada fotograma llenaria el log.
+#define RED_LOG(...)                                                              \
+  do {                                                                            \
+    if (REXCVAR_GET(red_registro) && g_red_lineas.fetch_add(1) < 4000) {          \
+      REXKRNL_INFO("[red] " __VA_ARGS__);                                         \
+    }                                                                             \
+  } while (0)
+
+static std::string RedIp(uint32_t ip_red) {  // en orden de red
+  const uint8_t* b = reinterpret_cast<const uint8_t*>(&ip_red);
+  return std::to_string(b[0]) + "." + std::to_string(b[1]) + "." + std::to_string(b[2]) + "." +
+         std::to_string(b[3]);
+}
+
+// Los primeros bytes de un paquete, en hexadecimal y en texto: el protocolo de
+// salas de EA de la epoca era de texto con cabecera binaria.
+static std::string RedVolcado(const uint8_t* p, int n) {
+  if (!p || n <= 0) return "";
+  int m = std::min(n, 96);
+  static const char* kHex = "0123456789ABCDEF";
+  std::string hex, txt;
+  for (int i = 0; i < m; ++i) {
+    hex += kHex[p[i] >> 4];
+    hex += kHex[p[i] & 15];
+    txt += (p[i] >= 0x20 && p[i] < 0x7F) ? static_cast<char>(p[i]) : '.';
+  }
+  return hex + " |" + txt + "|";
+}
+
+// errno de POSIX -> codigo de Winsock, que es lo que el juego lee con
+// WSAGetLastError. El original ponia 0 o nada, y un juego no puede distinguir
+// "todavia no" (WSAEWOULDBLOCK) de un fallo.
+static uint32_t RedErrorWsa(int e) {
+#if REX_PLATFORM_WIN32
+  return static_cast<uint32_t>(e);
+#else
+  switch (e) {
+    case 0: return 0;
+    case EWOULDBLOCK: return 10035;  // WSAEWOULDBLOCK (EAGAIN es el mismo en Linux)
+    case EINPROGRESS: return 10035;  // Winsock da WOULDBLOCK al conectar sin bloquear
+    case EALREADY: return 10037;
+    case ENOTSOCK: return 10038;
+    case EDESTADDRREQ: return 10039;
+    case EMSGSIZE: return 10040;
+    case ENOPROTOOPT: return 10042;
+    case EAFNOSUPPORT: return 10047;
+    case EADDRINUSE: return 10048;
+    case EADDRNOTAVAIL: return 10049;
+    case ENETDOWN: return 10050;
+    case ENETUNREACH: return 10051;
+    case ECONNABORTED: return 10053;
+    case ECONNRESET: return 10054;
+    case EPIPE: return 10054;
+    case ENOBUFS: return 10055;
+    case EISCONN: return 10056;
+    case ENOTCONN: return 10057;
+    case ETIMEDOUT: return 10060;
+    case ECONNREFUSED: return 10061;
+    case EHOSTUNREACH: return 10065;
+    case EINVAL: return 10022;
+    case EFAULT: return 10014;
+    case EBADF: return 10009;
+    default: return 10022;
+  }
+#endif
+}
+
+static uint32_t RedFijarError() {
+#if REX_PLATFORM_WIN32
+  uint32_t e = WSAGetLastError();
+#else
+  uint32_t e = RedErrorWsa(errno);
+#endif
+  XThread::SetLastError(e);
+  return e;
+}
+
+// La IP de este aparato en la LAN, en orden de red. Un socket UDP "conectado" a
+// una direccion de fuera no manda nada, pero deja que el sistema elija la
+// interfaz y getsockname dice cual.
+static uint32_t RedIpLocal() {
+  std::string fija = REXCVAR_GET(red_ip);
+  if (!fija.empty()) {
+    return inet_addr(fija.c_str());
+  }
+  static uint32_t cache = 0;
+  if (cache) return cache;
+#if !REX_PLATFORM_WIN32
+  int s = ::socket(AF_INET, SOCK_DGRAM, 0);
+  if (s >= 0) {
+    sockaddr_in fuera = {};
+    fuera.sin_family = AF_INET;
+    fuera.sin_port = htons(53);
+    fuera.sin_addr.s_addr = inet_addr("8.8.8.8");
+    if (::connect(s, reinterpret_cast<sockaddr*>(&fuera), sizeof(fuera)) == 0) {
+      sockaddr_in yo = {};
+      socklen_t n = sizeof(yo);
+      if (::getsockname(s, reinterpret_cast<sockaddr*>(&yo), &n) == 0) {
+        cache = yo.sin_addr.s_addr;
+      }
+    }
+    ::close(s);
+  }
+#endif
+  if (!cache) cache = htonl(INADDR_LOOPBACK);
+  return cache;
+}
+
+// Opciones de socket de Winsock (las que usa el 360) -> las de Linux. Los valores
+// llegan en big-endian desde la memoria del juego. Devuelve false si no hay
+// equivalente: entonces se finge exito y se apunta en el log.
+#if !REX_PLATFORM_WIN32
+static bool RedOpcion(uint32_t level, uint32_t optname, int* n_level, int* n_optname) {
+  if (level == 0xFFFF) {
+    *n_level = SOL_SOCKET;
+    switch (optname) {
+      case 0x0004: *n_optname = SO_REUSEADDR; return true;
+      case 0x0008: *n_optname = SO_KEEPALIVE; return true;
+      case 0x0010: *n_optname = SO_DONTROUTE; return true;
+      case 0x0020: *n_optname = SO_BROADCAST; return true;
+      case 0x0080: *n_optname = SO_LINGER; return true;
+      case 0x0100: *n_optname = SO_OOBINLINE; return true;
+      case 0x1001: *n_optname = SO_SNDBUF; return true;
+      case 0x1002: *n_optname = SO_RCVBUF; return true;
+      case 0x1005: *n_optname = SO_SNDTIMEO; return true;
+      case 0x1006: *n_optname = SO_RCVTIMEO; return true;
+      case 0x1007: *n_optname = SO_ERROR; return true;
+      case 0x1008: *n_optname = SO_TYPE; return true;
+      default: return false;
+    }
+  }
+  if (level == 6 && optname == 1) {  // IPPROTO_TCP, TCP_NODELAY
+    *n_level = IPPROTO_TCP;
+    *n_optname = TCP_NODELAY;
+    return true;
+  }
+  return false;
+}
+#endif
+
 // https://github.com/joolswills/mameox/blob/master/MAMEoX/Sources/xbox_Network.cpp#L136
 struct XNetStartupParams {
   uint8_t cfgSizeOfStruct;
@@ -199,10 +424,13 @@ u32 NetDll_XNetStartup_entry(u32 caller, ppc_ptr_t<XNetStartupParams> params) {
   }
   */
 
+  RED_LOG("XNetStartup (red_lan={}, ip local {}, red_dns='{}')", REXCVAR_GET(red_lan),
+          RedIp(RedIpLocal()), REXCVAR_GET(red_dns));
   return 0;
 }
 
 u32 NetDll_XNetCleanup_entry(u32 caller, mapped_void params) {
+  RED_LOG("XNetCleanup");
   auto xam = REX_KERNEL_STATE()->GetKernelModule<XamModule>("xam.xex");
   // auto xnet = xam->xnet();
   // xam->set_xnet(nullptr);
@@ -300,6 +528,8 @@ u32 NetDll_WSARecvFrom_entry(u32 caller, u32 socket, ppc_ptr_t<XWSABUF> buffers_
                              ppc_ptr_t<XSOCKADDR_IN> from_addr,
                              ppc_ptr_t<XWSAOVERLAPPED> overlapped_ptr,
                              mapped_void completion_routine_ptr) {
+  RED_LOG("WSARecvFrom(socket {:08X}, {} bufs, solapada={}) -> -1 (sin implementar)", socket,
+          buffer_count, overlapped_ptr ? 1 : 0);
   if (overlapped_ptr) {
     // auto evt = REX_KERNEL_OBJECTS()->LookupObject<XEvent>(
     //    overlapped_ptr->event_handle);
@@ -436,6 +666,26 @@ struct XnAddrStatus {
 };
 
 u32 NetDll_XNetGetTitleXnAddr_entry(u32 caller, ppc_ptr_t<XNADDR> addr_ptr) {
+  if (REXCVAR_GET(red_lan)) {
+    // PARCHE LOCAL (red): la IP de la LAN, como una 360 con DHCP. La MAC sale de
+    // la IP para que dos aparatos de la misma red no tengan la misma.
+    uint32_t ip = RedIpLocal();
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(&ip);
+    addr_ptr->ina.s_addr = ip;
+    addr_ptr->inaOnline.s_addr = 0;
+    addr_ptr->wPortOnline = 0;
+    const uint8_t mac[6] = {0x00, 0x1D, 0xD8, b[1], b[2], b[3]};
+    std::memcpy(addr_ptr->abEnet, mac, 6);
+    std::memset(addr_ptr->abOnline, 0, 20);
+    uint32_t estado = XnAddrStatus::XNET_GET_XNADDR_DHCP | XnAddrStatus::XNET_GET_XNADDR_GATEWAY |
+                      XnAddrStatus::XNET_GET_XNADDR_DNS;
+    static std::atomic<uint32_t> veces{0};
+    if (veces.fetch_add(1) < 5) {
+      RED_LOG("XNetGetTitleXnAddr -> {} estado {:02X}", RedIp(ip), estado);
+    }
+    return estado;
+  }
+
   // Just return a loopback address atm.
   addr_ptr->ina.s_addr = htonl(INADDR_LOOPBACK);
   addr_ptr->inaOnline.s_addr = 0;
@@ -480,7 +730,55 @@ void NetDll_XNetInAddrToString_entry(u32 caller, u32 in_addr, mapped_string stri
 // subsequent socket calls (like a handle to a XNet address)
 u32 NetDll_XNetXnAddrToInAddr_entry(u32 caller, ppc_ptr_t<XNADDR> xn_addr, mapped_void xid,
                                     mapped_void in_addr) {
+  if (REXCVAR_GET(red_lan) && xn_addr && in_addr) {
+    // PARCHE LOCAL (red): sin la asociacion segura de XNet, la direccion "segura"
+    // es directamente la IP de la LAN que trae la XNADDR.
+    uint32_t ip = xn_addr->ina.s_addr;
+    std::memcpy(in_addr, &ip, 4);
+    RED_LOG("XNetXnAddrToInAddr -> {}", RedIp(ip));
+    return 0;
+  }
+  RED_LOG("XNetXnAddrToInAddr -> 1 (falla)");
   return 1;
+}
+
+// PARCHE LOCAL (red): las claves de sesion y la "conexion segura" de XNet. En LAN
+// no hay asociacion segura que montar: la clave solo tiene que existir y no
+// repetirse, y conectar con el otro es ya poder mandarle paquetes.
+u32 NetDll_XNetCreateKey_entry(u32 caller, mapped_void xnkid, mapped_void xnkey) {
+  static std::atomic<uint32_t> cuenta{0};
+  uint32_t n = cuenta.fetch_add(1) + 1;
+  uint32_t ip = RedIpLocal();
+  uint8_t* id = static_cast<uint8_t*>(static_cast<void*>(xnkid));
+  uint8_t* key = static_cast<uint8_t*>(static_cast<void*>(xnkey));
+  if (id) {
+    std::memcpy(id, &ip, 4);
+    memory::store_and_swap<uint32_t>(id + 4, n);
+  }
+  if (key) {
+    for (int i = 0; i < 16; ++i) key[i] = static_cast<uint8_t>(0x5A ^ (i * 31) ^ n);
+  }
+  RED_LOG("XNetCreateKey -> clave {}", n);
+  return 0;
+}
+
+u32 NetDll_XNetRegisterKey_entry(u32 caller, mapped_void xnkid, mapped_void xnkey) {
+  RED_LOG("XNetRegisterKey");
+  return 0;
+}
+
+u32 NetDll_XNetUnregisterKey_entry(u32 caller, mapped_void xnkid) {
+  RED_LOG("XNetUnregisterKey");
+  return 0;
+}
+
+u32 NetDll_XNetConnect_entry(u32 caller, u32 in_addr) {
+  RED_LOG("XNetConnect({})", RedIp(htonl(in_addr)));
+  return 0;
+}
+
+u32 NetDll_XNetGetConnectStatus_entry(u32 caller, u32 in_addr) {
+  return 2;  // XNET_CONNECT_STATUS_CONNECTED
 }
 
 // Does the reverse of the above.
@@ -506,17 +804,36 @@ struct XEthernetStatus {
 };
 
 u32 NetDll_XNetGetEthernetLinkStatus_entry(u32 caller) {
-  return 0;
+  uint32_t estado = REXCVAR_GET(red_lan) ? (XEthernetStatus::XNET_ETHERNET_LINK_ACTIVE |
+                                            XEthernetStatus::XNET_ETHERNET_LINK_100MBPS |
+                                            XEthernetStatus::XNET_ETHERNET_LINK_FULL_DUPLEX)
+                                         : 0;
+  static std::atomic<uint32_t> veces{0};
+  if (veces.fetch_add(1) < 5) {
+    RED_LOG("XNetGetEthernetLinkStatus -> {:02X}", estado);
+  }
+  return estado;
 }
 
 u32 NetDll_XNetDnsLookup_entry(u32 caller, mapped_string host, u32 event_handle, mapped_u32 pdns) {
-  // TODO(gibbed): actually implement this
+  // PARCHE LOCAL (red): con red_dns, cualquier nombre resuelve a esa IP.
+  std::string nombre = host ? std::string(host.value()) : std::string();
+  std::string destino = REXCVAR_GET(red_dns);
+  uint32_t ip = destino.empty() ? INADDR_NONE : inet_addr(destino.c_str());
   if (pdns) {
     auto dns_guest = REX_KERNEL_MEMORY()->SystemHeapAlloc(sizeof(XNDNS));
     auto dns = REX_KERNEL_MEMORY()->TranslateVirtual<XNDNS*>(dns_guest);
-    dns->status = 1;  // non-zero = error
+    std::memset(dns, 0, sizeof(XNDNS));
+    if (ip != INADDR_NONE) {
+      dns->status = 0;
+      dns->cina = 1;
+      dns->aina[0].s_addr = ip;
+    } else {
+      dns->status = 1;  // non-zero = error
+    }
     *pdns = dns_guest;
   }
+  RED_LOG("XNetDnsLookup('{}') -> {}", nombre, ip != INADDR_NONE ? RedIp(ip) : "falla");
   if (event_handle) {
     auto ev = REX_KERNEL_OBJECTS()->LookupObject<XEvent>(event_handle);
     assert_not_null(ev);
@@ -533,7 +850,60 @@ u32 NetDll_XNetDnsRelease_entry(u32 caller, ppc_ptr_t<XNDNS> dns) {
   return 0;
 }
 
+// PARCHE LOCAL (red): la medida de conexion con otros jugadores, antes de jugar.
+// Era un stub y el juego se quedaba en "Esperando a que se conecten los jugadores"
+// repitiendola cada 30 s. En la LAN no hay nada que medir: cada destino (cxna
+// direcciones Xbox + cina de servicio) sale ya completo, contactado y con buena
+// conexion.
+u32 NetDll_XNetQosLookup_entry(u32 caller, u32 cxna, mapped_void apxna, mapped_void apxnkid,
+                               mapped_void apxnkey, u32 cina, mapped_void aina,
+                               mapped_void adwServiceId, u32 cProbes, u32 dwBitsPerSec,
+                               u32 dwFlags, u32 event_handle, mapped_u32 ppxnqos) {
+  uint32_t n = cxna + cina;
+  uint32_t tam = 8 + std::max<uint32_t>(n, 1) * sizeof(XNQOSINFO);
+  if (ppxnqos) {
+    auto qos_guest = REX_KERNEL_MEMORY()->SystemHeapAlloc(tam);
+    auto qos = REX_KERNEL_MEMORY()->TranslateVirtual<XNQOS*>(qos_guest);
+    std::memset(qos, 0, tam);
+    qos->count = n;
+    qos->count_pending = 0;
+    for (uint32_t i = 0; i < n; ++i) {
+      XNQOSINFO& info = qos->info[i];
+      info.flags = 0x01 | 0x02;  // XNET_XNQOSINFO_COMPLETE | TARGET_CONTACTED
+      info.probes_xmit = cProbes ? cProbes : 4;
+      info.probes_recv = cProbes ? cProbes : 4;
+      info.rtt_min_in_msecs = 5;
+      info.rtt_med_in_msecs = 8;
+      info.up_bits_per_sec = 10000000;
+      info.down_bits_per_sec = 10000000;
+    }
+    *ppxnqos = qos_guest;
+  }
+  if (event_handle) {
+    auto ev = REX_KERNEL_OBJECTS()->LookupObject<XEvent>(event_handle);
+    if (ev) ev->Set(0, false);
+  }
+  RED_LOG("XNetQosLookup({} direcciones, {} servicios, {} sondas) -> todo contactado", cxna, cina,
+          cProbes);
+  return 0;
+}
+
+// PARCHE LOCAL (red): eran stubs. El juego los pide al entrar en Xbox Live y al
+// unirse a una partida. El id de maquina sale de la IP: distinto en cada aparato.
+u32 XNetLogonGetTitleID_entry() {
+  return REX_KERNEL_STATE()->title_id();
+}
+
+u32 XNetLogonGetMachineID_entry(mapped_u64 machine_id) {
+  if (machine_id) {
+    uint32_t ip = ntohl(RedIpLocal());
+    *machine_id = 0xFA00000000000000ull | ip;
+  }
+  return 0;
+}
+
 u32 NetDll_XNetQosServiceLookup_entry(u32 caller, u32 flags, u32 event_handle, mapped_u32 pqos) {
+  RED_LOG("XNetQosServiceLookup(flags {:08X}) -> 0 servicios", flags);
   // Set pqos as some games will try accessing it despite non-successful result
   if (pqos) {
     auto qos_guest = REX_KERNEL_MEMORY()->SystemHeapAlloc(sizeof(XNQOS));
@@ -585,13 +955,13 @@ u32 NetDll_socket_entry(u32 caller, u32 af, u32 type, u32 protocol) {
                          XSocket::Protocol((uint32_t)protocol));
 
   if (XFAILED(result)) {
+    uint32_t e = RedFijarError();
     socket->Release();
-
-    uint32_t error = xboxkrnl::xeRtlNtStatusToDosError(result);
-    XThread::SetLastError(error);
+    RED_LOG("socket(af {}, tipo {}, proto {}) -> falla {}", af, type, protocol, e);
     return -1;
   }
 
+  RED_LOG("socket(af {}, tipo {}, proto {}) -> {:08X}", af, type, protocol, socket->handle());
   return socket->handle();
 }
 
@@ -603,6 +973,7 @@ u32 NetDll_closesocket_entry(u32 caller, u32 socket_handle) {
     return -1;
   }
 
+  RED_LOG("closesocket({:08X})", socket_handle);
   // TODO: Absolutely delete this object. It is no longer valid after calling
   // closesocket.
   socket->Close();
@@ -620,13 +991,9 @@ i32 NetDll_shutdown_entry(u32 caller, u32 socket_handle, i32 how) {
 
   auto ret = socket->Shutdown(how);
   if (ret == -1) {
-#if REX_PLATFORM_WIN32
-    uint32_t error_code = WSAGetLastError();
-    XThread::SetLastError(error_code);
-#else
-    XThread::SetLastError(0x0);
-#endif
+    RedFijarError();
   }
+  RED_LOG("shutdown({:08X}, {}) -> {}", socket_handle, how, ret);
   return ret;
 }
 
@@ -639,8 +1006,146 @@ u32 NetDll_setsockopt_entry(u32 caller, u32 socket_handle, u32 level, u32 optnam
     return -1;
   }
 
+#if !REX_PLATFORM_WIN32
+  // PARCHE LOCAL (red): niveles y nombres de Winsock -> Linux, y el valor de
+  // big-endian. El original pasaba todo tal cual y en Android fallaba o tocaba
+  // otra opcion. Las de cifrado de XNet (0x5801/0x5802) las sigue tratando XSocket.
+  if (!(level == 0xFFFF && (optname == 0x5801 || optname == 0x5802))) {
+    int n_level = 0, n_optname = 0;
+    if (!RedOpcion(level, optname, &n_level, &n_optname)) {
+      RED_LOG("setsockopt({:08X}, {:X}, {:X}) sin equivalente: se finge exito", socket_handle,
+              level, optname);
+      return 0;
+    }
+    const uint8_t* p = static_cast<const uint8_t*>(static_cast<void*>(optval_ptr));
+    int ret = -1;
+    if (n_level == SOL_SOCKET && n_optname == SO_LINGER && optlen >= 4) {
+      linger l = {memory::load_and_swap<uint16_t>(p), memory::load_and_swap<uint16_t>(p + 2)};
+      ret = ::setsockopt(socket->native_handle(), n_level, n_optname, &l, sizeof(l));
+    } else if (n_level == SOL_SOCKET && (n_optname == SO_SNDTIMEO || n_optname == SO_RCVTIMEO) &&
+               optlen >= 4) {
+      uint32_t ms = memory::load_and_swap<uint32_t>(p);
+      timeval tv = {static_cast<time_t>(ms / 1000), static_cast<suseconds_t>((ms % 1000) * 1000)};
+      ret = ::setsockopt(socket->native_handle(), n_level, n_optname, &tv, sizeof(tv));
+    } else {
+      int v = optlen >= 4 ? static_cast<int>(memory::load_and_swap<uint32_t>(p))
+                          : (optlen >= 1 ? p[0] : 0);
+      ret = ::setsockopt(socket->native_handle(), n_level, n_optname, &v, sizeof(v));
+    }
+    if (ret < 0) {
+      uint32_t e = RedFijarError();
+      RED_LOG("setsockopt({:08X}, {:X}, {:X}) -> falla {}", socket_handle, level, optname, e);
+      return -1;
+    }
+    RED_LOG("setsockopt({:08X}, {:X}, {:X}, largo {})", socket_handle, level, optname, optlen);
+    return 0;
+  }
+#endif
   X_STATUS status = socket->SetOption(level, optname, optval_ptr, optlen);
   return XSUCCEEDED(status) ? 0 : -1;
+}
+
+// PARCHE LOCAL (red): eran stubs. El cliente de red de EA pregunta por su propia
+// direccion despues de bind y por el resultado de un connect sin bloqueo
+// (SO_ERROR), y con un stub se queda leyendo basura.
+static void RedGuardarSockaddr(const sockaddr_in& a, XSOCKADDR* x, uint32_t* largo) {
+  uint8_t* p = reinterpret_cast<uint8_t*>(x);
+  memory::store_and_swap<uint16_t>(p, a.sin_family);
+  std::memcpy(p + 2, &a.sin_port, 2);  // ya en orden de red
+  std::memcpy(p + 4, &a.sin_addr.s_addr, 4);
+  std::memset(p + 8, 0, 8);
+  *largo = 16;
+}
+
+u32 NetDll_getsockname_entry(u32 caller, u32 socket_handle, ppc_ptr_t<XSOCKADDR> name,
+                             mapped_u32 namelen) {
+  auto socket = REX_KERNEL_OBJECTS()->LookupObject<XSocket>(socket_handle);
+  if (!socket) {
+    XThread::SetLastError(0x2736);
+    return -1;
+  }
+  sockaddr_in a = {};
+  socklen_t n = sizeof(a);
+  if (::getsockname(socket->native_handle(), reinterpret_cast<sockaddr*>(&a), &n) < 0) {
+    RedFijarError();
+    return -1;
+  }
+  if (name && namelen) {
+    uint32_t largo = 0;
+    RedGuardarSockaddr(a, name, &largo);
+    *namelen = largo;
+  }
+  RED_LOG("getsockname({:08X}) -> {}:{}", socket_handle, RedIp(a.sin_addr.s_addr),
+          ntohs(a.sin_port));
+  return 0;
+}
+
+u32 NetDll_getpeername_entry(u32 caller, u32 socket_handle, ppc_ptr_t<XSOCKADDR> name,
+                             mapped_u32 namelen) {
+  auto socket = REX_KERNEL_OBJECTS()->LookupObject<XSocket>(socket_handle);
+  if (!socket) {
+    XThread::SetLastError(0x2736);
+    return -1;
+  }
+  sockaddr_in a = {};
+  socklen_t n = sizeof(a);
+  if (::getpeername(socket->native_handle(), reinterpret_cast<sockaddr*>(&a), &n) < 0) {
+    uint32_t e = RedFijarError();
+    RED_LOG("getpeername({:08X}) -> falla {}", socket_handle, e);
+    return -1;
+  }
+  if (name && namelen) {
+    uint32_t largo = 0;
+    RedGuardarSockaddr(a, name, &largo);
+    *namelen = largo;
+  }
+  RED_LOG("getpeername({:08X}) -> {}:{}", socket_handle, RedIp(a.sin_addr.s_addr),
+          ntohs(a.sin_port));
+  return 0;
+}
+
+u32 NetDll_getsockopt_entry(u32 caller, u32 socket_handle, u32 level, u32 optname,
+                            mapped_void optval_ptr, mapped_u32 optlen_ptr) {
+  auto socket = REX_KERNEL_OBJECTS()->LookupObject<XSocket>(socket_handle);
+  if (!socket) {
+    XThread::SetLastError(0x2736);
+    return -1;
+  }
+#if !REX_PLATFORM_WIN32
+  int n_level = 0, n_optname = 0;
+  if (!RedOpcion(level, optname, &n_level, &n_optname) || !optval_ptr || !optlen_ptr ||
+      *optlen_ptr < 4) {
+    RED_LOG("getsockopt({:08X}, {:X}, {:X}) sin equivalente -> 0", socket_handle, level, optname);
+    if (optval_ptr && optlen_ptr && *optlen_ptr >= 4) {
+      memory::store_and_swap<uint32_t>(static_cast<uint8_t*>(static_cast<void*>(optval_ptr)), 0);
+      *optlen_ptr = 4;
+    }
+    return 0;
+  }
+  int v = 0;
+  socklen_t n = sizeof(v);
+  if (::getsockopt(socket->native_handle(), n_level, n_optname, &v, &n) < 0) {
+    RedFijarError();
+    return -1;
+  }
+  if (n_level == SOL_SOCKET && n_optname == SO_ERROR) {
+    v = static_cast<int>(RedErrorWsa(v));
+  }
+  memory::store_and_swap<uint32_t>(static_cast<uint8_t*>(static_cast<void*>(optval_ptr)), static_cast<uint32_t>(v));
+  *optlen_ptr = 4;
+  RED_LOG("getsockopt({:08X}, {:X}, {:X}) -> {}", socket_handle, level, optname, v);
+  return 0;
+#else
+  int n = optlen_ptr ? static_cast<int>(*optlen_ptr) : 0;
+  int ret = ::getsockopt(socket->native_handle(), level, optname,
+                         static_cast<char*>(static_cast<void*>(optval_ptr)), &n);
+  if (ret < 0) {
+    RedFijarError();
+    return -1;
+  }
+  if (optlen_ptr) *optlen_ptr = n;
+  return 0;
+#endif
 }
 
 u32 NetDll_ioctlsocket_entry(u32 caller, u32 socket_handle, u32 cmd, mapped_void arg_ptr) {
@@ -651,6 +1156,30 @@ u32 NetDll_ioctlsocket_entry(u32 caller, u32 socket_handle, u32 cmd, mapped_void
     return -1;
   }
 
+#if !REX_PLATFORM_WIN32
+  // PARCHE LOCAL (red): FIONBIO y FIONREAD tienen otro numero en Winsock
+  // (0x8004667E y 0x4004667F) que en Linux, y el argumento va en big-endian. El
+  // original los pasaba tal cual: en Android el socket nunca dejaba de bloquear.
+  if (cmd == 0x8004667E) {
+    int v = memory::load_and_swap<uint32_t>(static_cast<uint8_t*>(static_cast<void*>(arg_ptr))) ? 1 : 0;
+    if (::ioctl(socket->native_handle(), FIONBIO, &v) < 0) {
+      RedFijarError();
+      return -1;
+    }
+    RED_LOG("ioctlsocket({:08X}, FIONBIO, {})", socket_handle, v);
+    return 0;
+  }
+  if (cmd == 0x4004667F) {
+    int v = 0;
+    if (::ioctl(socket->native_handle(), FIONREAD, &v) < 0) {
+      RedFijarError();
+      return -1;
+    }
+    memory::store_and_swap<uint32_t>(static_cast<uint8_t*>(static_cast<void*>(arg_ptr)), static_cast<uint32_t>(v));
+    return 0;
+  }
+  RED_LOG("ioctlsocket({:08X}, {:08X}) desconocido", socket_handle, cmd);
+#endif
   X_STATUS status = socket->IOControl(cmd, arg_ptr);
   if (XFAILED(status)) {
     XThread::SetLastError(xboxkrnl::xeRtlNtStatusToDosError(status));
@@ -670,12 +1199,17 @@ u32 NetDll_bind_entry(u32 caller, u32 socket_handle, ppc_ptr_t<XSOCKADDR_IN> nam
   }
 
   N_XSOCKADDR_IN native_name(name);
-  X_STATUS status = socket->Bind(&native_name, namelen);
+  uint32_t ip = htonl(native_name.sin_addr);
+  X_STATUS status = socket->Bind(&native_name, sizeof(sockaddr_in));
   if (XFAILED(status)) {
-    XThread::SetLastError(xboxkrnl::xeRtlNtStatusToDosError(status));
+    uint32_t e = RedFijarError();
+    RED_LOG("bind({:08X}, {}:{}) -> falla {}", socket_handle, RedIp(ip),
+            static_cast<uint16_t>(native_name.sin_port), e);
     return -1;
   }
 
+  RED_LOG("bind({:08X}, {}:{})", socket_handle, RedIp(ip),
+          static_cast<uint16_t>(native_name.sin_port));
   return 0;
 }
 
@@ -688,12 +1222,20 @@ u32 NetDll_connect_entry(u32 caller, u32 socket_handle, ppc_ptr_t<XSOCKADDR> nam
   }
 
   N_XSOCKADDR native_name(name);
-  X_STATUS status = socket->Connect(&native_name, namelen);
+  uint16_t puerto = 0;
+  uint32_t ip = 0;
+  std::memcpy(&puerto, native_name.sa_data, 2);
+  std::memcpy(&ip, native_name.sa_data + 2, 4);
+  X_STATUS status = socket->Connect(&native_name, sizeof(sockaddr_in));
   if (XFAILED(status)) {
-    XThread::SetLastError(xboxkrnl::xeRtlNtStatusToDosError(status));
+    // Sin bloqueo, EINPROGRESS -> WSAEWOULDBLOCK, que es lo que espera el juego.
+    uint32_t e = RedFijarError();
+    RED_LOG("connect({:08X}, {}:{}) -> {}", socket_handle, RedIp(ip), ntohs(puerto),
+            e == 10035 ? std::string("en curso (WOULDBLOCK)") : "falla " + std::to_string(e));
     return -1;
   }
 
+  RED_LOG("connect({:08X}, {}:{}) -> conectado", socket_handle, RedIp(ip), ntohs(puerto));
   return 0;
 }
 
@@ -707,10 +1249,12 @@ u32 NetDll_listen_entry(u32 caller, u32 socket_handle, i32 backlog) {
 
   X_STATUS status = socket->Listen(backlog);
   if (XFAILED(status)) {
-    XThread::SetLastError(xboxkrnl::xeRtlNtStatusToDosError(status));
+    uint32_t e = RedFijarError();
+    RED_LOG("listen({:08X}) -> falla {}", socket_handle, e);
     return -1;
   }
 
+  RED_LOG("listen({:08X}, {})", socket_handle, backlog);
   return 0;
 }
 
@@ -737,8 +1281,11 @@ u32 NetDll_accept_entry(u32 caller, u32 socket_handle, ppc_ptr_t<XSOCKADDR> addr
     std::memcpy(addr_ptr->sa_data, native_addr.sa_data, *addrlen_ptr - 2);
     *addrlen_ptr = native_len;
 
+    RED_LOG("accept({:08X}) -> {:08X}", socket_handle, new_socket->handle());
     return new_socket->handle();
   } else {
+    uint32_t e = RedFijarError();
+    if (e != 10035) RED_LOG("accept({:08X}) -> falla {}", socket_handle, e);
     return -1;
   }
 }
@@ -819,14 +1366,36 @@ i32 NetDll_select_entry(i32 caller, i32 nfds, ppc_ptr_t<x_fd_set> readfds,
   timeval* timeout_in = nullptr;
   timeval timeout;
   if (timeout_ptr) {
-    timeout = {static_cast<int32_t>(timeout_ptr.as_array<int32_t>()[0]),
-               static_cast<int32_t>(timeout_ptr.as_array<int32_t>()[1])};
-    chrono::Clock::ScaleGuestDurationTimeval(reinterpret_cast<int32_t*>(&timeout.tv_sec),
-                                             reinterpret_cast<int32_t*>(&timeout.tv_usec));
+    // PARCHE LOCAL (red): el timeval del juego va en big-endian; as_array lo leia
+    // tal cual. Y en 64 bits tv_sec es de 8 bytes: se escala en variables de 4.
+    const uint8_t* t = static_cast<const uint8_t*>(static_cast<void*>(timeout_ptr));
+    int32_t seg = static_cast<int32_t>(memory::load_and_swap<uint32_t>(t));
+    int32_t useg = static_cast<int32_t>(memory::load_and_swap<uint32_t>(t + 4));
+    chrono::Clock::ScaleGuestDurationTimeval(&seg, &useg);
+    timeout = {};
+    timeout.tv_sec = seg;
+    timeout.tv_usec = useg;
     timeout_in = &timeout;
   }
+#if !REX_PLATFORM_WIN32
+  // PARCHE LOCAL (red): Winsock ignora nfds y el juego pasa lo que sea (0); en
+  // POSIX tiene que ser el descriptor mas alto + 1, o select no mira ninguno.
+  {
+    int alto = -1;
+    for (auto* hs : {&host_readfds, &host_writefds, &host_exceptfds}) {
+      for (uint32_t i = 0; i < hs->count; ++i) {
+        alto = std::max(alto, static_cast<int>(hs->sockets[i]->native_handle()));
+      }
+    }
+    nfds = alto + 1;
+  }
+#endif
   int ret = select(nfds, readfds ? &native_readfds : nullptr, writefds ? &native_writefds : nullptr,
                    exceptfds ? &native_exceptfds : nullptr, timeout_in);
+  if (ret < 0) {
+    uint32_t e = RedFijarError();
+    RED_LOG("select -> falla {}", e);
+  }
   if (readfds) {
     host_readfds.UpdateFrom(&native_readfds);
     host_readfds.Store(readfds);
@@ -852,7 +1421,15 @@ u32 NetDll_recv_entry(u32 caller, u32 socket_handle, mapped_void buf_ptr, u32 bu
     return -1;
   }
 
-  return socket->Recv(buf_ptr, buf_len, flags);
+  int ret = socket->Recv(buf_ptr, buf_len, flags);
+  if (ret < 0) {
+    uint32_t e = RedFijarError();
+    if (e != 10035) RED_LOG("recv({:08X}) -> falla {}", socket_handle, e);
+  } else {
+    RED_LOG("recv({:08X}) -> {} bytes {}", socket_handle, ret,
+            RedVolcado(static_cast<const uint8_t*>(static_cast<void*>(buf_ptr)), ret));
+  }
+  return ret;
 }
 
 u32 NetDll_recvfrom_entry(u32 caller, u32 socket_handle, mapped_void buf_ptr, u32 buf_len,
@@ -883,13 +1460,12 @@ u32 NetDll_recvfrom_entry(u32 caller, u32 socket_handle, mapped_void buf_ptr, u3
   }
 
   if (ret == -1) {
-// TODO: Better way of getting the error code
-#if REX_PLATFORM_WIN32
-    uint32_t error_code = WSAGetLastError();
-    XThread::SetLastError(error_code);
-#else
-    XThread::SetLastError(0x0);
-#endif
+    uint32_t e = RedFijarError();
+    if (e != 10035) RED_LOG("recvfrom({:08X}) -> falla {}", socket_handle, e);
+  } else {
+    RED_LOG("recvfrom({:08X}) <- {}:{} {} bytes {}", socket_handle,
+            RedIp(htonl(native_from.sin_addr)), static_cast<uint16_t>(native_from.sin_port), ret,
+            RedVolcado(static_cast<const uint8_t*>(static_cast<void*>(buf_ptr)), ret));
   }
 
   return ret;
@@ -903,7 +1479,15 @@ u32 NetDll_send_entry(u32 caller, u32 socket_handle, mapped_void buf_ptr, u32 bu
     return -1;
   }
 
-  return socket->Send(buf_ptr, buf_len, flags);
+  int ret = socket->Send(buf_ptr, buf_len, flags);
+  if (ret < 0) {
+    uint32_t e = RedFijarError();
+    RED_LOG("send({:08X}, {} bytes) -> falla {}", socket_handle, buf_len, e);
+  } else {
+    RED_LOG("send({:08X}) -> {} de {} bytes {}", socket_handle, ret, buf_len,
+            RedVolcado(static_cast<const uint8_t*>(static_cast<void*>(buf_ptr)), buf_len));
+  }
+  return ret;
 }
 
 u32 NetDll_sendto_entry(u32 caller, u32 socket_handle, mapped_void buf_ptr, u32 buf_len, u32 flags,
@@ -915,8 +1499,20 @@ u32 NetDll_sendto_entry(u32 caller, u32 socket_handle, mapped_void buf_ptr, u32 
     return -1;
   }
 
-  N_XSOCKADDR_IN native_to(to_ptr);
-  return socket->SendTo(buf_ptr, buf_len, flags, &native_to, to_len);
+  N_XSOCKADDR_IN native_to;
+  if (to_ptr) native_to = *to_ptr;
+  int ret = socket->SendTo(buf_ptr, buf_len, flags, to_ptr ? &native_to : nullptr, to_len);
+  uint32_t ip = to_ptr ? htonl(native_to.sin_addr) : 0;
+  uint16_t puerto = to_ptr ? static_cast<uint16_t>(native_to.sin_port) : 0;
+  if (ret < 0) {
+    uint32_t e = RedFijarError();
+    RED_LOG("sendto({:08X}) -> {}:{} {} bytes: falla {}", socket_handle, RedIp(ip), puerto,
+            buf_len, e);
+  } else {
+    RED_LOG("sendto({:08X}) -> {}:{} {} bytes {}", socket_handle, RedIp(ip), puerto, ret,
+            RedVolcado(static_cast<const uint8_t*>(static_cast<void*>(buf_ptr)), buf_len));
+  }
+  return ret;
 }
 
 u32 NetDll___WSAFDIsSet_entry(u32 socket_handle, ppc_ptr_t<x_fd_set> fd_set) {
@@ -1030,25 +1626,27 @@ REX_EXPORT_STUB(__imp__NetDll_XHttpSetStatusCallback);
 REX_EXPORT_STUB(__imp__NetDll_XHttpShutdown);
 REX_EXPORT_STUB(__imp__NetDll_XHttpStartup);
 REX_EXPORT_STUB(__imp__NetDll_XHttpWriteData);
-REX_EXPORT_STUB(__imp__NetDll_XNetConnect);
-REX_EXPORT_STUB(__imp__NetDll_XNetCreateKey);
+REX_EXPORT(__imp__NetDll_XNetConnect, rex::kernel::xam::NetDll_XNetConnect_entry)
+REX_EXPORT(__imp__NetDll_XNetCreateKey, rex::kernel::xam::NetDll_XNetCreateKey_entry)
 REX_EXPORT_STUB(__imp__NetDll_XNetDnsReverseLookup);
 REX_EXPORT_STUB(__imp__NetDll_XNetDnsReverseRelease);
 REX_EXPORT_STUB(__imp__NetDll_XNetGetBroadcastVersionStatus);
-REX_EXPORT_STUB(__imp__NetDll_XNetGetConnectStatus);
+REX_EXPORT(__imp__NetDll_XNetGetConnectStatus, rex::kernel::xam::NetDll_XNetGetConnectStatus_entry)
 REX_EXPORT_STUB(__imp__NetDll_XNetGetSystemLinkPort);
 REX_EXPORT_STUB(__imp__NetDll_XNetGetXnAddrPlatform);
 REX_EXPORT_STUB(__imp__NetDll_XNetInAddrToServer);
 REX_EXPORT_STUB(__imp__NetDll_XNetQosGetListenStats);
-REX_EXPORT_STUB(__imp__NetDll_XNetQosLookup);
-REX_EXPORT_STUB(__imp__NetDll_XNetRegisterKey);
+REX_EXPORT(__imp__NetDll_XNetQosLookup, rex::kernel::xam::NetDll_XNetQosLookup_entry)
+REX_EXPORT(__imp__XNetLogonGetTitleID, rex::kernel::xam::XNetLogonGetTitleID_entry)
+REX_EXPORT(__imp__XNetLogonGetMachineID, rex::kernel::xam::XNetLogonGetMachineID_entry)
+REX_EXPORT(__imp__NetDll_XNetRegisterKey, rex::kernel::xam::NetDll_XNetRegisterKey_entry)
 REX_EXPORT_STUB(__imp__NetDll_XNetReplaceKey);
 REX_EXPORT_STUB(__imp__NetDll_XNetServerToInAddr);
 REX_EXPORT_STUB(__imp__NetDll_XNetSetOpt);
 REX_EXPORT_STUB(__imp__NetDll_XNetStartupEx);
 REX_EXPORT_STUB(__imp__NetDll_XNetTsAddrToInAddr);
 REX_EXPORT_STUB(__imp__NetDll_XNetUnregisterInAddr);
-REX_EXPORT_STUB(__imp__NetDll_XNetUnregisterKey);
+REX_EXPORT(__imp__NetDll_XNetUnregisterKey, rex::kernel::xam::NetDll_XNetUnregisterKey_entry)
 REX_EXPORT_STUB(__imp__NetDll_XmlDownloadContinue);
 REX_EXPORT_STUB(__imp__NetDll_XmlDownloadGetParseTime);
 REX_EXPORT_STUB(__imp__NetDll_XmlDownloadGetReceivedDataSize);
@@ -1097,6 +1695,6 @@ REX_EXPORT_STUB(__imp__NetDll_XnpToolIpProxyInject);
 REX_EXPORT_STUB(__imp__NetDll_XnpToolSetCallbacks);
 REX_EXPORT_STUB(__imp__NetDll_XnpUnregisterKeyForCallerType);
 REX_EXPORT_STUB(__imp__NetDll_XnpUpdateConfigParams);
-REX_EXPORT_STUB(__imp__NetDll_getpeername);
-REX_EXPORT_STUB(__imp__NetDll_getsockname);
-REX_EXPORT_STUB(__imp__NetDll_getsockopt);
+REX_EXPORT(__imp__NetDll_getpeername, rex::kernel::xam::NetDll_getpeername_entry)
+REX_EXPORT(__imp__NetDll_getsockname, rex::kernel::xam::NetDll_getsockname_entry)
+REX_EXPORT(__imp__NetDll_getsockopt, rex::kernel::xam::NetDll_getsockopt_entry)

@@ -235,6 +235,16 @@ final class MotorNativo {
         if (Ajustes.gamertagValido(gamertag) && !gamertag.isEmpty()) {
             a.add("--user_gamertag=" + gamertag);
         }
+        // Xbox Live del juego contra el servidor de EA de la LAN: los permisos de
+        // Live, la red de verdad, la sesion de Live y todos los nombres (los
+        // servidores de EA) a esa IP. Solo en este motor: son opciones de su SDK.
+        String servidor = ajustes.servidorLan();
+        if (Ajustes.ipValida(servidor)) {
+            a.add("--grant_user_privileges=true");
+            a.add("--red_lan=true");
+            a.add("--red_live=true");
+            a.add("--red_dns=" + servidor);
+        }
         if (!BuildConfig.DEBUG && !BuildConfig.REGISTRO) {
             a.add("--log_file=/dev/null");
             a.add("--log_level=off");

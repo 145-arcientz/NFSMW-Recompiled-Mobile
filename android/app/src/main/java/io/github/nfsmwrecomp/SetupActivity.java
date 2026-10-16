@@ -296,6 +296,15 @@ public class SetupActivity extends AppCompatActivity {
             espacio(8),
             campoGamertag()
         ));
+        // Multijugador en la LAN: solo el motor nativo tiene las opciones de red.
+        if (MotorNativo.ACTIVO) {
+            col.addView(tarjeta(
+                seccion(R.string.servidor_lan),
+                resumen(R.string.servidor_lan_resumen),
+                espacio(8),
+                campoServidorLan()
+            ));
+        }
 
         // --- Graficos
         col.addView(tarjeta(
@@ -522,6 +531,40 @@ public class SetupActivity extends AppCompatActivity {
                     ajustes.gamertag(g);
                 } else {
                     caja.setError(getString(R.string.gamertag_error));
+                }
+            }
+        });
+        caja.addView(texto);
+        return caja;
+    }
+
+    /**
+     * La IP del PC con el servidor de EA de la LAN. Como el gamertag: se guarda
+     * segun se escribe si es una IPv4 valida, y vacia la quita.
+     */
+    private View campoServidorLan() {
+        TextInputLayout caja = new TextInputLayout(this, null,
+                com.google.android.material.R.attr.textInputOutlinedStyle);
+        caja.setHint(R.string.servidor_lan_ip);
+        caja.setBoxStrokeColor(ACENTO);
+        caja.setHintTextColor(ColorStateList.valueOf(ACENTO));
+        TextInputEditText texto = new TextInputEditText(caja.getContext());
+        texto.setSingleLine(true);
+        texto.setTextColor(Color.WHITE);
+        texto.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        texto.setFilters(new InputFilter[] {new InputFilter.LengthFilter(15)});
+        texto.setText(ajustes.servidorLan());
+        texto.setHint("10.0.0.4");
+        texto.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void afterTextChanged(Editable s) {
+                String ip = s.toString().trim();
+                if (ip.isEmpty() || Ajustes.ipValida(ip)) {
+                    caja.setError(null);
+                    ajustes.servidorLan(ip);
+                } else {
+                    caja.setError(getString(R.string.servidor_lan_error));
                 }
             }
         });

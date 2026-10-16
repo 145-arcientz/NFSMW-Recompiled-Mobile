@@ -387,6 +387,16 @@ namespace {
 std::atomic<uint32_t> g_llamadas{0};
 std::atomic<int32_t> g_cada_anotado{1};
 std::atomic<int32_t> g_mapas_anotado{2};
+std::atomic<bool> g_dos_jugadores_anotado{false};
+
+/*
+ * Split screen. The two maps are one per player: views 13 and 14 are the shadow maps of views 1 and 2,
+ * as 4 and 5 are their road reflections. sub_82445660 asks for both (r4 = 1) when views 1 and 2 hold a
+ * scene, and in single player view 2 stays off (sub_8243FF30 leaves only 1 and 4). With two players,
+ * dropping the second map freezes player 2's shadows (seen on the phone: the bottom half). So the single
+ * map only applies while view 2 is off. Byte +8 is the view's "active" flag (nfsmw_recortes_carrera.cpp).
+ */
+constexpr uint32_t kVista2Activa = 0x82A38070 + 2 * 112 + 8;
 
 }  // namespace
 }  // namespace nfsmw::recorte_sombras
@@ -394,8 +404,13 @@ std::atomic<int32_t> g_mapas_anotado{2};
 REX_EXTERN(__imp__sub_82443B18);
 REX_HOOK_RAW(sub_82443B18) {
   using namespace nfsmw::recorte_sombras;
-  // A single map, which is what the game itself does in the menus (r4 = 0).
-  if (nfsmw::guardia30::MapasEfectivos(REXCVAR_GET(nfsmw_sombras_mapas)) <= 1) {
+  // A single map, which is what the game itself does in the menus (r4 = 0). Not in split screen: there
+  // the second map is player 2's.
+  const bool dos_jugadores = base[kVista2Activa] != 0;
+  if (dos_jugadores && !g_dos_jugadores_anotado.exchange(true, std::memory_order_relaxed)) {
+    REXLOG_INFO("[recortes] sombras: pantalla dividida, los dos mapas (uno por jugador)");
+  }
+  if (!dos_jugadores && nfsmw::guardia30::MapasEfectivos(REXCVAR_GET(nfsmw_sombras_mapas)) <= 1) {
     if (g_mapas_anotado.exchange(1, std::memory_order_relaxed) != 1) {
       REXLOG_INFO("[recortes] sombras: un solo mapa en vez de dos");
     }

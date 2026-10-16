@@ -13,6 +13,20 @@
 #include <rex/logging.h>
 #include <rex/thread.h>
 
+#include <string>
+
+#include <rex/cvar.h>
+
+#if REX_PLATFORM_WIN32
+#include <winsock2.h>
+#else
+#include <arpa/inet.h>
+#endif
+
+// PARCHE LOCAL (red): definidas en xam_net.cpp. Ver XOnlineGetServiceInfo abajo.
+REXCVAR_DECLARE(std::string, red_dns);
+REXCVAR_DECLARE(bool, red_lan);
+
 namespace rex {
 namespace kernel {
 namespace xam {
@@ -48,6 +62,25 @@ X_HRESULT XLiveBaseApp::DispatchMessageSync(uint32_t message, uint32_t buffer_pt
       // and pServiceInfo. pServiceInfo should contain pointer to
       // XONLINE_SERVICE_INFO structure.
       REXKRNL_DEBUG("CXLiveLogon::GetServiceInfo({:08X}, {:08X})", buffer_ptr, buffer_length);
+      // PARCHE LOCAL (red): con red_dns, el servicio esta en esa IP. Most
+      // Wanted pide el servicio de EA (0x45410004) y, con la IP que le den, abre
+      // la pasarela segura (XNetConnect); sin esto su NetConn se queda en "-svc"
+      // y el juego dice "Has perdido tu conexion a Xbox Live". Aqui buffer_ptr es
+      // el id del servicio y buffer_length el puntero a XONLINE_SERVICE_INFO
+      // { dwServiceID, IN_ADDR serviceIP, WORD wServicePort, WORD wReserved }.
+      {
+        std::string destino = REXCVAR_GET(red_dns);
+        uint32_t ip = destino.empty() ? INADDR_NONE : inet_addr(destino.c_str());
+        if (ip != INADDR_NONE && buffer_length) {
+          auto info = memory_->TranslateVirtual(buffer_length);
+          memory::store_and_swap<uint32_t>(info + 0, buffer_ptr);
+          std::memcpy(info + 4, &ip, 4);  // ya en orden de red
+          memory::store_and_swap<uint16_t>(info + 8, 0);
+          memory::store_and_swap<uint16_t>(info + 10, 0);
+          REXKRNL_INFO("[red] XOnlineGetServiceInfo({:08X}) -> {}", buffer_ptr, destino);
+          return X_E_SUCCESS;
+        }
+      }
       return 0x80151802;  // ERROR_CONNECTION_INVALID
     }
     case 0x00058020: {
@@ -82,6 +115,20 @@ X_HRESULT XLiveBaseApp::DispatchMessageSync(uint32_t message, uint32_t buffer_pt
       "Unimplemented XLIVEBASE message app={:08X}, msg={:08X}, arg1={:08X}, "
       "arg2={:08X}",
       app_id(), message, buffer_ptr, buffer_length);
+  // PARCHE LOCAL (red): en la LAN, lo desconocido se apunta (con sus parametros,
+  // para saber que es) y va bien. Most Wanted manda 0x5000D al empezar la sesion
+  // de una partida y, con el error, se queda en "Comenzando sesion de juego".
+  if (REXCVAR_GET(red_lan)) {
+    std::string hex;
+    if (buffer_ptr && buffer_length && buffer_length <= 256) {
+      for (uint32_t i = 0; i < buffer_length; ++i) {
+        hex += fmt::format("{:02X}", buffer[i]);
+        if (i % 4 == 3) hex += " ";
+      }
+    }
+    REXKRNL_INFO("[red] XLIVEBASE {:08X} desconocido -> exito. Parametros: {}", message, hex);
+    return X_E_SUCCESS;
+  }
   return X_E_FAIL;
 }
 

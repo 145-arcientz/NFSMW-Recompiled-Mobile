@@ -171,6 +171,10 @@
     <string name="seccion_perfil">Perfil do Xbox 360</string>
     <string name="gamertag_resumen">O nome que o jogo vê no seu perfil. Se você mudar, seus jogos salvos são mantidos: eles vão pelo ID do perfil, não pelo nome.</string>
     <string name="gamertag_error">Até 15 letras, números e espaços, começando com uma letra.</string>
+    <string name="servidor_lan">Servidor LAN (multijogador)</string>
+    <string name="servidor_lan_resumen">Xbox Live do jogo contra o servidor da EA que você rodar num PC do seu Wi-Fi (tools/red/servidor_ea.py). Vazio: o jogo como sempre.</string>
+    <string name="servidor_lan_ip">IP do PC</string>
+    <string name="servidor_lan_error">Um endereço IPv4 como 10.0.0.4</string>
     <string name="seccion_tactil">Controles de toque</string>
     <string name="editar_tactil">Editar controles de toque</string>
     <string name="editar_tactil_resumen">Mova os botões de toque e mude o tamanho e a opacidade.</string>

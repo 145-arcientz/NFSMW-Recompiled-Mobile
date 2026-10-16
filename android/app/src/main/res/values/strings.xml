@@ -190,6 +190,10 @@
     <string name="gamertag" translatable="false">Gamertag</string>
     <string name="gamertag_resumen">The name the game sees for your profile. Your saves are kept if you change it: they go by the profile ID, not by the name.</string>
     <string name="gamertag_error">Up to 15 letters, numbers and spaces, starting with a letter.</string>
+    <string name="servidor_lan">LAN server (multiplayer)</string>
+    <string name="servidor_lan_resumen">Xbox Live in the game, against the EA server you run on a PC on your Wi-Fi (tools/red/servidor_ea.py). Empty: the game as always.</string>
+    <string name="servidor_lan_ip">PC IP</string>
+    <string name="servidor_lan_error">An IPv4 address like 10.0.0.4</string>
     <string name="seccion_tactil">Touch controls</string>
     <string name="editar_tactil">Edit touch controls</string>
     <string name="editar_tactil_resumen">Move the touch buttons and change their size and opacity.</string>
