@@ -172,8 +172,14 @@
     <string name="seccion_perfil">Perfil do Xbox 360</string>
     <string name="gamertag_resumen">O nome que o jogo vê no seu perfil. Se você mudar, seus jogos salvos são mantidos: eles vão pelo ID do perfil, não pelo nome.</string>
     <string name="gamertag_error">Até 15 letras, números e espaços, começando com uma letra.</string>
+    <string name="gamertag_libre" formatted="true">%1$s é seu em %2$s (reservado para este celular enquanto você joga)</string>
+    <string name="gamertag_en_uso" formatted="true">%1$s já está com outro celular em %2$s: escolha outro gamertag para jogar lá.</string>
+    <string name="gamertag_sin_respuesta" formatted="true">Não foi possível verificar o gamertag: %1$s não responde.</string>
+    <string name="gamertag_en_uso_titulo">Gamertag em uso</string>
+    <string name="gamertag_en_uso_pregunta" formatted="true">Outro celular já tem %1$s em %2$s. Quer jogar mesmo assim, sem modo online? Você pode jogar tudo menos Xbox Live.</string>
+    <string name="jugar_sin_online">Jogar sem online</string>
     <string name="servidor_lan">Servidor LAN (multijogador)</string>
-    <string name="servidor_lan_resumen">Xbox Live do jogo contra o servidor da EA que você rodar num PC do seu Wi-Fi (tools/red/servidor_ea.py). Vazio: o jogo como sempre.</string>
+    <string name="servidor_lan_resumen">Xbox Live do jogo contra o servidor da EA que você rodar num PC do seu Wi-Fi (nfsmw-server-lan). Vazio: o jogo como sempre.</string>
     <string name="servidor_lan_ip">IP do PC</string>
     <string name="servidor_lan_error">Um endereço IPv4 como 10.0.0.4</string>
     <string name="seccion_tactil">Controles de toque</string>

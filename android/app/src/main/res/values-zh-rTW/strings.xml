@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Traditional Chinese texts. Generated from values/strings.xml: same keys,
+    same order; the ones marked translatable="false" live only there.
+-->
+<resources>
+
+    <string name="apk_con_juego">這個 APK 內含遊戲，僅供你自己的裝置使用：請勿分享。</string>
+    <string name="apk_sonda">不含遊戲的 APK：只有 Vulkan 探測工具，用來測試你的手機與 GPU 驅動程式。</string>
+
+    <!-- Game -->
+    <string name="seccion_juego">遊戲</string>
+    <string name="sin_iso">尚未選擇 ISO。你需要自己的 Xbox 360 ISO（%1$s 版）。</string>
+    <string name="edicion_apk">這個 APK 是為遊戲的 %1$s 版建置的。</string>
+    <string name="motor_nativo">原生渲染器。</string>
+    <string name="limite_fps">影格率上限</string>
+    <string name="limite_fps_resumen">遊戲的最高速度。90、120 和無上限為實驗性功能，需要有這麼快的螢幕。無上限會讓遊戲以手機能跑的最快速度執行（最高 240 fps）。</string>
+    <string name="fps_valor">%1$d fps</string>
+    <string name="fps_experimental">%1$d fps（實驗性）</string>
+    <string name="fps_sin_limite">無上限（實驗性）</string>
+    <string name="resolucion_interna">渲染解析度</string>
+    <string name="resolucion_interna_resumen">遊戲在送到螢幕前繪製的尺寸。1280×720 與 Xbox 360 相同。</string>
+    <string name="res_interna_576">1024×576 · 較快</string>
+    <string name="res_interna_720">1280×720 · Xbox 360</string>
+    <string name="res_interna_1080">1920×1080 · 較清晰</string>
+    <string name="calidad_sombras">陰影品質</string>
+    <string name="calidad_sombras_resumen">柔和邊緣會像 Xbox 360 一樣模糊陰影輪廓（更耗 GPU）。與 Xbox 360 相同還會找回樹木、灌木和圍欄的陰影（更耗 CPU）。</string>
+    <string name="sombras_rapida">快速</string>
+    <string name="sombras_suave">柔和邊緣</string>
+    <string name="sombras_xbox360">與 Xbox 360 相同</string>
+    <string name="resolucion_sombras">陰影解析度</string>
+    <string name="sombras_nativa">原生（Xbox 360）</string>
+    <string name="sombras_alta">高</string>
+    <string name="sombras_muy_alta">非常高</string>
+    <string name="sombras_ultra">極致</string>
+    <string name="sombras">陰影</string>
+    <string name="sombras_resumen">陰影貼圖重新繪製的頻率。每 2 個影格比較省，幾乎看不出差別。</string>
+    <string name="sombras_siempre">每個影格</string>
+    <string name="sombras_cada_2">每 2 個影格</string>
+    <string name="sombras_distancia">陰影距離</string>
+    <string name="sombras_distancia_resumen">多遠的物體仍會投下陰影。陰影的大部分成本都在這裡。</string>
+    <string name="sombras_lejos">遠（與遊戲相同）</string>
+    <string name="sombras_media">中</string>
+    <string name="sombras_cerca">近 · 較快</string>
+    <string name="reflejos_coche">車身反射</string>
+    <string name="reflejos_coche_resumen">每個影格重新繪製車身反射貼圖的幾個面。</string>
+    <string name="calidad_alta">高</string>
+    <string name="calidad_media">中</string>
+    <string name="calidad_baja">低 · 較快</string>
+    <string name="reflejo_asfalto">濕路面反射</string>
+    <string name="reflejo_asfalto_resumen">水面也用它反射：關閉後海面會變黑。</string>
+    <string name="resplandor_cielo">天空光暈</string>
+    <string name="resplandor_cielo_resumen">自然會去除原版在樹木和屋頂上留下的藍色邊緣。不耗效能。</string>
+    <string name="cielo_natural">自然</string>
+    <string name="cielo_original">原版</string>
+    <string name="cielo_suave">柔和</string>
+    <string name="filtro_color">遊戲色彩濾鏡</string>
+    <string name="filtro_color_resumen">遊戲的黃色色調、降低飽和度與暗角。不耗效能。</string>
+    <string name="filtro_color_original">原版</string>
+    <string name="filtro_color_suave">一半</string>
+    <string name="filtro_color_apagado">關閉</string>
+    <string name="desenfoque">速度模糊</string>
+    <string name="desenfoque_resumen">加速和使用 NOS 時的放射狀模糊。每個影格需要 1.5–2 毫秒。</string>
+    <string name="filtro_imagen">影像濾鏡</string>
+    <string name="filtro_imagen_resumen">疊加在遊戲畫面風格上的額外風格。</string>
+    <string name="filtro_imagen_no">無</string>
+    <string name="filtro_imagen_cine">電影</string>
+    <string name="filtro_imagen_vivo">鮮豔</string>
+    <string name="filtro_imagen_calido">暖色</string>
+    <string name="filtro_imagen_frio">冷色</string>
+    <string name="filtro_imagen_sepia">復古棕</string>
+    <string name="filtro_imagen_noir">黑白</string>
+    <string name="filtro_imagen_crt">CRT</string>
+    <string name="seccion_sonido">音效</string>
+    <string name="audio_aaudio">透過 AAudio 輸出聲音</string>
+    <string name="audio_aaudio_resumen">這個應用程式的低延遲 Android 輸出。關閉：使用原生引擎的 SDL 輸出。</string>
+    <string name="compatibilidad">相容模式（實驗性）</string>
+    <string name="compatibilidad_resumen">為無法執行原生渲染器的 GPU 改為模擬 Xbox 360 的 GPU。速度慢很多。</string>
+    <string name="escalado">縮放到螢幕</string>
+    <string name="escalado_resumen">遊戲畫面如何調整到螢幕大小。當遊戲以低於螢幕的解析度繪製時（螢幕：原生），FSR 效果最明顯。</string>
+    <string name="escalado_bilineal">雙線性（標準）</string>
+    <string name="escalado_fsr">AMD FSR 1.0 · 更清晰的放大</string>
+    <string name="escalado_cas">AMD CAS · 僅銳化</string>
+    <string name="iso_incompleta">這個 ISO 不完整：檔案結尾少了 %1$s 的遊戲資料，像是下載或解壓縮中途中斷。用它無法載入遊戲。</string>
+    <string name="iso_no_es_xbox">這個檔案不是 Xbox 360 ISO：它沒有 Xbox 360 檔案系統。可能是 PC 或 PS2 版、尚未解壓縮的 .zip 或 .7z，或是別的遊戲。用它的話，遊戲會顯示黑畫面後關閉。</string>
+    <string name="iso_otra_edicion">這個 ISO 是遊戲的另一個版本。這個 APK 是為 %1$s 版建置的，無法用其他版本啟動：請選擇 %1$s 版的 ISO，或用這個 ISO 建置 APK。</string>
+    <string name="ediciones_apk">這個 APK 包含遊戲的 %1$s 版。</string>
+    <string name="edicion_iso">%1$s 版的 ISO。這個 APK 包含 %2$s。</string>
+    <string name="iso_edicion_no_incluida">這個 ISO 是這個 APK 不包含的遊戲版本（包含的是 %1$s）：用它無法啟動遊戲。</string>
+    <string name="iso_elegida">ISO：%1$s</string>
+    <string name="elegir_iso">選擇 ISO…</string>
+    <string name="iso_sin_permiso">Android 沒有授予這個 ISO 的永久存取權。請從手機的儲存空間選取。</string>
+    <string name="jugar">開始遊戲</string>
+    <string name="jugar_sin_iso">選擇你的 ISO 才能開始遊戲。</string>
+    <string name="jugar_sin_juego">這個 APK 不包含遊戲。</string>
+
+    <!-- Display -->
+    <string name="seccion_pantalla">顯示</string>
+    <string name="resolucion">解析度</string>
+    <string name="resolucion_resumen">螢幕上最終影像的尺寸。遊戲本身的繪製方式不變。</string>
+    <string name="res_nativa">原生 · %1$d×%2$d</string>
+    <string name="estirar">延展至全螢幕</string>
+    <string name="estirar_resumen">關閉：Xbox 360 的 16:9 畫面，帶黑邊。開啟：填滿螢幕，但畫面會變形。</string>
+    <string name="mostrar_fps">顯示 FPS</string>
+    <string name="mostrar_fps_resumen">角落計數器：每秒影格數與每個影格的毫秒數。</string>
+
+    <!-- Graphics -->
+    <string name="seccion_graficos">圖形</string>
+    <string name="suavizado">反鋸齒</string>
+    <string name="suavizado_resumen">讓鋸齒狀邊緣變平滑。MSAA 是遊戲本身的方式：最細緻也最耗效能。FXAA 是套在最終影像上的濾鏡：省很多，但會稍微模糊。</string>
+    <string name="aa_no">關閉</string>
+    <string name="msaa_muestras">MSAA 取樣數</string>
+    <string name="msaa_muestras_resumen">4x 是遊戲使用的設定（選單中 46 fps 對 60 fps）。2x 平滑較少，也較省效能。</string>
+    <string name="fxaa_calidad">FXAA 品質</string>
+    <string name="fxaa_calidad_resumen">高會平滑更多邊緣，包括較淡的邊緣，畫面也會稍微柔和一些。</string>
+    <string name="fxaa_normal">一般</string>
+    <string name="fxaa_alta">高</string>
+    <string name="posprocesado">後製處理</string>
+    <string name="posprocesado_resumen">原版遊戲的色彩濾鏡和模糊。關閉：GPU 負擔較輕，但看起來不再像原版。</string>
+    <string name="anisotropico">各向異性過濾</string>
+    <string name="anisotropico_resumen">斜看的材質更清晰，例如遠方的道路。</string>
+    <string name="aniso_no">關閉</string>
+    <string name="escala">內部解析度</string>
+    <string name="escala_resumen">2x 以 2560×1440 繪製：更清晰，但負擔重很多。建議使用 1x。</string>
+
+    <!-- Performance -->
+    <string name="seccion_rendimiento">效能</string>
+    <string name="fijar_hilos">將執行緒固定到核心</string>
+    <string name="fijar_hilos_resumen">把遊戲最重的執行緒放到最快的核心上。</string>
+    <string name="driver">GPU 驅動程式</string>
+    <string name="ayuda_driver">Turnip 是 Mesa 為 Adreno 開發的開源驅動程式。匯入 Turnip 驅動程式的 .zip（含 meta.json），並在這裡選取。</string>
+    <string name="driver_sistema">系統驅動程式（%1$s）</string>
+    <string name="gpu_desconocida">未知</string>
+    <string name="ayuda_driver_otra">Mesa 的開源驅動程式 Turnip 僅適用於 Adreno GPU：在這個 GPU（%1$s）上，遊戲會使用系統驅動程式。你可以匯入其他 Vulkan 驅動程式（含 meta.json 的 .zip）來試試看。</string>
+    <string name="driver_sistema_sin_gpu">系統驅動程式</string>
+    <string name="importar_driver">匯入驅動程式（.zip）</string>
+    <string name="borrar_driver">刪除所選項目</string>
+    <string name="driver_importado">已匯入驅動程式：%1$s</string>
+    <string name="driver_error">無法匯入驅動程式：%1$s</string>
+    <string name="error_driver_carpeta">無法建立 %1$s</string>
+    <string name="error_driver_meta">meta.json 不是有效的 JSON</string>
+    <string name="error_driver_sin_so">zip 裡沒有驅動程式的 .so</string>
+    <string name="error_driver_mover">無法將驅動程式移到 %1$s</string>
+    <string name="turbo">GPU 加速</string>
+    <string name="turbo_resumen">鎖定 GPU 時脈，而不是讓系統調整。僅限在 Adreno GPU 上使用 Turnip 時。不一定有幫助：請用 FPS 計數器確認。</string>
+
+    <!-- Language -->
+    <string name="seccion_idioma">語言</string>
+    <string name="idioma_auto">自動（手機語言）</string>
+
+    <!-- Advanced -->
+    <string name="seccion_avanzado">進階</string>
+    <string name="avanzado_resumen">用來測試每個項目在你手機上的效能成本。預設值就是建議值。</string>
+    <string name="una_pasada">單次繪製場景</string>
+    <string name="una_pasada_resumen">一次繪製整個場景，而不是分成三個區塊：繪製呼叫減少約 30 %，比賽中 fps 約提升 25–45 %。它會停用遊戲的 MSAA，所以選擇 MSAA 時會關閉。</string>
+    <string name="edram_fsi">在像素著色器中處理 EDRAM（實驗性）</string>
+    <string name="edram_fsi_resumen">模擬 Xbox 360 EDRAM 的另一種方式。GPU 不支援時會忽略。</string>
+    <string name="oclusion">遮蔽查詢</string>
+    <string name="oclusion_resumen">太陽光暈與燈光。會讓遊戲等待 GPU。</string>
+    <string name="exposicion">精確曝光</string>
+    <string name="exposicion_resumen">每個影格都從 GPU 讀回影像。關閉後畫面會顯得泛白。</string>
+    <string name="memexport">讀回 memexport</string>
+    <string name="memexport_resumen">著色器寫入內容的記憶體一致性。可能會降低效能。</string>
+    <string name="paginas">更新 GPU 寫入的頁面</string>
+    <string name="paginas_resumen">記憶體一致性。可能會降低效能。</string>
+    <string name="registro_detallado">詳細記錄</string>
+    <string name="registro_detallado_resumen">log_level=debug。會讓 fps 大幅下降：僅用於診斷問題。</string>
+    <string name="probar_vulkan">測試 Vulkan</string>
+    <string name="probar_vulkan_resumen">不執行遊戲，載入 GPU 驅動程式並檢查它支援哪些功能。</string>
+    <string name="sin_informe">還沒有探測報告。點選「測試 Vulkan」。</string>
+
+    <!-- Touch controller -->
+    <string name="tactil_ocultar">隱藏</string>
+    <string name="tactil_mostrar">觸控</string>
+    <string name="tactil_mando">手把</string>
+    <string name="tactil_gestos">手指</string>
+    <string name="seccion_perfil">Xbox 360 個人檔案</string>
+    <string name="gamertag_resumen">遊戲在你的個人檔案中看到的名稱。更改後存檔仍會保留：存檔是依個人檔案 ID，而不是名稱。</string>
+    <string name="gamertag_error">最多 15 個英文字母、數字和空格，必須以字母開頭。</string>
+    <string name="gamertag_libre" formatted="true">%1$s 在 %2$s 上屬於你（遊戲期間為這支手機保留）</string>
+    <string name="gamertag_en_uso" formatted="true">%1$s 在 %2$s 上已被另一支手機使用：請選擇其他玩家代號才能在那裡遊戲。</string>
+    <string name="gamertag_sin_respuesta" formatted="true">無法檢查玩家代號：%1$s 沒有回應。</string>
+    <string name="gamertag_en_uso_titulo">玩家代號已被使用</string>
+    <string name="gamertag_en_uso_pregunta" formatted="true">另一支手機已在 %2$s 上使用 %1$s。仍要在沒有線上模式的情況下遊戲嗎？除了 Xbox Live 以外都能玩。</string>
+    <string name="jugar_sin_online">離線遊戲</string>
+    <string name="servidor_lan">區域網路伺服器（多人遊戲）</string>
+    <string name="servidor_lan_resumen">讓遊戲中的 Xbox Live 連到你在 Wi-Fi 內的電腦上執行的 EA 伺服器（nfsmw-server-lan）。留空：照常遊戲。</string>
+    <string name="servidor_lan_ip">電腦的 IP</string>
+    <string name="servidor_lan_error">像 10.0.0.4 這樣的 IPv4 位址</string>
+    <string name="seccion_tactil">觸控操作</string>
+    <string name="editar_tactil">編輯觸控操作</string>
+    <string name="editar_tactil_resumen">移動觸控按鈕，並調整大小與不透明度。</string>
+    <string name="vibracion">震動</string>
+    <string name="vibracion_resumen">遊戲會讓控制器震動：碰撞、氮氣加速、崎嶇路面……實體控制器（USB 或藍牙）會震動；沒有連接控制器時，則由手機震動。</string>
+    <string name="probar_vibracion">測試震動</string>
+    <string name="vibracion_mando_motores">%1$s（%2$s）：震動中 · 馬達：%3$d</string>
+    <string name="vibracion_mando_sin_motores">%1$s（%2$s）：Android 沒有提供這個控制器的馬達，所以無法震動。</string>
+    <string name="vibracion_mando_xbox_usb">%1$s（%2$s）：透過 USB 時 Android 不提供它的馬達，所以這項測試無法讓它震動。遊戲中由 SDL 透過 USB 以自己的震動功能控制（連接時會要求 USB 權限）。</string>
+    <string name="vibracion_sin_mandos">沒有連接控制器：由手機震動。</string>
+    <string name="girar_inclinando">傾斜手機來轉向</string>
+    <string name="girar_inclinando_resumen">在比賽和自由駕駛中，像方向盤一樣傾斜手機，取代左搖桿（左搖桿會隱藏）。直線加速賽仍保留換道箭頭。</string>
+    <string name="menus_tactiles">用手指操作選單</string>
+    <string name="menus_tactiles_resumen">在選單和暫停選單中沒有手把：滑動來移動（在選項清單中，橫向滑動會改變數值），點選選項來選擇，點選箭頭來改變數值，點選下方的提示（例如「Ⓐ 確認」或「Ⓑ 返回」）即可按下。兩指點按：返回。上方的手把按鈕會讓手把回來。</string>
+    <string name="deslizar_invertido">反轉選單中的滑動方向</string>
+    <string name="deslizar_invertido_resumen">關閉：像翻頁一樣，向左滑會到右邊的選項。開啟：向右滑會到右邊的選項。</string>
+    <string name="sensibilidad_giro">轉向靈敏度</string>
+    <string name="sensibilidad_giro_resumen">越往右，轉到底所需的傾斜越少。</string>
+    <string name="sensibilidad_valor">%1$d · %2$d° 時轉到底</string>
+    <string name="editor_tamano">大小</string>
+    <string name="editor_opacidad">不透明度</string>
+    <string name="editor_restaurar">重設</string>
+    <string name="editor_cancelar">取消</string>
+    <string name="editor_listo">完成</string>
+    <string name="editor_ayuda">拖曳控制項即可移動。大小會套用到所選的控制項；若未選取，則套用到全部。</string>
+    <string name="editor_disposicion_normal">操作：一般</string>
+    <string name="editor_disposicion_aceleracion">操作：直線加速</string>
+    <string name="editor_disposicion_conduciendo">操作：駕駛中</string>
+</resources>

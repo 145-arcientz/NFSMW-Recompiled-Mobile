@@ -1153,6 +1153,9 @@ constexpr EtiquetaIndicacion kEtiquetasIndicacion[] = {
     {0x61D596D7, kBotonB},  // "Atras"
     {0x8CD567B8, kBotonB},  // LANGUAGE_COMMON_BACK
     {0x7F7340AF, kBotonY},  // "Estadisticas": LANGUAGE_COMMON_GAME_STATS, con Y en el menu principal
+    // "Tarjeta de jugador", con RB, en la sala de juego y en el punto de encuentro del online
+    // (OL_GameRoom, OL_LobbyRoom; 2026-10-16): su icono no es el RB de kTexturasIndicacion.
+    {0x92463C0C, kBotonRB},
 };
 
 // Las texturas de los iconos de boton de las indicaciones (imagenes de 32x32 a la izquierda
@@ -1820,6 +1823,92 @@ bool ZonaDeIndicacion(Indicacion& ind, const std::vector<Texto>& textos) {
   return mejor != nullptr;
 }
 
+// Las indicaciones de la barra de abajo van en filas a ~25 unidades (OL_GameRoom: "(A) Cambiar
+// coche" encima de "(B) Atras"), unos 4 mm en un movil, y el dedo daba en la de al lado. Cada
+// una crece hacia el hueco que tiene: hasta el centro de la fila de encima y de la de debajo
+// (donde dos se pisan, Tocar elige la fila mas cercana al dedo); la primera fila, hacia arriba
+// sin pisar ninguna opcion; la ultima, hasta el borde de abajo; y la primera de cada fila,
+// hasta el borde izquierdo de la imagen.
+constexpr float kMismaFila = 12.0f;     // dos iconos con el centro a menos de esto, misma fila
+constexpr float kBarraDesde = 150.0f;   // las filas de la barra de abajo empiezan por aqui
+constexpr float kCrecerArriba = 24.0f;  // lo que sube la primera fila, si no hay una opcion antes
+
+void CrecerBarra(Menu& menu) {
+  // Un icono sin boton conocido justo donde empieza una indicacion conocida (por la etiqueta
+  // de su texto, kEtiquetasIndicacion): es el suyo. Fuera: empieza un poco mas a la derecha
+  // y MejorEnFila lo preferiria, y tocarlo no hace nada.
+  auto tapado = [&menu](const Indicacion& i) {
+    if (i.boton >= 0) {
+      return false;
+    }
+    for (const Indicacion& o : menu.indicaciones) {
+      if (o.boton >= 0 && std::fabs(o.icono.Cy() - i.icono.Cy()) < kMismaFila &&
+          i.icono.x0 >= o.zona.x0 - 4.0f && i.icono.x0 <= o.zona.x0 + 40.0f) {
+        return true;
+      }
+    }
+    return false;
+  };
+  std::vector<Indicacion> quedan;
+  for (const Indicacion& i : menu.indicaciones) {
+    if (!tapado(i)) {
+      quedan.push_back(i);
+    }
+  }
+  menu.indicaciones = std::move(quedan);
+  std::vector<float> filas;  // el centro de cada fila de la barra, de arriba abajo
+  for (const Indicacion& ind : menu.indicaciones) {
+    const float cy = ind.icono.Cy();
+    bool nueva = cy >= kBarraDesde;
+    for (const float f : filas) {
+      nueva = nueva && std::fabs(f - cy) >= kMismaFila;
+    }
+    if (nueva) {
+      filas.push_back(cy);
+    }
+  }
+  std::sort(filas.begin(), filas.end());
+  for (Indicacion& ind : menu.indicaciones) {
+    const float cy = ind.icono.Cy();
+    size_t k = 0;
+    while (k < filas.size() && std::fabs(filas[k] - cy) >= kMismaFila) {
+      ++k;
+    }
+    if (cy < kBarraDesde || k == filas.size()) {
+      continue;
+    }
+    bool primera = true;
+    for (const Indicacion& otra : menu.indicaciones) {
+      primera = primera && !(std::fabs(otra.icono.Cy() - cy) < kMismaFila && otra.icono.x0 < ind.icono.x0 - 1.0f);
+    }
+    if (primera) {
+      ind.zona.x0 = -kMedioAnchoVisible;
+    }
+    float arriba = k > 0 ? filas[k - 1] : ind.zona.y0 - kCrecerArriba;
+    if (k == 0) {
+      for (const Opcion& o : menu.opciones) {
+        if (o.caja.y1 <= ind.zona.y0 && o.caja.x0 < ind.zona.x1 && ind.zona.x0 < o.caja.x1) {
+          arriba = std::max(arriba, o.caja.y1 + 2.0f);
+        }
+      }
+    }
+    const float abajo = k + 1 < filas.size() ? filas[k + 1] : kMedioAltoVisible;
+    ind.zona.y0 = std::min(ind.zona.y0, arriba);
+    ind.zona.y1 = std::max(ind.zona.y1, abajo);
+  }
+}
+
+// Entre dos indicaciones de una misma fila que caen bajo el dedo: la que empieza mas a la
+// derecha sin pasarse de el (el texto de una se estima y puede pisar la siguiente); si el dedo
+// esta a la izquierda de todas (la zona de la primera llega al borde, CrecerBarra), la primera.
+bool MejorEnFila(const Indicacion& a, const Indicacion& b, float x) {
+  const bool va = a.icono.x0 <= x + kMargenIndicacion, vb = b.icono.x0 <= x + kMargenIndicacion;
+  if (va != vb) {
+    return va;
+  }
+  return va ? a.icono.x0 > b.icono.x0 : a.icono.x0 < b.icono.x0;
+}
+
 bool LeerMenu(Menu& menu) {
   auto* runtime = rex::Runtime::instance();
   auto* memoria = runtime ? runtime->memory() : nullptr;
@@ -1883,6 +1972,7 @@ bool LeerMenu(Menu& menu) {
       ind.zona.x1 += 30.0f;
     }
   }
+  CrecerBarra(menu);
   return true;
 }
 
@@ -2024,12 +2114,20 @@ jint Tocar(float u, float v) {
     return kMenusDesconocido;
   }
   const Menu& menu = g_menu;
-  // Una indicacion. Si caen dos (el texto de una se estima y puede pisar la siguiente),
-  // la que empieza mas a la derecha sin pasarse del dedo.
+  // Una indicacion. Si caen varias: la de la fila con el centro mas cerca del dedo (las de la
+  // barra crecen hasta pisarse, CrecerBarra) y, en esa fila, MejorEnFila.
   const Indicacion* indicacion = nullptr;
   for (const Indicacion& ind : menu.indicaciones) {
-    if (ind.zona.Contiene(x, y, kMargenIndicacion) && ind.icono.x0 <= x + kMargenIndicacion &&
-        (!indicacion || ind.icono.x0 > indicacion->icono.x0)) {
+    if (!ind.zona.Contiene(x, y, kMargenIndicacion)) {
+      continue;
+    }
+    if (!indicacion) {
+      indicacion = &ind;
+    } else if (std::fabs(ind.icono.Cy() - indicacion->icono.Cy()) < kMismaFila) {
+      if (MejorEnFila(ind, *indicacion, x)) {
+        indicacion = &ind;
+      }
+    } else if (std::fabs(ind.icono.Cy() - y) < std::fabs(indicacion->icono.Cy() - y)) {
       indicacion = &ind;
     }
   }

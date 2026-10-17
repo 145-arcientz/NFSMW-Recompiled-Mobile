@@ -10,7 +10,7 @@ llegó; el estado y el protocolo están en esta primera sección.
 ### Cómo se prueba
 
 1. En el PC: `python servidor_ea.py --ip <IP del PC>` desde el proyecto aparte
-   `..\nfsmw-servidor-lan` (directorio 30960, salas 10901; todo al log
+   `..\nfsmw-server-lan` (github.com/victorgbd/nfsmw-server-lan; directorio 30960, salas 10901; todo al log
    `registros/servidor.log` de ese proyecto; ver `tools/red/README.md`).
 2. En cada móvil, ajustes de la app → "Servidor LAN (multijugador)": la IP del PC. Con eso
    el motor nativo arranca con `--grant_user_privileges --red_lan --red_live

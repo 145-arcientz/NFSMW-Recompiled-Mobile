@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Italian texts. Generated from values/strings.xml: same keys,
+    same order; the ones marked translatable="false" live only there.
+-->
+<resources>
+
+    <string name="apk_con_juego">Questo APK contiene il gioco. È solo per i tuoi dispositivi: non condividerlo.</string>
+    <string name="apk_sonda">APK senza il gioco: include solo la sonda Vulkan, per provare il telefono e il driver della GPU.</string>
+
+    <!-- Game -->
+    <string name="seccion_juego">Gioco</string>
+    <string name="sin_iso">Nessuna ISO selezionata. Serve la tua ISO di Xbox 360, edizione %1$s.</string>
+    <string name="edicion_apk">Questo APK è stato compilato per l\'edizione %1$s del gioco.</string>
+    <string name="motor_nativo">Renderer nativo.</string>
+    <string name="limite_fps">Limite di fotogrammi</string>
+    <string name="limite_fps_resumen">La velocità massima del gioco. 90, 120 e Senza limite sono sperimentali e richiedono uno schermo così veloce. Senza limite lascia andare il gioco alla massima velocità del telefono (fino a 240 fps).</string>
+    <string name="fps_valor">%1$d fps</string>
+    <string name="fps_experimental">%1$d fps (sperimentale)</string>
+    <string name="fps_sin_limite">Senza limite (sperimentale)</string>
+    <string name="resolucion_interna">Risoluzione di rendering</string>
+    <string name="resolucion_interna_resumen">La dimensione a cui viene disegnato il gioco, prima di arrivare allo schermo. 1280×720 è quella di Xbox 360.</string>
+    <string name="res_interna_576">1024×576 · più veloce</string>
+    <string name="res_interna_720">1280×720 · Xbox 360</string>
+    <string name="res_interna_1080">1920×1080 · più nitida</string>
+    <string name="calidad_sombras">Qualità delle ombre</string>
+    <string name="calidad_sombras_resumen">Bordi morbidi sfuma il contorno delle ombre come su Xbox 360 (più GPU). Come Xbox 360 riporta anche le ombre di alberi, cespugli e recinzioni (più CPU).</string>
+    <string name="sombras_rapida">Veloce</string>
+    <string name="sombras_suave">Bordi morbidi</string>
+    <string name="sombras_xbox360">Come Xbox 360</string>
+    <string name="resolucion_sombras">Risoluzione delle ombre</string>
+    <string name="sombras_nativa">Nativa (Xbox 360)</string>
+    <string name="sombras_alta">Alta</string>
+    <string name="sombras_muy_alta">Molto alta</string>
+    <string name="sombras_ultra">Ultra</string>
+    <string name="sombras">Ombre</string>
+    <string name="sombras_resumen">Ogni quanto si ridisegnano le mappe delle ombre. Ogni 2 fotogrammi costa meno e quasi non si nota.</string>
+    <string name="sombras_siempre">Ogni fotogramma</string>
+    <string name="sombras_cada_2">Ogni 2 fotogrammi</string>
+    <string name="sombras_distancia">Distanza delle ombre</string>
+    <string name="sombras_distancia_resumen">Fino a che distanza gli oggetti proiettano ombre. Gran parte del costo delle ombre sta qui.</string>
+    <string name="sombras_lejos">Lontano (come il gioco)</string>
+    <string name="sombras_media">Media</string>
+    <string name="sombras_cerca">Vicino · più veloce</string>
+    <string name="reflejos_coche">Riflessi dell\'auto</string>
+    <string name="reflejos_coche_resumen">Quante facce della mappa dei riflessi dell\'auto vengono ridisegnate a ogni fotogramma.</string>
+    <string name="calidad_alta">Alta</string>
+    <string name="calidad_media">Media</string>
+    <string name="calidad_baja">Bassa · più veloce</string>
+    <string name="reflejo_asfalto">Riflesso della strada bagnata</string>
+    <string name="reflejo_asfalto_resumen">Anche l\'acqua lo riflette: senza, il mare diventa nero.</string>
+    <string name="resplandor_cielo">Bagliore del cielo</string>
+    <string name="resplandor_cielo_resumen">Naturale toglie i bordi blu che l\'originale lascia su alberi e tetti. Nessun costo.</string>
+    <string name="cielo_natural">Naturale</string>
+    <string name="cielo_original">Originale</string>
+    <string name="cielo_suave">Morbido</string>
+    <string name="filtro_color">Filtro colore del gioco</string>
+    <string name="filtro_color_resumen">La tinta gialla, la desaturazione e la vignettatura del gioco. Nessun costo.</string>
+    <string name="filtro_color_original">Originale</string>
+    <string name="filtro_color_suave">A metà</string>
+    <string name="filtro_color_apagado">Disattivato</string>
+    <string name="desenfoque">Sfocatura della velocità</string>
+    <string name="desenfoque_resumen">La sfocatura radiale quando acceleri e con il NOS. Costa 1,5–2 ms per fotogramma.</string>
+    <string name="filtro_imagen">Filtro immagine</string>
+    <string name="filtro_imagen_resumen">Uno stile in più sopra quello del gioco.</string>
+    <string name="filtro_imagen_no">Nessuno</string>
+    <string name="filtro_imagen_cine">Cinema</string>
+    <string name="filtro_imagen_vivo">Vivace</string>
+    <string name="filtro_imagen_calido">Caldo</string>
+    <string name="filtro_imagen_frio">Freddo</string>
+    <string name="filtro_imagen_sepia">Seppia</string>
+    <string name="filtro_imagen_noir">Bianco e nero</string>
+    <string name="filtro_imagen_crt">CRT</string>
+    <string name="seccion_sonido">Audio</string>
+    <string name="audio_aaudio">Audio tramite AAudio</string>
+    <string name="audio_aaudio_resumen">L\'uscita audio a bassa latenza di Android di questa app. Disattivato: l\'uscita SDL del motore nativo.</string>
+    <string name="compatibilidad">Modalità compatibilità (sperimentale)</string>
+    <string name="compatibilidad_resumen">Emula la GPU di Xbox 360 invece di usare il renderer nativo, per le GPU che non riescono a eseguirlo. Molto più lenta.</string>
+    <string name="escalado">Scalatura allo schermo</string>
+    <string name="escalado_resumen">Come l\'immagine del gioco viene portata alla dimensione dello schermo. FSR rende al meglio quando il gioco disegna sotto la risoluzione dello schermo (Schermo: nativa).</string>
+    <string name="escalado_bilineal">Bilineare (standard)</string>
+    <string name="escalado_fsr">AMD FSR 1.0 · ingrandimento più nitido</string>
+    <string name="escalado_cas">AMD CAS · solo nitidezza</string>
+    <string name="iso_incompleta">Questa ISO è incompleta: mancano %1$s di dati di gioco alla fine del file, come dopo un download o un\'estrazione interrotti. Il gioco non si caricherà.</string>
+    <string name="iso_no_es_xbox">Questo file non è una ISO di Xbox 360: non ha un file system di Xbox 360. Potrebbe essere la versione PC o PS2, un .zip o .7z non estratto, o un altro gioco. Con questo il gioco mostra una schermata nera e si chiude.</string>
+    <string name="iso_otra_edicion">Questa ISO è di un\'altra edizione del gioco. Questo APK è stato compilato per l\'edizione %1$s e non si avvia con un\'altra: scegli la ISO %1$s, oppure compila l\'APK da questa ISO.</string>
+    <string name="ediciones_apk">Questo APK include le edizioni %1$s del gioco.</string>
+    <string name="edicion_iso">ISO dell\'edizione %1$s. Questo APK include %2$s.</string>
+    <string name="iso_edicion_no_incluida">Questa ISO è di un\'edizione del gioco che questo APK non include (include %1$s): il gioco non si avvierà.</string>
+    <string name="iso_elegida">ISO: %1$s</string>
+    <string name="elegir_iso">Scegli ISO…</string>
+    <string name="iso_sin_permiso">Android non ha concesso l\'accesso permanente a quella ISO. Selezionala dalla memoria del telefono.</string>
+    <string name="jugar">Gioca</string>
+    <string name="jugar_sin_iso">Scegli la tua ISO per giocare.</string>
+    <string name="jugar_sin_juego">Questo APK non include il gioco.</string>
+
+    <!-- Display -->
+    <string name="seccion_pantalla">Schermo</string>
+    <string name="resolucion">Risoluzione</string>
+    <string name="resolucion_resumen">La dimensione dell\'immagine finale sullo schermo. Il gioco viene comunque disegnato allo stesso modo.</string>
+    <string name="res_nativa">Nativa · %1$d×%2$d</string>
+    <string name="estirar">Estendi a tutto schermo</string>
+    <string name="estirar_resumen">Disattivato: l\'immagine 16:9 di Xbox 360, con bande nere. Attivato: riempie lo schermo, ma deforma l\'immagine.</string>
+    <string name="mostrar_fps">Mostra FPS</string>
+    <string name="mostrar_fps_resumen">Contatore nell\'angolo: fotogrammi al secondo e millisecondi per fotogramma.</string>
+
+    <!-- Graphics -->
+    <string name="seccion_graficos">Grafica</string>
+    <string name="suavizado">Antialiasing</string>
+    <string name="suavizado_resumen">Ammorbidisce i bordi seghettati. MSAA è quello del gioco: il più fine e il più costoso. FXAA è un filtro sull\'immagine finale: costa molto meno, ma è un po\' più morbido.</string>
+    <string name="aa_no">Disattivato</string>
+    <string name="msaa_muestras">Campioni MSAA</string>
+    <string name="msaa_muestras_resumen">4x è quello che usa il gioco (46 fps contro 60 nel menu). 2x ammorbidisce meno e costa meno.</string>
+    <string name="fxaa_calidad">Qualità FXAA</string>
+    <string name="fxaa_calidad_resumen">Alta ammorbidisce più bordi, anche quelli deboli, e rende l\'immagine un po\' più morbida.</string>
+    <string name="fxaa_normal">Normale</string>
+    <string name="fxaa_alta">Alta</string>
+    <string name="posprocesado">Post-elaborazione</string>
+    <string name="posprocesado_resumen">Il filtro colore e la sfocatura del gioco originale. Disattivato: meno lavoro per la GPU, ma non sembra più l\'originale.</string>
+    <string name="anisotropico">Filtro anisotropico</string>
+    <string name="anisotropico_resumen">Texture più nitide viste di sbieco, come la strada in lontananza.</string>
+    <string name="aniso_no">Disattivato</string>
+    <string name="escala">Risoluzione interna</string>
+    <string name="escala_resumen">2x disegna a 2560×1440: più nitido, ma molto più pesante. Si consiglia 1x.</string>
+
+    <!-- Performance -->
+    <string name="seccion_rendimiento">Prestazioni</string>
+    <string name="fijar_hilos">Fissa i thread ai core</string>
+    <string name="fijar_hilos_resumen">Mette i thread più pesanti del gioco sui core più veloci.</string>
+    <string name="driver">Driver della GPU</string>
+    <string name="ayuda_driver">Turnip è il driver open source di Mesa per Adreno. Importa un .zip di un driver Turnip (con meta.json) e selezionalo qui.</string>
+    <string name="driver_sistema">Driver di sistema (%1$s)</string>
+    <string name="gpu_desconocida">sconosciuta</string>
+    <string name="ayuda_driver_otra">Turnip, il driver open source di Mesa, è solo per GPU Adreno: con questa GPU (%1$s) il gioco usa il driver di sistema. Puoi importare un altro driver Vulkan (.zip con meta.json) per provarlo.</string>
+    <string name="driver_sistema_sin_gpu">Driver di sistema</string>
+    <string name="importar_driver">Importa driver (.zip)</string>
+    <string name="borrar_driver">Elimina selezionato</string>
+    <string name="driver_importado">Driver importato: %1$s</string>
+    <string name="driver_error">Impossibile importare il driver: %1$s</string>
+    <string name="error_driver_carpeta">impossibile creare %1$s</string>
+    <string name="error_driver_meta">meta.json non è un JSON valido</string>
+    <string name="error_driver_sin_so">lo zip non contiene il .so di un driver</string>
+    <string name="error_driver_mover">impossibile spostare il driver in %1$s</string>
+    <string name="turbo">Turbo della GPU</string>
+    <string name="turbo_resumen">Blocca la frequenza della GPU invece di lasciarla regolare al sistema. Solo con Turnip su una GPU Adreno. Non sempre aiuta: controlla con il contatore FPS.</string>
+
+    <!-- Language -->
+    <string name="seccion_idioma">Lingua</string>
+    <string name="idioma_auto">Automatica (lingua del telefono)</string>
+
+    <!-- Advanced -->
+    <string name="seccion_avanzado">Avanzate</string>
+    <string name="avanzado_resumen">Per provare quanto costa ogni cosa sul tuo telefono. I valori predefiniti sono quelli consigliati.</string>
+    <string name="una_pasada">Scena in un solo passaggio</string>
+    <string name="una_pasada_resumen">Disegna la scena una volta sola invece che in tre fasce: ~30 % di disegni in meno e circa +25-45 % di fps in gara. Disattiva l\'MSAA del gioco, quindi si spegne con MSAA selezionato.</string>
+    <string name="edram_fsi">EDRAM nel pixel shader (sperimentale)</string>
+    <string name="edram_fsi_resumen">Un altro modo di emulare la EDRAM di Xbox 360. Ignorato se la GPU non lo supporta.</string>
+    <string name="oclusion">Query di occlusione</string>
+    <string name="oclusion_resumen">Riflessi del sole e luci. Fanno aspettare il gioco la GPU.</string>
+    <string name="exposicion">Esposizione precisa</string>
+    <string name="exposicion_resumen">Rilegge l\'immagine dalla GPU a ogni fotogramma. Senza, l\'immagine appare sbiadita.</string>
+    <string name="memexport">Rilettura di memexport</string>
+    <string name="memexport_resumen">Coerenza della memoria per ciò che scrivono gli shader. Può costare prestazioni.</string>
+    <string name="paginas">Aggiorna le pagine scritte dalla GPU</string>
+    <string name="paginas_resumen">Coerenza della memoria. Può costare prestazioni.</string>
+    <string name="registro_detallado">Log dettagliato</string>
+    <string name="registro_detallado_resumen">log_level=debug. Fa crollare gli fps: solo per diagnosticare problemi.</string>
+    <string name="probar_vulkan">Prova Vulkan</string>
+    <string name="probar_vulkan_resumen">Carica il driver della GPU e controlla cosa supporta, senza il gioco.</string>
+    <string name="sin_informe">Ancora nessun rapporto della sonda. Tocca “Prova Vulkan”.</string>
+
+    <!-- Touch controller -->
+    <string name="tactil_ocultar">NASCONDI</string>
+    <string name="tactil_mostrar">TOUCH</string>
+    <string name="tactil_mando">PAD</string>
+    <string name="tactil_gestos">DITO</string>
+    <string name="seccion_perfil">Profilo Xbox 360</string>
+    <string name="gamertag_resumen">Il nome che il gioco vede nel tuo profilo. Se lo cambi, i salvataggi restano: vanno per ID del profilo, non per nome.</string>
+    <string name="gamertag_error">Fino a 15 lettere, numeri e spazi, iniziando con una lettera.</string>
+    <string name="gamertag_libre" formatted="true">%1$s è tuo su %2$s (riservato a questo telefono mentre giochi)</string>
+    <string name="gamertag_en_uso" formatted="true">%1$s è già usato su %2$s da un altro telefono: scegli un altro gamertag per giocarci.</string>
+    <string name="gamertag_sin_respuesta" formatted="true">Impossibile verificare il gamertag: %1$s non risponde.</string>
+    <string name="gamertag_en_uso_titulo">Gamertag in uso</string>
+    <string name="gamertag_en_uso_pregunta" formatted="true">Un altro telefono ha già %1$s su %2$s. Vuoi giocare comunque, senza modalità online? Puoi giocare a tutto tranne Xbox Live.</string>
+    <string name="jugar_sin_online">Gioca offline</string>
+    <string name="servidor_lan">Server LAN (multigiocatore)</string>
+    <string name="servidor_lan_resumen">Xbox Live nel gioco, contro il server EA che avvii su un PC della tua Wi-Fi (nfsmw-server-lan). Vuoto: il gioco come sempre.</string>
+    <string name="servidor_lan_ip">IP del PC</string>
+    <string name="servidor_lan_error">Un indirizzo IPv4 come 10.0.0.4</string>
+    <string name="seccion_tactil">Comandi touch</string>
+    <string name="editar_tactil">Modifica comandi touch</string>
+    <string name="editar_tactil_resumen">Sposta i pulsanti touch e cambia dimensione e opacità.</string>
+    <string name="vibracion">Vibrazione</string>
+    <string name="vibracion_resumen">Il gioco fa vibrare il controller: urti, nitro, terreno accidentato... Vibra un controller fisico (USB o Bluetooth); se non ce n\'è nessuno collegato, vibra il telefono.</string>
+    <string name="probar_vibracion">Prova vibrazione</string>
+    <string name="vibracion_mando_motores">%1$s (%2$s): vibrazione · motori: %3$d</string>
+    <string name="vibracion_mando_sin_motores">%1$s (%2$s): Android non espone motori per questo controller, quindi non può vibrare.</string>
+    <string name="vibracion_mando_xbox_usb">%1$s (%2$s): via USB Android non espone i suoi motori, quindi questa prova non può farlo vibrare. Nel gioco lo gestisce SDL via USB con la sua vibrazione (chiede il permesso USB quando lo colleghi).</string>
+    <string name="vibracion_sin_mandos">Nessun controller collegato: vibra il telefono.</string>
+    <string name="girar_inclinando">Sterza inclinando il telefono</string>
+    <string name="girar_inclinando_resumen">In gara e in giro libero, inclina il telefono come un volante invece di usare la levetta sinistra, che viene nascosta. Le gare di accelerazione mantengono le frecce di corsia.</string>
+    <string name="menus_tactiles">Menu con il dito</string>
+    <string name="menus_tactiles_resumen">Nei menu e nel menu di pausa non c\'è il pad: scorri per spostarti (in un elenco di opzioni, di lato cambia il valore), tocca un\'opzione per sceglierla, tocca le frecce per cambiarne il valore e tocca i suggerimenti in basso, come “Ⓐ Accetta” o “Ⓑ Indietro”, per premerli. Con due dita, indietro. Il pulsante PAD in alto riporta il pad.</string>
+    <string name="deslizar_invertido">Scorrimento invertito nei menu</string>
+    <string name="deslizar_invertido_resumen">Disattivato: come girare pagina, scorrendo a sinistra si va all\'opzione a destra. Attivato: scorrendo a destra si va a quella a destra.</string>
+    <string name="sensibilidad_giro">Sensibilità dello sterzo</string>
+    <string name="sensibilidad_giro_resumen">Più a destra, meno inclinazione serve per sterzare fino in fondo.</string>
+    <string name="sensibilidad_valor">%1$d · sterzata completa a %2$d°</string>
+    <string name="editor_tamano">DIMENSIONE</string>
+    <string name="editor_opacidad">OPACITÀ</string>
+    <string name="editor_restaurar">RIPRISTINA</string>
+    <string name="editor_cancelar">ANNULLA</string>
+    <string name="editor_listo">FATTO</string>
+    <string name="editor_ayuda">Trascina un comando per spostarlo. DIMENSIONE cambia quello selezionato, o tutti se nessuno è selezionato.</string>
+    <string name="editor_disposicion_normal">COMANDI: NORMALE</string>
+    <string name="editor_disposicion_aceleracion">COMANDI: ACCELERAZIONE</string>
+    <string name="editor_disposicion_conduciendo">COMANDI: GUIDA</string>
+</resources>

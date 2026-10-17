@@ -12,6 +12,8 @@ import android.hardware.usb.UsbManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
@@ -35,6 +37,7 @@ import android.widget.Toast;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.radiobutton.MaterialRadioButton;
 import com.google.android.material.slider.LabelFormatter;
@@ -51,6 +54,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
@@ -75,6 +80,26 @@ public class SetupActivity extends AppCompatActivity {
     private TextView textoInforme;
     private View filaTurbo;
     private boolean avanzadoAbierto;
+
+    // Si el gamertag esta libre en el servidor de la LAN (ComprobacionGamertag).
+    // La red, en su hilo; `comprobaciones` cuenta las consultas para tirar las
+    // respuestas que llegan tarde (ya se cambio el nombre o el servidor).
+    private final ExecutorService red = Executors.newSingleThreadExecutor();
+    private final Handler hiloPrincipal = new Handler(Looper.getMainLooper());
+    private final Runnable comprobacionPendiente = this::comprobarGamertag;
+    // Cada consulta que sale libre aparta el nombre para este movil unos minutos
+    // (10 en el servidor); mientras esta pantalla se ve, se renueva cada minuto.
+    private static final long RENOVAR_MS = 60_000;
+    private final Runnable renovarReserva = new Runnable() {
+        @Override public void run() {
+            comprobarGamertag();
+            hiloPrincipal.postDelayed(this, RENOVAR_MS);
+        }
+    };
+    private TextInputLayout cajaGamertag;
+    private boolean gamertagEscritoValido = true;
+    private boolean comprobandoParaJugar;
+    private int comprobaciones;
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -136,6 +161,24 @@ public class SetupActivity extends AppCompatActivity {
         refrescar();
         // Si el juego se acaba de cerrar, por que (files/logs/cierre.txt).
         Cierres.guardar(this);
+        // Al volver (otro jugador ha podido entrar con el nombre mientras tanto).
+        programarComprobacion();
+        hiloPrincipal.removeCallbacks(renovarReserva);
+        hiloPrincipal.postDelayed(renovarReserva, RENOVAR_MS);
+    }
+
+    @Override
+    protected void onPause() {
+        // En el juego ya no hace falta: al entrar en Xbox Live cuenta la conexion.
+        hiloPrincipal.removeCallbacks(renovarReserva);
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        hiloPrincipal.removeCallbacksAndMessages(null);
+        red.shutdownNow();
+        super.onDestroy();
     }
 
     private View espacio(int altoDp) {
@@ -227,7 +270,7 @@ public class SetupActivity extends AppCompatActivity {
         botonJugar.setTypeface(Typeface.DEFAULT_BOLD);
         botonJugar.setMinHeight(dp(64));
         estilarBotonPrimario(botonJugar);
-        botonJugar.setOnClickListener(v -> lanzar(false));
+        botonJugar.setOnClickListener(v -> jugar());
         
         LinearLayout.LayoutParams lpJugar = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -433,12 +476,12 @@ public class SetupActivity extends AppCompatActivity {
         // --- Idioma
         col.addView(tarjeta(
             seccion(R.string.seccion_idioma),
-            selector(0, 0,
-                    Arrays.asList(getString(R.string.idioma_auto), getString(R.string.idioma_en),
-                            getString(R.string.idioma_es), getString(R.string.idioma_pt)),
-                    Arrays.asList(Idioma.CODIGOS), Idioma.elegido(this), false, codigo -> {
-                        Idioma.elegir(this, codigo);
-                        recreate();
+            desplegable(0, 0, nombresIdiomas(), Arrays.asList(Idioma.CODIGOS), Idioma.elegido(this),
+                    codigo -> {
+                        if (!codigo.equals(Idioma.elegido(this))) {
+                            Idioma.elegir(this, codigo);
+                            recreate();
+                        }
                     })
         ));
 
@@ -528,15 +571,22 @@ public class SetupActivity extends AppCompatActivity {
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void afterTextChanged(Editable s) {
                 String g = s.toString().trim();
-                if (Ajustes.gamertagValido(g)) {
+                gamertagEscritoValido = Ajustes.gamertagValido(g);
+                if (gamertagEscritoValido) {
                     caja.setError(null);
                     ajustes.gamertag(g);
+                    programarComprobacion();
                 } else {
+                    // Mal escrito: manda el error de formato, no el del servidor.
+                    hiloPrincipal.removeCallbacks(comprobacionPendiente);
+                    comprobaciones++;
+                    caja.setHelperText(null);
                     caja.setError(getString(R.string.gamertag_error));
                 }
             }
         });
         caja.addView(texto);
+        cajaGamertag = caja;
         return caja;
     }
 
@@ -565,6 +615,8 @@ public class SetupActivity extends AppCompatActivity {
                 if (ip.isEmpty() || Ajustes.ipValida(ip)) {
                     caja.setError(null);
                     ajustes.servidorLan(ip);
+                    // Otro servidor, otros jugadores: el nombre puede estar en uso alli.
+                    programarComprobacion();
                 } else {
                     caja.setError(getString(R.string.servidor_lan_error));
                 }
@@ -896,6 +948,14 @@ public class SetupActivity extends AppCompatActivity {
         return caja;
     }
 
+    private List<String> nombresIdiomas() {
+        List<String> nombres = new ArrayList<>();
+        for (int id : Idioma.NOMBRES) {
+            nombres.add(getString(id));
+        }
+        return nombres;
+    }
+
     /**
      * Como selector(), pero en un menu desplegable: para las listas largas, que
      * en botones ocupan media pantalla.
@@ -1049,15 +1109,130 @@ public class SetupActivity extends AppCompatActivity {
         ((LinearLayout) filaTurbo).getChildAt(1).setAlpha(propio ? 1f : 0.5f);
     }
 
+    /** Medio segundo despues de dejar de escribir: no una consulta por tecla. */
+    private void programarComprobacion() {
+        hiloPrincipal.removeCallbacks(comprobacionPendiente);
+        comprobaciones++;
+        hiloPrincipal.postDelayed(comprobacionPendiente, 500);
+    }
+
+    /**
+     * Pregunta al servidor de la LAN si el gamertag esta libre y lo dice debajo
+     * del campo. Sin servidor (o sin el motor nativo, que es el que tiene red) no
+     * hay nada que comprobar.
+     */
+    private void comprobarGamertag() {
+        if (cajaGamertag == null || !gamertagEscritoValido) {
+            return;
+        }
+        String ip = ajustes.servidorLan();
+        if (!MotorNativo.ACTIVO || !Ajustes.ipValida(ip)) {
+            cajaGamertag.setError(null);
+            cajaGamertag.setHelperText(null);
+            return;
+        }
+        String gamertag = ajustes.gamertag();
+        final int n = ++comprobaciones;
+        red.execute(() -> {
+            ComprobacionGamertag.Resultado r = ComprobacionGamertag.comprobar(ip, gamertag);
+            hiloPrincipal.post(() -> {
+                if (n == comprobaciones) {
+                    mostrarComprobacion(ip, gamertag, r);
+                }
+            });
+        });
+    }
+
+    private void mostrarComprobacion(String ip, String gamertag, ComprobacionGamertag.Resultado r) {
+        if (cajaGamertag == null || !gamertagEscritoValido) {
+            return;
+        }
+        String nombre = ComprobacionGamertag.efectivo(gamertag);
+        switch (r) {
+            case LIBRE:
+                cajaGamertag.setError(null);
+                cajaGamertag.setHelperText(getString(R.string.gamertag_libre, nombre, ip));
+                break;
+            case EN_USO:
+                cajaGamertag.setHelperText(null);
+                cajaGamertag.setError(getString(R.string.gamertag_en_uso, nombre, ip));
+                break;
+            default:
+                cajaGamertag.setError(null);
+                cajaGamertag.setHelperText(getString(R.string.gamertag_sin_respuesta, ip));
+                break;
+        }
+    }
+
+    /**
+     * Jugar. Con servidor de la LAN se pregunta otra vez antes de entrar (otro
+     * jugador ha podido conectarse con ese nombre desde que se escribio) y, si
+     * esta en uso, no se entra. Sin servidor configurado, o si no contesta, se
+     * juega como siempre.
+     */
+    private void jugar() {
+        String ip = ajustes.servidorLan();
+        if (!MotorNativo.ACTIVO || !Ajustes.ipValida(ip)) {
+            lanzar(false);
+            return;
+        }
+        if (comprobandoParaJugar) {
+            return;
+        }
+        comprobandoParaJugar = true;
+        botonJugar.setEnabled(false);
+        String gamertag = ajustes.gamertag();
+        final int n = ++comprobaciones;
+        red.execute(() -> {
+            ComprobacionGamertag.Resultado r = ComprobacionGamertag.comprobar(ip, gamertag);
+            hiloPrincipal.post(() -> {
+                comprobandoParaJugar = false;
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+                refrescar();
+                if (n == comprobaciones) {
+                    mostrarComprobacion(ip, gamertag, r);
+                }
+                if (r == ComprobacionGamertag.Resultado.EN_USO) {
+                    preguntarJugarSinOnline(ip, gamertag);
+                    return;
+                }
+                lanzar(false);
+            });
+        });
+    }
+
+    /**
+     * El gamertag lo tiene otro movil: o se cambia, o se juega esta vez sin el
+     * modo online (sin las opciones de la LAN; el servidor guardado no se toca).
+     */
+    private void preguntarJugarSinOnline(String ip, String gamertag) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.gamertag_en_uso_titulo)
+                .setMessage(getString(R.string.gamertag_en_uso_pregunta,
+                        ComprobacionGamertag.efectivo(gamertag), ip))
+                .setPositiveButton(R.string.jugar_sin_online, (d, w) -> lanzar(false, true))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
     private void lanzar(boolean sonda) {
+        lanzar(sonda, false);
+    }
+
+    private void lanzar(boolean sonda, boolean sinOnline) {
         if (sonda) {
             Ajustes.informeSonda(this).delete();
         }
         // La sonda no carga el juego: le vale la libmain principal.
         Ediciones.Edicion edicion = sonda ? Ediciones.principal() : edicionAlJugar();
         Intent i = new Intent(this, GameActivity.class);
-        i.putExtra(GameActivity.EXTRA_ARGUMENTOS,
-                ajustes.argumentos(this, sonda).toArray(new String[0]));
+        List<String> argumentos = ajustes.argumentos(this, sonda);
+        if (sinOnline) {
+            MotorNativo.quitarRed(argumentos);
+        }
+        i.putExtra(GameActivity.EXTRA_ARGUMENTOS, argumentos.toArray(new String[0]));
         i.putExtra(GameActivity.EXTRA_EDICION, edicion.id);
         if (!sonda) {
             i.putExtra(GameActivity.EXTRA_ISO, ajustes.iso());

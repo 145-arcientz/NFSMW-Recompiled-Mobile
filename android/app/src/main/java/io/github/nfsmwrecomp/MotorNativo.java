@@ -178,6 +178,22 @@ final class MotorNativo {
      * Los argumentos del juego (o de la sonda) con el motor nativo. La ISO la
      * añade GameActivity. nombreDriver como en Ajustes.argumentos.
      */
+    // Las opciones de la LAN que pone argumentos() con un servidor configurado.
+    private static final String[] OPCIONES_RED = {"--grant_user_privileges", "--red_lan",
+            "--red_live", "--red_dns", "--red_registro", "--nfsmw_red_sonda"};
+
+    /** Para jugar una vez sin online (SetupActivity: el gamertag lo tiene otro movil). */
+    static void quitarRed(List<String> args) {
+        args.removeIf(a -> {
+            for (String o : OPCIONES_RED) {
+                if (a.startsWith(o + "=")) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
     static List<String> argumentos(Context ctx, Ajustes ajustes, boolean sonda, String nombreDriver) {
         List<String> a = new ArrayList<>();
         a.add("--user_data_root=" + carpetaUsuario(ctx).getAbsolutePath());

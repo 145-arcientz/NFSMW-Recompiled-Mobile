@@ -34,7 +34,8 @@ and the [CHANGELOG](CHANGELOG.md). Everything it changes in the ReXGlue SDK is i
 
 Playable, with rough edges. Known to run start to finish through the prologue and
 into free roam on an Intel Iris 540 (a weak integrated GPU) at roughly 18–38 FPS
-at 854×480.
+at 854×480. On Android it is playable on recent Snapdragon phones with the native
+engine, including races between two phones over the local network.
 
 | Area | State |
 |---|---|
@@ -46,8 +47,8 @@ at 854×480.
 | V-sync and frame limiting | Working, via a local patch — neither exists in the stock SDK |
 | Internal resolution scaling | Working, up to 4× |
 | Save games | Working |
-| Multiplayer | **Not working.** The privilege gate is solved; the network layer underneath is not. See [docs/diario/red-y-privilegios.md](docs/diario/red-y-privilegios.md) |
-| Android (Snapdragon, Turnip) | **In progress.** Boots from the ISO, reaches the menus and races with a Bluetooth controller, with sound. Main menu (3D) at ~50 fps on a Snapdragon 8 Elite with the Qualcomm driver; Turnip loads but is far slower. See [docs/android.md](docs/android.md) |
+| Multiplayer (LAN) | **Working on Android, native engine.** The 360 version has no System Link, only "Xbox Live" against EA's 2005 servers; a PC on the same Wi-Fi stands in for them with [nfsmw-server-lan](https://github.com/victorgbd/nfsmw-server-lan), and the app takes its IP in the "LAN server" setting. Quick Match works end to end: create, find and join a game, the game room, a full race between two phones (peer to peer over UDP) and switching hosts. Tested between a Snapdragon 8 Elite and a Mali-G57 phone, PAL Spain edition; the other editions build but are untested online. Gamertags are checked against the server so two phones can't join with the same one. Stats and leaderboards are in progress (circuit only). See [docs/diario/red-y-privilegios.md](docs/diario/red-y-privilegios.md) |
+| Android | **Playable.** Two engines: the Xenos path of this fork and the native renderer of [codepdbh/nfsmw-android](https://github.com/codepdbh/nfsmw-android) (`nativo/`), which is the one recommended. One APK carries six editions of the game (PAL Spain, USA, Japan, PAL Germany, Italy and UK); PAL Spain and USA have been played on phones, the rest build but are untested. Touch controls in races and menus driven by touch, physical controllers, tilt steering. Launcher in ten languages. See [docs/android.md](docs/android.md) and [docs/motor-nativo.md](docs/motor-nativo.md) |
 
 ## What you need
 

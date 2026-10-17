@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    German texts. Generated from values/strings.xml: same keys,
+    same order; the ones marked translatable="false" live only there.
+-->
+<resources>
+
+    <string name="apk_con_juego">Diese APK enthält das Spiel. Sie ist nur für deine eigenen Geräte: nicht weitergeben.</string>
+    <string name="apk_sonda">APK ohne das Spiel: Sie enthält nur den Vulkan-Test, um dein Handy und den GPU-Treiber zu prüfen.</string>
+
+    <!-- Game -->
+    <string name="seccion_juego">Spiel</string>
+    <string name="sin_iso">Keine ISO ausgewählt. Du brauchst deine eigene Xbox-360-ISO, Edition %1$s.</string>
+    <string name="edicion_apk">Diese APK wurde für die Edition %1$s des Spiels gebaut.</string>
+    <string name="motor_nativo">Nativer Renderer.</string>
+    <string name="limite_fps">Bildratenbegrenzung</string>
+    <string name="limite_fps_resumen">Die Höchstgeschwindigkeit des Spiels. 90, 120 und Unbegrenzt sind experimentell und brauchen einen so schnellen Bildschirm. Unbegrenzt lässt das Spiel so schnell laufen, wie das Handy kann (bis 240 fps).</string>
+    <string name="fps_valor">%1$d fps</string>
+    <string name="fps_experimental">%1$d fps (experimentell)</string>
+    <string name="fps_sin_limite">Unbegrenzt (experimentell)</string>
+    <string name="resolucion_interna">Renderauflösung</string>
+    <string name="resolucion_interna_resumen">Die Größe, in der das Spiel gezeichnet wird, bevor es auf den Bildschirm kommt. 1280×720 ist die der Xbox 360.</string>
+    <string name="res_interna_576">1024×576 · schneller</string>
+    <string name="res_interna_720">1280×720 · Xbox 360</string>
+    <string name="res_interna_1080">1920×1080 · schärfer</string>
+    <string name="calidad_sombras">Schattenqualität</string>
+    <string name="calidad_sombras_resumen">Weiche Kanten zeichnet den Schattenrand weich wie auf der Xbox 360 (mehr GPU). Wie Xbox 360 bringt außerdem die Schatten von Bäumen, Büschen und Zäunen zurück (mehr CPU).</string>
+    <string name="sombras_rapida">Schnell</string>
+    <string name="sombras_suave">Weiche Kanten</string>
+    <string name="sombras_xbox360">Wie Xbox 360</string>
+    <string name="resolucion_sombras">Schattenauflösung</string>
+    <string name="sombras_nativa">Nativ (Xbox 360)</string>
+    <string name="sombras_alta">Hoch</string>
+    <string name="sombras_muy_alta">Sehr hoch</string>
+    <string name="sombras_ultra">Ultra</string>
+    <string name="sombras">Schatten</string>
+    <string name="sombras_resumen">Wie oft die Schattenkarten neu gezeichnet werden. Jedes 2. Bild ist günstiger und fällt kaum auf.</string>
+    <string name="sombras_siempre">Jedes Bild</string>
+    <string name="sombras_cada_2">Jedes 2. Bild</string>
+    <string name="sombras_distancia">Schattenentfernung</string>
+    <string name="sombras_distancia_resumen">Bis zu welcher Entfernung Objekte noch Schatten werfen. Hier liegt der Großteil der Schattenkosten.</string>
+    <string name="sombras_lejos">Weit (wie im Spiel)</string>
+    <string name="sombras_media">Mittel</string>
+    <string name="sombras_cerca">Nah · schneller</string>
+    <string name="reflejos_coche">Autospiegelungen</string>
+    <string name="reflejos_coche_resumen">Wie viele Seiten der Spiegelungskarte des Autos pro Bild neu gezeichnet werden.</string>
+    <string name="calidad_alta">Hoch</string>
+    <string name="calidad_media">Mittel</string>
+    <string name="calidad_baja">Niedrig · schneller</string>
+    <string name="reflejo_asfalto">Spiegelung nasser Straße</string>
+    <string name="reflejo_asfalto_resumen">Auch das Wasser spiegelt sie: ohne sie wird das Meer schwarz.</string>
+    <string name="resplandor_cielo">Himmelsleuchten</string>
+    <string name="resplandor_cielo_resumen">Natürlich entfernt die blauen Säume, die das Original an Bäumen und Dächern lässt. Kostet nichts.</string>
+    <string name="cielo_natural">Natürlich</string>
+    <string name="cielo_original">Original</string>
+    <string name="cielo_suave">Weich</string>
+    <string name="filtro_color">Farbfilter des Spiels</string>
+    <string name="filtro_color_resumen">Der Gelbstich, die Entsättigung und die Vignette des Spiels. Kostet nichts.</string>
+    <string name="filtro_color_original">Original</string>
+    <string name="filtro_color_suave">Halb</string>
+    <string name="filtro_color_apagado">Aus</string>
+    <string name="desenfoque">Geschwindigkeitsunschärfe</string>
+    <string name="desenfoque_resumen">Die radiale Unschärfe beim Beschleunigen und mit NOS. Kostet 1,5–2 ms pro Bild.</string>
+    <string name="filtro_imagen">Bildfilter</string>
+    <string name="filtro_imagen_resumen">Ein zusätzlicher Look über dem des Spiels.</string>
+    <string name="filtro_imagen_no">Keiner</string>
+    <string name="filtro_imagen_cine">Kino</string>
+    <string name="filtro_imagen_vivo">Lebendig</string>
+    <string name="filtro_imagen_calido">Warm</string>
+    <string name="filtro_imagen_frio">Kalt</string>
+    <string name="filtro_imagen_sepia">Sepia</string>
+    <string name="filtro_imagen_noir">Schwarzweiß</string>
+    <string name="filtro_imagen_crt">CRT</string>
+    <string name="seccion_sonido">Ton</string>
+    <string name="audio_aaudio">Ton über AAudio</string>
+    <string name="audio_aaudio_resumen">Die Android-Ausgabe mit niedriger Latenz dieser App. Aus: die SDL-Ausgabe der nativen Engine.</string>
+    <string name="compatibilidad">Kompatibilitätsmodus (experimentell)</string>
+    <string name="compatibilidad_resumen">Emuliert die GPU der Xbox 360, statt den nativen Renderer zu nutzen, für GPUs, die ihn nicht ausführen können. Viel langsamer.</string>
+    <string name="escalado">Skalierung auf den Bildschirm</string>
+    <string name="escalado_resumen">Wie das Spielbild auf die Bildschirmgröße gebracht wird. FSR bringt am meisten, wenn das Spiel unter der Bildschirmauflösung zeichnet (Bildschirm: nativ).</string>
+    <string name="escalado_bilineal">Bilinear (Standard)</string>
+    <string name="escalado_fsr">AMD FSR 1.0 · schärfere Hochskalierung</string>
+    <string name="escalado_cas">AMD CAS · nur Schärfen</string>
+    <string name="iso_incompleta">Diese ISO ist unvollständig: Am Ende der Datei fehlen %1$s Spieldaten, wie nach einem abgebrochenen Download oder Entpacken. Damit lädt das Spiel nicht.</string>
+    <string name="iso_no_es_xbox">Diese Datei ist keine Xbox-360-ISO: Sie hat kein Xbox-360-Dateisystem. Es könnte die PC- oder PS2-Version sein, eine nicht entpackte .zip- oder .7z-Datei oder ein anderes Spiel. Damit zeigt das Spiel einen schwarzen Bildschirm und schließt sich.</string>
+    <string name="iso_otra_edicion">Diese ISO ist eine andere Edition des Spiels. Diese APK wurde für die Edition %1$s gebaut und startet mit keiner anderen: Wähle die ISO %1$s oder baue die APK aus dieser ISO.</string>
+    <string name="ediciones_apk">Diese APK enthält die Editionen %1$s des Spiels.</string>
+    <string name="edicion_iso">ISO der Edition %1$s. Diese APK enthält %2$s.</string>
+    <string name="iso_edicion_no_incluida">Diese ISO ist eine Edition des Spiels, die diese APK nicht enthält (sie enthält %1$s): Das Spiel startet damit nicht.</string>
+    <string name="iso_elegida">ISO: %1$s</string>
+    <string name="elegir_iso">ISO auswählen…</string>
+    <string name="iso_sin_permiso">Android hat keinen dauerhaften Zugriff auf diese ISO gewährt. Wähle sie aus dem Speicher des Handys.</string>
+    <string name="jugar">Spielen</string>
+    <string name="jugar_sin_iso">Wähle deine ISO, um zu spielen.</string>
+    <string name="jugar_sin_juego">Diese APK enthält das Spiel nicht.</string>
+
+    <!-- Display -->
+    <string name="seccion_pantalla">Bildschirm</string>
+    <string name="resolucion">Auflösung</string>
+    <string name="resolucion_resumen">Größe des fertigen Bildes auf dem Bildschirm. Das Spiel selbst wird gleich gezeichnet.</string>
+    <string name="res_nativa">Nativ · %1$d×%2$d</string>
+    <string name="estirar">Auf Vollbild strecken</string>
+    <string name="estirar_resumen">Aus: das 16:9-Bild der Xbox 360 mit schwarzen Balken. An: füllt den Bildschirm, verzerrt aber das Bild.</string>
+    <string name="mostrar_fps">FPS anzeigen</string>
+    <string name="mostrar_fps_resumen">Zähler in der Ecke: Bilder pro Sekunde und Millisekunden pro Bild.</string>
+
+    <!-- Graphics -->
+    <string name="seccion_graficos">Grafik</string>
+    <string name="suavizado">Kantenglättung</string>
+    <string name="suavizado_resumen">Glättet gezackte Kanten. MSAA ist die des Spiels: die feinste und teuerste. FXAA ist ein Filter über dem fertigen Bild: viel günstiger, aber etwas weicher.</string>
+    <string name="aa_no">Aus</string>
+    <string name="msaa_muestras">MSAA-Samples</string>
+    <string name="msaa_muestras_resumen">4x verwendet das Spiel (46 fps statt 60 im Menü). 2x glättet weniger und kostet weniger.</string>
+    <string name="fxaa_calidad">FXAA-Qualität</string>
+    <string name="fxaa_calidad_resumen">Hoch glättet mehr Kanten, auch schwache, und macht das Bild etwas weicher.</string>
+    <string name="fxaa_normal">Normal</string>
+    <string name="fxaa_alta">Hoch</string>
+    <string name="posprocesado">Nachbearbeitung</string>
+    <string name="posprocesado_resumen">Der Farbfilter und die Unschärfe des Originalspiels. Aus: weniger Arbeit für die GPU, aber es sieht nicht mehr wie das Original aus.</string>
+    <string name="anisotropico">Anisotrope Filterung</string>
+    <string name="anisotropico_resumen">Schärfere Texturen im schrägen Blickwinkel, wie die Straße in der Ferne.</string>
+    <string name="aniso_no">Aus</string>
+    <string name="escala">Interne Auflösung</string>
+    <string name="escala_resumen">2x zeichnet in 2560×1440: schärfer, aber viel schwerer. 1x wird empfohlen.</string>
+
+    <!-- Performance -->
+    <string name="seccion_rendimiento">Leistung</string>
+    <string name="fijar_hilos">Threads an Kerne binden</string>
+    <string name="fijar_hilos_resumen">Legt die schwersten Threads des Spiels auf die schnellsten Kerne.</string>
+    <string name="driver">GPU-Treiber</string>
+    <string name="ayuda_driver">Turnip ist der Open-Source-Treiber von Mesa für Adreno. Importiere eine .zip mit einem Turnip-Treiber (mit meta.json) und wähle ihn hier aus.</string>
+    <string name="driver_sistema">Systemtreiber (%1$s)</string>
+    <string name="gpu_desconocida">unbekannt</string>
+    <string name="ayuda_driver_otra">Turnip, der Open-Source-Treiber von Mesa, ist nur für Adreno-GPUs: Mit dieser GPU (%1$s) verwendet das Spiel den Systemtreiber. Du kannst einen anderen Vulkan-Treiber (.zip mit meta.json) importieren, um ihn auszuprobieren.</string>
+    <string name="driver_sistema_sin_gpu">Systemtreiber</string>
+    <string name="importar_driver">Treiber importieren (.zip)</string>
+    <string name="borrar_driver">Ausgewählten löschen</string>
+    <string name="driver_importado">Treiber importiert: %1$s</string>
+    <string name="driver_error">Treiber konnte nicht importiert werden: %1$s</string>
+    <string name="error_driver_carpeta">%1$s konnte nicht erstellt werden</string>
+    <string name="error_driver_meta">meta.json ist kein gültiges JSON</string>
+    <string name="error_driver_sin_so">die Zip-Datei enthält keine Treiber-.so</string>
+    <string name="error_driver_mover">der Treiber konnte nicht nach %1$s verschoben werden</string>
+    <string name="turbo">GPU-Turbo</string>
+    <string name="turbo_resumen">Fixiert den GPU-Takt, statt ihn vom System regeln zu lassen. Nur mit Turnip auf einer Adreno-GPU. Hilft nicht immer: prüfe es mit dem FPS-Zähler.</string>
+
+    <!-- Language -->
+    <string name="seccion_idioma">Sprache</string>
+    <string name="idioma_auto">Automatisch (Sprache des Handys)</string>
+
+    <!-- Advanced -->
+    <string name="seccion_avanzado">Erweitert</string>
+    <string name="avanzado_resumen">Um zu testen, was jede Einstellung auf deinem Handy kostet. Die Standardwerte sind die empfohlenen.</string>
+    <string name="una_pasada">Szene in einem Durchgang</string>
+    <string name="una_pasada_resumen">Zeichnet die Szene einmal statt in drei Streifen: ~30 % weniger Zeichenaufrufe und etwa +25-45 % fps in Rennen. Es schaltet das MSAA des Spiels ab, deshalb ist es bei gewähltem MSAA aus.</string>
+    <string name="edram_fsi">EDRAM im Pixel-Shader (experimentell)</string>
+    <string name="edram_fsi_resumen">Eine andere Art, den EDRAM der Xbox 360 zu emulieren. Wird ignoriert, wenn die GPU es nicht unterstützt.</string>
+    <string name="oclusion">Okklusionsabfragen</string>
+    <string name="oclusion_resumen">Sonnenreflexe und Lichter. Lässt das Spiel auf die GPU warten.</string>
+    <string name="exposicion">Genaue Belichtung</string>
+    <string name="exposicion_resumen">Liest das Bild jedes Mal von der GPU zurück. Ohne sie wirkt das Bild ausgewaschen.</string>
+    <string name="memexport">Memexport zurücklesen</string>
+    <string name="memexport_resumen">Speicherkohärenz für das, was die Shader schreiben. Kann Leistung kosten.</string>
+    <string name="paginas">Von der GPU geschriebene Seiten aktualisieren</string>
+    <string name="paginas_resumen">Speicherkohärenz. Kann Leistung kosten.</string>
+    <string name="registro_detallado">Ausführliches Protokoll</string>
+    <string name="registro_detallado_resumen">log_level=debug. Lässt die fps einbrechen: nur zur Fehlersuche.</string>
+    <string name="probar_vulkan">Vulkan testen</string>
+    <string name="probar_vulkan_resumen">Lädt den GPU-Treiber und prüft, was er unterstützt, ohne das Spiel.</string>
+    <string name="sin_informe">Noch kein Testbericht. Tippe auf „Vulkan testen“.</string>
+
+    <!-- Touch controller -->
+    <string name="tactil_ocultar">AUSBL.</string>
+    <string name="tactil_mostrar">TOUCH</string>
+    <string name="tactil_mando">PAD</string>
+    <string name="tactil_gestos">FINGER</string>
+    <string name="seccion_perfil">Xbox-360-Profil</string>
+    <string name="gamertag_resumen">Der Name, den das Spiel in deinem Profil sieht. Wenn du ihn änderst, bleiben deine Spielstände erhalten: Sie hängen an der Profil-ID, nicht am Namen.</string>
+    <string name="gamertag_error">Bis zu 15 Buchstaben, Zahlen und Leerzeichen, beginnend mit einem Buchstaben.</string>
+    <string name="gamertag_libre" formatted="true">%1$s gehört dir auf %2$s (für dieses Handy reserviert, während du spielst)</string>
+    <string name="gamertag_en_uso" formatted="true">%1$s ist auf %2$s schon von einem anderen Handy belegt: Wähle einen anderen Gamertag, um dort zu spielen.</string>
+    <string name="gamertag_sin_respuesta" formatted="true">Der Gamertag konnte nicht geprüft werden: %1$s antwortet nicht.</string>
+    <string name="gamertag_en_uso_titulo">Gamertag belegt</string>
+    <string name="gamertag_en_uso_pregunta" formatted="true">Ein anderes Handy hat %1$s auf %2$s schon. Willst du trotzdem spielen, ohne Online-Modus? Du kannst alles spielen außer Xbox Live.</string>
+    <string name="jugar_sin_online">Offline spielen</string>
+    <string name="servidor_lan">LAN-Server (Mehrspieler)</string>
+    <string name="servidor_lan_resumen">Xbox Live im Spiel, gegen den EA-Server, den du auf einem PC in deinem WLAN startest (nfsmw-server-lan). Leer: das Spiel wie immer.</string>
+    <string name="servidor_lan_ip">IP des PCs</string>
+    <string name="servidor_lan_error">Eine IPv4-Adresse wie 10.0.0.4</string>
+    <string name="seccion_tactil">Touch-Steuerung</string>
+    <string name="editar_tactil">Touch-Steuerung bearbeiten</string>
+    <string name="editar_tactil_resumen">Verschiebe die Touch-Tasten und ändere ihre Größe und Deckkraft.</string>
+    <string name="vibracion">Vibration</string>
+    <string name="vibracion_resumen">Das Spiel lässt den Controller rumpeln: Unfälle, Nitro, unebener Boden... Ein echter Controller (USB oder Bluetooth) vibriert; ist keiner verbunden, vibriert das Handy.</string>
+    <string name="probar_vibracion">Vibration testen</string>
+    <string name="vibracion_mando_motores">%1$s (%2$s): vibriert · Motoren: %3$d</string>
+    <string name="vibracion_mando_sin_motores">%1$s (%2$s): Android stellt für diesen Controller keine Motoren bereit, daher kann er nicht vibrieren.</string>
+    <string name="vibracion_mando_xbox_usb">%1$s (%2$s): Über USB stellt Android keine Motoren für ihn bereit, daher kann dieser Test ihn nicht vibrieren lassen. Im Spiel steuert ihn SDL über USB mit eigener Vibration (beim Verbinden wird die USB-Berechtigung erfragt).</string>
+    <string name="vibracion_sin_mandos">Kein Controller verbunden: Das Handy vibriert.</string>
+    <string name="girar_inclinando">Durch Neigen des Handys lenken</string>
+    <string name="girar_inclinando_resumen">In Rennen und im freien Fahren das Handy wie ein Lenkrad neigen, statt den linken Stick zu benutzen, der ausgeblendet wird. Drag-Rennen behalten die Spurpfeile.</string>
+    <string name="menus_tactiles">Menüs per Finger</string>
+    <string name="menus_tactiles_resumen">In Menüs und im Pausenmenü gibt es kein Pad: Wische, um dich zu bewegen (in einer Optionsliste ändert seitliches Wischen den Wert), tippe auf eine Option, um sie zu wählen, tippe auf die Pfeile, um ihren Wert zu ändern, und tippe auf die Hinweise unten wie „Ⓐ Bestätigen“ oder „Ⓑ Zurück“, um sie zu drücken. Mit zwei Fingern zurück. Die Taste PAD oben bringt das Pad zurück.</string>
+    <string name="deslizar_invertido">Wischen in Menüs umkehren</string>
+    <string name="deslizar_invertido_resumen">Aus: wie beim Umblättern führt Wischen nach links zur Option rechts. An: Wischen nach rechts führt zur rechten.</string>
+    <string name="sensibilidad_giro">Lenkempfindlichkeit</string>
+    <string name="sensibilidad_giro_resumen">Je weiter rechts, desto weniger Neigung braucht es für den vollen Lenkeinschlag.</string>
+    <string name="sensibilidad_valor">%1$d · voller Einschlag bei %2$d°</string>
+    <string name="editor_tamano">GRÖSSE</string>
+    <string name="editor_opacidad">DECKKRAFT</string>
+    <string name="editor_restaurar">ZURÜCKSETZEN</string>
+    <string name="editor_cancelar">ABBRECHEN</string>
+    <string name="editor_listo">FERTIG</string>
+    <string name="editor_ayuda">Ziehe ein Bedienelement, um es zu verschieben. GRÖSSE ändert das ausgewählte, oder alle, wenn keines ausgewählt ist.</string>
+    <string name="editor_disposicion_normal">STEUERUNG: NORMAL</string>
+    <string name="editor_disposicion_aceleracion">STEUERUNG: DRAG</string>
+    <string name="editor_disposicion_conduciendo">STEUERUNG: FAHREN</string>
+</resources>

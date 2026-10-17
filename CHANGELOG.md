@@ -10,6 +10,51 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Añadido
 
+- **Multijugador en red local** (motor nativo, 0.5.0). La versión de 360 no tiene System
+  Link: su online es "Xbox Live" contra los servidores de EA de 2005, que ya no existen. Ahora
+  un PC de la misma Wi-Fi hace de ese servidor con
+  [nfsmw-server-lan](https://github.com/victorgbd/nfsmw-server-lan) (Python, sin
+  dependencias), y en la app basta con poner su IP en el ajuste nuevo **"Servidor LAN
+  (multijugador)"**. Funciona Xbox Live → Partida rápida: crear partida, buscarla y unirse
+  desde otro móvil, la sala de juego con la lista de jugadores, la carrera entre los dos
+  móviles (conectados directamente por UDP, sin pasar por el PC), los resultados al acabar y
+  cambiar de anfitrión sin reiniciar. Probado con un RedMagic (Snapdragon 8 Elite) y un Galaxy
+  A22 (Mali-G57), con la PAL España: carreras de circuito completas. Lo que hizo falta en el
+  SDK del motor nativo, todo apagado sin servidor configurado:
+  - los privilegios de Xbox Live (`grant_user_privileges`), la sesión iniciada en Live
+    (`red_live`), la red de verdad con la IP del móvil (`red_lan`) y todos los nombres de
+    los servidores de EA hacia el PC (`red_dns`, también `XOnlineGetServiceInfo`);
+  - los sockets, que venían de Windows: `select`, `FIONBIO`, `setsockopt`, errores WSA,
+    orden de bytes de `sendto`/`recvfrom`, `SIGPIPE`; `WSARecvFrom` solapada y
+    `WSAGetOverlappedResult` (el hilo de recepción del enlace de juego); y
+    `WSAWaitForMultipleEvents`, que esperaba a *todos* los eventos en vez de a cualquiera
+    y devolvía siempre 0: el anfitrión solo recibía el primer paquete del otro;
+  - un gancho en la tabla `xmap` de DirtySock, que mandaba todo el tráfico de la carrera al
+    servidor (en Xbox Live, la pasarela segura); ahora va al otro móvil;
+  - la información de sesión de `XSessionCreate` para el anfitrión, `XSessionLeave`, QoS y
+    `XNet*` mínimos.
+  El gancho lleva direcciones de la PAL España y se traduce a las otras cinco ediciones con el
+  resto de la app; esas cinco compilan, pero solo la PAL se ha probado en red. Detalle en
+  [docs/diario/red-y-privilegios.md](docs/diario/red-y-privilegios.md).
+- Gamertag único en el servidor LAN (0.5.0): al poner el servidor o el gamertag, al volver a la
+  pantalla de inicio y al pulsar Jugar, la app pregunta al servidor (TCP 10902) si el nombre
+  está libre. Si lo tiene otro móvil, conectado o apartado, el campo sale en rojo y Jugar
+  pregunta si se quiere jugar **sin modo online** (esa vez, sin las opciones de red). Un nombre
+  comprobado queda apartado 10 minutos para ese móvil, y se renueva mientras la pantalla de
+  inicio está abierta. Sin servidor configurado no se comprueba nada; si no contesta, se
+  avisa y se deja jugar (`ComprobacionGamertag.java`).
+- Estadísticas personales, clasificación y Blacklist 15 del online, en el servidor LAN (0.5.0): el
+  protocolo (`user` con `STAT`/`LWSTAT`/`LMSTAT`, `snap` con sus filas `+snp`) sacado del código
+  del juego, y los resultados de cada carrera (`rank`) descifrados y sumados por jugador.
+  Faltan los modos que no son circuito y qué es cada tabla de la clasificación.
+- La pantalla de inicio en **diez idiomas** (0.5.0): a inglés, español y portugués se suman italiano,
+  alemán, francés, polaco, japonés, coreano y chino tradicional (traducciones hechas con la
+  IA, sin revisar por nativos). El idioma se elige ahora en un desplegable, con el nombre de
+  cada uno en su lengua.
+- Por qué se cerró el juego, sin adb (0.5.0): al volver a la pantalla de inicio, la app apunta en
+  `files/logs/cierre.txt` el motivo que guarda Android (Android 11+) y, si fue un fallo nativo,
+  las cadenas legibles del informe; el informe entero va al lado (`Cierres.java`). El APK
+  normal no escribe el log del juego, y un móvil que se quedaba en negro no dejaba nada.
 - Las demás ediciones que soporta nfsmw-nx, con el motor nativo: PAL Alemania, Italia,
   Francia y Reino Unido, la traducción polaca de fans, Corea y Asia (chino tradicional).
   Se reconocen por el SHA-256 de su `default.xex` (los del instalador de nfsmw-nx) y llevan
@@ -335,6 +380,16 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Cambiado
 
+- Menús con el dedo (0.5.0): las indicaciones de abajo crecen hacia el espacio libre. En las
+  pantallas del online van en filas a unos 4 mm («Ⓐ Cambiar coche» encima de «Ⓑ Atrás») y el
+  dedo pulsaba la de al lado. Ahora cada fila llega hasta el centro de la vecina (la primera
+  sube un poco más, sin pisar ninguna opción, y la última baja hasta el borde), la primera de
+  cada fila llega hasta el borde izquierdo y, donde dos se pisan, gana la fila más cercana al
+  dedo. En el punto de encuentro del online, cada fila pasa de unos 3 mm a 6-7 mm de alto en
+  un Galaxy A22 (`CrecerBarra`, `nativo_android.cpp`).
+- El servidor de EA de la LAN sale del repositorio a su propio proyecto (0.5.0),
+  [nfsmw-server-lan](https://github.com/victorgbd/nfsmw-server-lan); en `tools/red/`
+  queda una nota.
 - El motor nativo, dentro del repositorio: [`nativo/`](nativo) es el código de
   codepdbh/nfsmw-android en `6df1501` (GPL-3.0, con su licencia), en un commit tal cual y
   otro con nuestros cambios a 25 de sus ficheros, en vez de una copia al lado
@@ -464,6 +519,18 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Arreglado
 
+- `preparar_nativo.py` dejaba sin efecto los ganchos nuevos en las otras ediciones (0.5.0): si el
+  generador de código no tenía nada que reescribir, las llamadas que una preparación anterior
+  había hecho directas seguían saltándose el gancho, porque `llamadas_directas.py` solo las
+  hace directas y nunca al revés. Ahora se deshacen primero. Salió con los ganchos de red;
+  comprobado en las cinco ediciones que ninguna función enganchada se llama directa.
+- Menús con el dedo (0.5.0): «RB Tarjeta de jugador» en la sala de juego y el punto de encuentro no
+  hacía nada (su icono no es el RB conocido): se reconoce por la etiqueta del texto. Y un
+  icono sin reconocer en el mismo sitio que una indicación conocida ya no se queda con el
+  toque.
+- Una ISO que no es de Xbox 360 (0.5.0; la versión de PC o PS2, un .zip sin extraer, otro juego) se
+  avisa en la pantalla de inicio en vez de dar una pantalla negra, y el SDK del motor nativo
+  acepta las imágenes XGD3 que la app ya daba por buenas.
 - Pantalla dividida (motor nativo): las sombras del jugador 2, la mitad de abajo, salían
   congeladas. El juego dibuja un mapa de sombras por jugador (vistas 13 y 14, de las vistas 1 y
   2), y `nfsmw_sombras_mapas = 1` le hacía dibujar solo el primero. Ahora ese recorte solo vale

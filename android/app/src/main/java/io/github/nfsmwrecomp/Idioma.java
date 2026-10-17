@@ -8,7 +8,9 @@ import java.util.Locale;
 
 /**
  * El idioma de la app: el del telefono, o uno forzado desde la pantalla de
- * inicio (ingles, espanol o portugues; los textos estan en res/values*).
+ * inicio (los textos estan en res/values*; los de italiano, aleman, frances,
+ * polaco, japones, coreano y chino tradicional salen de values/strings.xml con
+ * las mismas claves).
  *
  * Cada actividad lo aplica en attachBaseContext. Ahi todavia no hay Intent,
  * asi que GameActivity, que vive en otro proceso, lo lee de las preferencias
@@ -16,8 +18,15 @@ import java.util.Locale;
  */
 final class Idioma {
 
-    /** "" = el del telefono. */
-    static final String[] CODIGOS = {"", "en", "es", "pt"};
+    /**
+     * "" = el del telefono. Despues, por el nombre de cada idioma en su lengua:
+     * los de alfabeto latino por orden alfabetico y luego japones, coreano y
+     * chino tradicional. NOMBRES va en el mismo orden.
+     */
+    static final String[] CODIGOS = {"", "de", "en", "es", "fr", "it", "pl", "pt", "ja", "ko", "zh-TW"};
+    static final int[] NOMBRES = {R.string.idioma_auto, R.string.idioma_de, R.string.idioma_en,
+            R.string.idioma_es, R.string.idioma_fr, R.string.idioma_it, R.string.idioma_pl,
+            R.string.idioma_pt, R.string.idioma_ja, R.string.idioma_ko, R.string.idioma_zh_tw};
 
     private static final String CLAVE = "idioma";
 

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Texts in English, the default language. Translations live in values-es
-    (Spanish) and values-pt (Portuguese); any string added here must be added
-    there too. The ones marked translatable="false" are the same in all three.
+    Texts in English, the default language. Translations live in values-es,
+    values-pt, values-it, values-de, values-fr, values-pl, values-ja, values-ko
+    and values-zh-rTW; any string added here must be added there too. The ones
+    marked translatable="false" are the same in all of them and live only here.
 -->
 <resources>
     <string name="app_name" translatable="false">NFSMW Recompiled</string>
@@ -157,9 +158,17 @@
     <!-- Language -->
     <string name="seccion_idioma">Language</string>
     <string name="idioma_auto">Automatic (phone language)</string>
+    <!-- Each language in its own language, so anyone can find theirs. -->
+    <string name="idioma_de" translatable="false">Deutsch</string>
     <string name="idioma_en" translatable="false">English</string>
     <string name="idioma_es" translatable="false">Español</string>
+    <string name="idioma_fr" translatable="false">Français</string>
+    <string name="idioma_it" translatable="false">Italiano</string>
+    <string name="idioma_pl" translatable="false">Polski</string>
     <string name="idioma_pt" translatable="false">Português</string>
+    <string name="idioma_ja" translatable="false">日本語</string>
+    <string name="idioma_ko" translatable="false">한국어</string>
+    <string name="idioma_zh_tw" translatable="false">繁體中文</string>
 
     <!-- Advanced -->
     <string name="seccion_avanzado">Advanced</string>
@@ -191,8 +200,14 @@
     <string name="gamertag" translatable="false">Gamertag</string>
     <string name="gamertag_resumen">The name the game sees for your profile. Your saves are kept if you change it: they go by the profile ID, not by the name.</string>
     <string name="gamertag_error">Up to 15 letters, numbers and spaces, starting with a letter.</string>
+    <string name="gamertag_libre" formatted="true">%1$s is yours on %2$s (held for this phone while you play)</string>
+    <string name="gamertag_en_uso" formatted="true">%1$s is already taken on %2$s by another phone: pick another gamertag to play there.</string>
+    <string name="gamertag_sin_respuesta" formatted="true">Couldn\'t check the gamertag: %1$s doesn\'t answer.</string>
+    <string name="gamertag_en_uso_titulo">Gamertag in use</string>
+    <string name="gamertag_en_uso_pregunta" formatted="true">Another phone already has %1$s on %2$s. Do you want to play anyway, without online mode? You can play everything except Xbox Live.</string>
+    <string name="jugar_sin_online">Play offline</string>
     <string name="servidor_lan">LAN server (multiplayer)</string>
-    <string name="servidor_lan_resumen">Xbox Live in the game, against the EA server you run on a PC on your Wi-Fi (tools/red/servidor_ea.py). Empty: the game as always.</string>
+    <string name="servidor_lan_resumen">Xbox Live in the game, against the EA server you run on a PC on your Wi-Fi (nfsmw-server-lan). Empty: the game as always.</string>
     <string name="servidor_lan_ip">PC IP</string>
     <string name="servidor_lan_error">An IPv4 address like 10.0.0.4</string>
     <string name="seccion_tactil">Touch controls</string>

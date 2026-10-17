@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Japanese texts. Generated from values/strings.xml: same keys,
+    same order; the ones marked translatable="false" live only there.
+-->
+<resources>
+
+    <string name="apk_con_juego">この APK にはゲームが含まれています。自分の端末専用です。共有しないでください。</string>
+    <string name="apk_sonda">ゲームなしの APK です。スマートフォンと GPU ドライバーをテストする Vulkan プローブだけが入っています。</string>
+
+    <!-- Game -->
+    <string name="seccion_juego">ゲーム</string>
+    <string name="sin_iso">ISO が選択されていません。自分の Xbox 360 の ISO（%1$s 版）が必要です。</string>
+    <string name="edicion_apk">この APK はゲームの %1$s 版用にビルドされています。</string>
+    <string name="motor_nativo">ネイティブレンダラー。</string>
+    <string name="limite_fps">フレームレート上限</string>
+    <string name="limite_fps_resumen">ゲームの最高速度です。90、120、無制限は実験的で、それだけ速い画面が必要です。無制限では、ゲームはスマートフォンが出せる限りの速さで動きます（最大 240 fps）。</string>
+    <string name="fps_valor">%1$d fps</string>
+    <string name="fps_experimental">%1$d fps（実験的）</string>
+    <string name="fps_sin_limite">無制限（実験的）</string>
+    <string name="resolucion_interna">描画解像度</string>
+    <string name="resolucion_interna_resumen">画面に送る前にゲームを描画するサイズです。1280×720 が Xbox 360 と同じです。</string>
+    <string name="res_interna_576">1024×576 · 速い</string>
+    <string name="res_interna_720">1280×720 · Xbox 360</string>
+    <string name="res_interna_1080">1920×1080 · 鮮明</string>
+    <string name="calidad_sombras">影の品質</string>
+    <string name="calidad_sombras_resumen">「ソフトエッジ」は Xbox 360 のように影の輪郭をぼかします（GPU 負荷増）。「Xbox 360 と同じ」は木や茂み、柵の影も復活させます（CPU 負荷増）。</string>
+    <string name="sombras_rapida">高速</string>
+    <string name="sombras_suave">ソフトエッジ</string>
+    <string name="sombras_xbox360">Xbox 360 と同じ</string>
+    <string name="resolucion_sombras">影の解像度</string>
+    <string name="sombras_nativa">ネイティブ（Xbox 360）</string>
+    <string name="sombras_alta">高</string>
+    <string name="sombras_muy_alta">最高</string>
+    <string name="sombras_ultra">ウルトラ</string>
+    <string name="sombras">影</string>
+    <string name="sombras_resumen">シャドウマップを描き直す頻度です。2 フレームごとは負荷が軽く、ほとんど違いがわかりません。</string>
+    <string name="sombras_siempre">毎フレーム</string>
+    <string name="sombras_cada_2">2 フレームごと</string>
+    <string name="sombras_distancia">影の描画距離</string>
+    <string name="sombras_distancia_resumen">どこまで離れた物体が影を落とすかです。影の負荷の大部分はここにあります。</string>
+    <string name="sombras_lejos">遠く（ゲームと同じ）</string>
+    <string name="sombras_media">中</string>
+    <string name="sombras_cerca">近く · 速い</string>
+    <string name="reflejos_coche">車の反射</string>
+    <string name="reflejos_coche_resumen">車の反射マップの面を毎フレームいくつ描き直すかです。</string>
+    <string name="calidad_alta">高</string>
+    <string name="calidad_media">中</string>
+    <string name="calidad_baja">低 · 速い</string>
+    <string name="reflejo_asfalto">濡れた路面の反射</string>
+    <string name="reflejo_asfalto_resumen">水面にも使われます。オフにすると海が黒くなります。</string>
+    <string name="resplandor_cielo">空の輝き</string>
+    <string name="resplandor_cielo_resumen">「自然」はオリジナルが木や屋根に残す青い縁取りを取り除きます。負荷なし。</string>
+    <string name="cielo_natural">自然</string>
+    <string name="cielo_original">オリジナル</string>
+    <string name="cielo_suave">ソフト</string>
+    <string name="filtro_color">ゲームのカラーフィルター</string>
+    <string name="filtro_color_resumen">ゲームの黄色い色調、彩度の低下、周辺減光です。負荷なし。</string>
+    <string name="filtro_color_original">オリジナル</string>
+    <string name="filtro_color_suave">半分</string>
+    <string name="filtro_color_apagado">オフ</string>
+    <string name="desenfoque">スピードブラー</string>
+    <string name="desenfoque_resumen">加速時と NOS 使用時の放射状ブラーです。1 フレームあたり 1.5～2 ms かかります。</string>
+    <string name="filtro_imagen">画像フィルター</string>
+    <string name="filtro_imagen_resumen">ゲームの見た目にさらに重ねるスタイルです。</string>
+    <string name="filtro_imagen_no">なし</string>
+    <string name="filtro_imagen_cine">シネマ</string>
+    <string name="filtro_imagen_vivo">ビビッド</string>
+    <string name="filtro_imagen_calido">暖色</string>
+    <string name="filtro_imagen_frio">寒色</string>
+    <string name="filtro_imagen_sepia">セピア</string>
+    <string name="filtro_imagen_noir">白黒</string>
+    <string name="filtro_imagen_crt">CRT</string>
+    <string name="seccion_sonido">サウンド</string>
+    <string name="audio_aaudio">AAudio で音声を出力</string>
+    <string name="audio_aaudio_resumen">このアプリの低遅延 Android 出力です。オフ：ネイティブエンジンの SDL 出力。</string>
+    <string name="compatibilidad">互換モード（実験的）</string>
+    <string name="compatibilidad_resumen">ネイティブレンダラーを動かせない GPU 向けに、Xbox 360 の GPU をエミュレートします。かなり遅くなります。</string>
+    <string name="escalado">画面へのスケーリング</string>
+    <string name="escalado_resumen">ゲームの映像を画面サイズに合わせる方法です。FSR は、ゲームが画面の解像度より低く描画しているとき（画面：ネイティブ）に最も効果があります。</string>
+    <string name="escalado_bilineal">バイリニア（標準）</string>
+    <string name="escalado_fsr">AMD FSR 1.0 · より鮮明な拡大</string>
+    <string name="escalado_cas">AMD CAS · シャープ化のみ</string>
+    <string name="iso_incompleta">この ISO は不完全です。ダウンロードや展開が途中で止まったときのように、ファイルの末尾で %1$s のゲームデータが欠けています。このままではゲームを読み込めません。</string>
+    <string name="iso_no_es_xbox">このファイルは Xbox 360 の ISO ではありません。Xbox 360 のファイルシステムがありません。PC 版や PS2 版、展開していない .zip や .7z、または別のゲームかもしれません。このままではゲームは黒い画面のまま終了します。</string>
+    <string name="iso_otra_edicion">この ISO はゲームの別の版です。この APK は %1$s 版用にビルドされており、他の版では起動しません。%1$s 版の ISO を選ぶか、この ISO から APK をビルドしてください。</string>
+    <string name="ediciones_apk">この APK にはゲームの %1$s 版が含まれています。</string>
+    <string name="edicion_iso">%1$s 版の ISO。この APK には %2$s が含まれています。</string>
+    <string name="iso_edicion_no_incluida">この ISO は、この APK に含まれていない版のゲームです（含まれているのは %1$s）。このままではゲームは起動しません。</string>
+    <string name="iso_elegida">ISO：%1$s</string>
+    <string name="elegir_iso">ISO を選択…</string>
+    <string name="iso_sin_permiso">Android がこの ISO への永続的なアクセスを許可しませんでした。スマートフォンのストレージから選んでください。</string>
+    <string name="jugar">プレイ</string>
+    <string name="jugar_sin_iso">プレイするには ISO を選んでください。</string>
+    <string name="jugar_sin_juego">この APK にはゲームが含まれていません。</string>
+
+    <!-- Display -->
+    <string name="seccion_pantalla">画面</string>
+    <string name="resolucion">解像度</string>
+    <string name="resolucion_resumen">画面に表示する最終的な映像のサイズです。ゲーム自体の描画は変わりません。</string>
+    <string name="res_nativa">ネイティブ · %1$d×%2$d</string>
+    <string name="estirar">全画面に引き伸ばす</string>
+    <string name="estirar_resumen">オフ：黒帯付きの Xbox 360 の 16:9 映像。オン：画面いっぱいに表示しますが、映像がゆがみます。</string>
+    <string name="mostrar_fps">FPS を表示</string>
+    <string name="mostrar_fps_resumen">隅のカウンター：1 秒あたりのフレーム数と 1 フレームあたりのミリ秒。</string>
+
+    <!-- Graphics -->
+    <string name="seccion_graficos">グラフィック</string>
+    <string name="suavizado">アンチエイリアス</string>
+    <string name="suavizado_resumen">ギザギザの縁を滑らかにします。MSAA はゲーム本来のもので、最も精細ですが負荷も最大です。FXAA は最終映像にかけるフィルターで、はるかに軽いものの少しぼやけます。</string>
+    <string name="aa_no">オフ</string>
+    <string name="msaa_muestras">MSAA サンプル数</string>
+    <string name="msaa_muestras_resumen">4x はゲームが使う設定です（メニューで 60 fps に対して 46 fps）。2x は滑らかさも負荷も控えめです。</string>
+    <string name="fxaa_calidad">FXAA 品質</string>
+    <string name="fxaa_calidad_resumen">「高」は薄い縁も含めてより多くの縁を滑らかにし、映像も少し柔らかくなります。</string>
+    <string name="fxaa_normal">標準</string>
+    <string name="fxaa_alta">高</string>
+    <string name="posprocesado">ポストプロセス</string>
+    <string name="posprocesado_resumen">オリジナルのゲームのカラーフィルターとブラーです。オフ：GPU の負荷は減りますが、オリジナルの見た目ではなくなります。</string>
+    <string name="anisotropico">異方性フィルタリング</string>
+    <string name="anisotropico_resumen">遠くの道路のように、斜めから見たテクスチャが鮮明になります。</string>
+    <string name="aniso_no">オフ</string>
+    <string name="escala">内部解像度</string>
+    <string name="escala_resumen">2x は 2560×1440 で描画します。鮮明になりますが、非常に重くなります。1x を推奨します。</string>
+
+    <!-- Performance -->
+    <string name="seccion_rendimiento">パフォーマンス</string>
+    <string name="fijar_hilos">スレッドをコアに固定</string>
+    <string name="fijar_hilos_resumen">ゲームの最も重いスレッドを最も速いコアに割り当てます。</string>
+    <string name="driver">GPU ドライバー</string>
+    <string name="ayuda_driver">Turnip は Mesa のオープンソースの Adreno 用ドライバーです。Turnip ドライバーの .zip（meta.json 入り）をインポートし、ここで選択してください。</string>
+    <string name="driver_sistema">システムドライバー（%1$s）</string>
+    <string name="gpu_desconocida">不明</string>
+    <string name="ayuda_driver_otra">Mesa のオープンソースドライバー Turnip は Adreno GPU 専用です。この GPU（%1$s）では、ゲームはシステムドライバーを使います。試したい場合は別の Vulkan ドライバー（meta.json 入りの .zip）をインポートできます。</string>
+    <string name="driver_sistema_sin_gpu">システムドライバー</string>
+    <string name="importar_driver">ドライバーをインポート（.zip）</string>
+    <string name="borrar_driver">選択したものを削除</string>
+    <string name="driver_importado">ドライバーをインポートしました：%1$s</string>
+    <string name="driver_error">ドライバーをインポートできませんでした：%1$s</string>
+    <string name="error_driver_carpeta">%1$s を作成できませんでした</string>
+    <string name="error_driver_meta">meta.json が正しい JSON ではありません</string>
+    <string name="error_driver_sin_so">zip にドライバーの .so が入っていません</string>
+    <string name="error_driver_mover">ドライバーを %1$s に移動できませんでした</string>
+    <string name="turbo">GPU ターボ</string>
+    <string name="turbo_resumen">システムに任せず GPU のクロックを固定します。Adreno GPU で Turnip を使うときのみ。必ず効果があるとは限らないので、FPS カウンターで確認してください。</string>
+
+    <!-- Language -->
+    <string name="seccion_idioma">言語</string>
+    <string name="idioma_auto">自動（スマートフォンの言語）</string>
+
+    <!-- Advanced -->
+    <string name="seccion_avanzado">詳細設定</string>
+    <string name="avanzado_resumen">各設定がスマートフォンでどれだけ負荷になるか試すためのものです。既定値が推奨値です。</string>
+    <string name="una_pasada">シーンを 1 パスで描画</string>
+    <string name="una_pasada_resumen">シーンを 3 つの帯に分けず 1 回で描画します。描画回数が約 30 % 減り、レース中の fps が約 +25～45 % 上がります。ゲームの MSAA を無効にするため、MSAA を選んでいるとオフになります。</string>
+    <string name="edram_fsi">ピクセルシェーダーでの EDRAM（実験的）</string>
+    <string name="edram_fsi_resumen">Xbox 360 の EDRAM をエミュレートする別の方法です。GPU が対応していない場合は無視されます。</string>
+    <string name="oclusion">オクルージョンクエリ</string>
+    <string name="oclusion_resumen">太陽のフレアやライト。ゲームが GPU を待つことになります。</string>
+    <string name="exposicion">正確な露出</string>
+    <string name="exposicion_resumen">毎フレーム GPU から映像を読み戻します。オフにすると映像が白っぽくなります。</string>
+    <string name="memexport">memexport の読み戻し</string>
+    <string name="memexport_resumen">シェーダーが書き込む内容のメモリ整合性です。パフォーマンスが下がることがあります。</string>
+    <string name="paginas">GPU が書いたページを更新</string>
+    <string name="paginas_resumen">メモリ整合性です。パフォーマンスが下がることがあります。</string>
+    <string name="registro_detallado">詳細ログ</string>
+    <string name="registro_detallado_resumen">log_level=debug。fps が大きく下がります。問題の診断にのみ使ってください。</string>
+    <string name="probar_vulkan">Vulkan をテスト</string>
+    <string name="probar_vulkan_resumen">ゲームなしで GPU ドライバーを読み込み、対応している機能を確認します。</string>
+    <string name="sin_informe">プローブのレポートはまだありません。「Vulkan をテスト」をタップしてください。</string>
+
+    <!-- Touch controller -->
+    <string name="tactil_ocultar">隠す</string>
+    <string name="tactil_mostrar">タッチ</string>
+    <string name="tactil_mando">パッド</string>
+    <string name="tactil_gestos">指</string>
+    <string name="seccion_perfil">Xbox 360 プロフィール</string>
+    <string name="gamertag_resumen">ゲームがプロフィールに表示する名前です。変更してもセーブデータは残ります。名前ではなくプロフィール ID で管理されているためです。</string>
+    <string name="gamertag_error">15 文字以内の英字・数字・スペースで、英字から始めてください。</string>
+    <string name="gamertag_libre" formatted="true">%2$s で %1$s はあなたのものです（プレイ中はこのスマートフォン用に確保）</string>
+    <string name="gamertag_en_uso" formatted="true">%2$s では %1$s がすでに別のスマートフォンで使われています。そこでプレイするには別のゲーマータグを選んでください。</string>
+    <string name="gamertag_sin_respuesta" formatted="true">ゲーマータグを確認できませんでした：%1$s が応答しません。</string>
+    <string name="gamertag_en_uso_titulo">ゲーマータグが使用中です</string>
+    <string name="gamertag_en_uso_pregunta" formatted="true">別のスマートフォンが %2$s で %1$s をすでに使っています。オンラインモードなしでプレイしますか？Xbox Live 以外はすべて遊べます。</string>
+    <string name="jugar_sin_online">オフラインでプレイ</string>
+    <string name="servidor_lan">LAN サーバー（マルチプレイ）</string>
+    <string name="servidor_lan_resumen">ゲーム内の Xbox Live を、Wi-Fi 内の PC で動かす EA サーバー（nfsmw-server-lan）につなぎます。空欄：いつもどおりのゲーム。</string>
+    <string name="servidor_lan_ip">PC の IP</string>
+    <string name="servidor_lan_error">10.0.0.4 のような IPv4 アドレス</string>
+    <string name="seccion_tactil">タッチ操作</string>
+    <string name="editar_tactil">タッチ操作を編集</string>
+    <string name="editar_tactil_resumen">タッチボタンを移動し、サイズと不透明度を変更します。</string>
+    <string name="vibracion">振動</string>
+    <string name="vibracion_resumen">衝突、ニトロ、荒れた路面などでゲームがコントローラーを振動させます。物理コントローラー（USB または Bluetooth）が振動し、接続されていなければスマートフォンが振動します。</string>
+    <string name="probar_vibracion">振動をテスト</string>
+    <string name="vibracion_mando_motores">%1$s（%2$s）：振動中 · モーター：%3$d</string>
+    <string name="vibracion_mando_sin_motores">%1$s（%2$s）：Android がこのコントローラーのモーターを公開していないため、振動できません。</string>
+    <string name="vibracion_mando_xbox_usb">%1$s（%2$s）：USB 接続では Android がモーターを公開しないため、このテストでは振動させられません。ゲーム内では SDL が独自の振動機能で USB 経由で制御します（接続時に USB の許可を求めます）。</string>
+    <string name="vibracion_sin_mandos">コントローラーが接続されていません：スマートフォンが振動します。</string>
+    <string name="girar_inclinando">スマートフォンを傾けてハンドル操作</string>
+    <string name="girar_inclinando_resumen">レースとフリーローム中は、左スティックの代わりにスマートフォンをハンドルのように傾けます（左スティックは非表示になります）。ドラッグレースでは車線の矢印がそのまま残ります。</string>
+    <string name="menus_tactiles">指でメニュー操作</string>
+    <string name="menus_tactiles_resumen">メニューとポーズメニューではパッドは表示されません。スワイプで移動し（オプションの一覧では横方向で値が変わります）、項目をタップして選択、矢印をタップして値を変更し、下部の「Ⓐ 決定」や「Ⓑ 戻る」などの表示をタップすると押せます。2 本指で戻ります。上部のパッドボタンでパッドを戻せます。</string>
+    <string name="deslizar_invertido">メニューのスワイプ方向を反転</string>
+    <string name="deslizar_invertido_resumen">オフ：ページをめくるように、左へスワイプすると右の項目へ移動します。オン：右へスワイプすると右の項目へ移動します。</string>
+    <string name="sensibilidad_giro">ハンドル感度</string>
+    <string name="sensibilidad_giro_resumen">右に寄せるほど、少ない傾きで最大まで切れます。</string>
+    <string name="sensibilidad_valor">%1$d · %2$d° で最大舵角</string>
+    <string name="editor_tamano">サイズ</string>
+    <string name="editor_opacidad">不透明度</string>
+    <string name="editor_restaurar">リセット</string>
+    <string name="editor_cancelar">キャンセル</string>
+    <string name="editor_listo">完了</string>
+    <string name="editor_ayuda">操作ボタンをドラッグして移動します。サイズは選択中のボタン、何も選択していなければすべてのボタンに適用されます。</string>
+    <string name="editor_disposicion_normal">操作：ノーマル</string>
+    <string name="editor_disposicion_aceleracion">操作：ドラッグ</string>
+    <string name="editor_disposicion_conduciendo">操作：走行中</string>
+</resources>

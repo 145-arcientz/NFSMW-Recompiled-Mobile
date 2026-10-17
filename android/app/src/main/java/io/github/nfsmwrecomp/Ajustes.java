@@ -110,7 +110,7 @@ final class Ajustes {
     void gamertag(String v) { p.edit().putString("gamertag", v).apply(); }
 
     /**
-     * IP del PC con el servidor de EA de la LAN (proyecto nfsmw-servidor-lan, ver tools/red/README.md). Vacia,
+     * IP del PC con el servidor de EA de la LAN (proyecto nfsmw-server-lan, ver tools/red/README.md). Vacia,
      * el juego va como siempre; con una IP, Xbox Live del juego va a ese servidor:
      * ver MotorNativo.argumentos y docs/diario/red-y-privilegios.md.
      */
