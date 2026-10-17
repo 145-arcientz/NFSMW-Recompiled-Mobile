@@ -90,7 +90,8 @@ final class Ediciones {
      * de que edicion es el codigo (sin SHA-256), no se puede decir.
      */
     static boolean ajena(String xex) {
-        return xex != null && !xex.isEmpty() && !principal().xex.isEmpty() && deXex(xex) == null;
+        return xex != null && !xex.isEmpty() && !IsoXex.NO_ES_ISO.equals(xex)
+                && !principal().xex.isEmpty() && deXex(xex) == null;
     }
 
     /** Con la que se juega esa ISO: la suya si va en el APK; si no, la principal. */

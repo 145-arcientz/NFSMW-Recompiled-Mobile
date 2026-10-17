@@ -13,11 +13,23 @@
 #include <rex/logging.h>
 #include <rex/thread.h>
 
+#include <cstring>
+
+#include <rex/cvar.h>
+
+// PARCHE LOCAL (red): definida en xam_net.cpp.
+REXCVAR_DECLARE(bool, red_lan);
+
 namespace rex {
 namespace kernel {
 namespace xam {
 using namespace rex::system;
 using namespace rex::system::xam;
+
+// PARCHE LOCAL (red): en xam_net.cpp.
+void RedXnAddrPropia(uint8_t* destino);
+uint32_t RedIpLocalRed();
+
 namespace apps {
 using namespace rex::system;
 
@@ -113,6 +125,28 @@ X_HRESULT XgiApp::DispatchMessageSync(uint32_t message, uint32_t buffer_ptr,
           "{:08X})",
           session_ptr, flags, num_slots_public, num_slots_private, user_xuid, session_info_ptr,
           nonce_ptr);
+      // PARCHE LOCAL (red): el anfitrion (XSESSION_CREATE_HOST, bit 0) recibe su
+      // XSESSION_INFO { XNKID 8, XNADDR del anfitrion 36, XNKEY 16 } y un nonce. Sin
+      // esto quedaba a ceros y el juego mandaba esa clave nula a los demas
+      // (PLATPARAMS de la partida). El que se une trae la del anfitrion: no se toca.
+      if (REXCVAR_GET(red_lan) && (flags & 1) && session_info_ptr) {
+        static uint32_t cuenta = 0;
+        ++cuenta;
+        uint32_t ip = RedIpLocalRed();
+        const uint8_t* b = reinterpret_cast<const uint8_t*>(&ip);
+        uint8_t* info = memory_->TranslateVirtual(session_info_ptr);
+        uint8_t xnkid[8] = {0x80, b[0], b[1], b[2], b[3], 0x00, static_cast<uint8_t>(cuenta >> 8),
+                            static_cast<uint8_t>(cuenta)};
+        std::memcpy(info, xnkid, 8);
+        RedXnAddrPropia(info + 8);
+        for (int i = 0; i < 16; ++i) info[44 + i] = static_cast<uint8_t>(xnkid[i % 8] ^ (0x5A + i));
+        if (nonce_ptr) {
+          uint8_t* nonce = memory_->TranslateVirtual(nonce_ptr);
+          for (int i = 0; i < 8; ++i) nonce[i] = static_cast<uint8_t>(xnkid[i] ^ 0xA5);
+        }
+        REXKRNL_INFO("[red] XSessionCreate anfitrion: XNKID {:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
+                     xnkid[0], xnkid[1], xnkid[2], xnkid[3], xnkid[4], xnkid[5], xnkid[6], xnkid[7]);
+      }
       return X_E_SUCCESS;
     }
     case 0x000B0011: {
@@ -138,6 +172,16 @@ X_HRESULT XgiApp::DispatchMessageSync(uint32_t message, uint32_t buffer_ptr,
       REXKRNL_DEBUG("{}({:08X}, {}, {}, {:08X}, {:08X})",
                     is_local ? "XGISessionJoinLocal" : "XGISessionJoinRemote", session_ptr,
                     user_count, xuid_array_ptr, user_index_array, private_slots_array);
+      return X_E_SUCCESS;
+    }
+    case 0x000B0013: {
+      // PARCHE LOCAL (red): XSessionLeaveLocal/Remote, mismo bufer que el Join
+      // de arriba. Sin el, X_E_FAIL al salir de una partida de la LAN.
+      uint32_t session_ptr = memory::load_and_swap<uint32_t>(buffer + 0);
+      uint32_t user_count = memory::load_and_swap<uint32_t>(buffer + 4);
+      uint32_t xuid_array_ptr = memory::load_and_swap<uint32_t>(buffer + 8);
+      REXKRNL_DEBUG("{}({:08X}, {})", xuid_array_ptr ? "XGISessionLeaveRemote" : "XGISessionLeaveLocal",
+                    session_ptr, user_count);
       return X_E_SUCCESS;
     }
     case 0x000B0014: {

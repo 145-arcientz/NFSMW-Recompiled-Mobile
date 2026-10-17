@@ -29,6 +29,20 @@ REXCVAR_DEFINE_BOOL(nfsmw_red_sonda, false, "NFSMW",
                     "y su estado interno. Solo mide");
 
 REX_EXTERN(__imp__sub_82819F48);
+REX_EXTERN(__imp__sub_82546E18);
+REX_EXTERN(__imp__sub_8284D030);
+REX_EXTERN(__imp__sub_82547130);
+REX_EXTERN(__imp__sub_8284C6D0);
+REX_EXTERN(__imp__sub_8284CBA8);
+REX_EXTERN(__imp__sub_8284C768);
+REX_EXTERN(__imp__sub_8284C770);
+REX_EXTERN(__imp__sub_8284C810);
+REX_EXTERN(__imp__sub_8284C898);
+REX_EXTERN(__imp__sub_8284C8D0);
+REX_EXTERN(__imp__sub_8284C990);
+REX_EXTERN(__imp__sub_82829AD0);
+
+REXCVAR_DECLARE(bool, red_lan);
 
 namespace {
 
@@ -65,7 +79,9 @@ void ApuntarClaves(uint8_t* base) {
                                      0x820A220C, 0x8209A594, 0x8202AA00, 0x8202A418, 0x820A1C8C,
                                      0x820A2FBC, 0x8202A9F8, 0x820A1C80, 0x820A17E0, 0x820A1FB8,
                                      0x820786F8, 0x820A1754, 0x820A18F8, 0x8202A9F0, 0x8202A9E8,
-                                     0x820A09CC, 0x820A09C4, 0x820A260C,
+                                     // (sin la de 'WHEN': nada la referencia y no se
+                                     // traduce a las otras ediciones)
+                                     0x820A09C4, 0x820A260C,
                                      // la de la respuesta a 'usea' y la de la version (en P)
                                      0x820A1FB8, 0x820A233C};
   for (uint32_t d : kClaves) {
@@ -133,6 +149,21 @@ void ApuntarClaves(uint8_t* base) {
     }
     REXLOG_INFO("[red_sonda] cadenas {:08X}-{:08X}:{}", desde, hasta, t);
   };
+  cadenas(0x820A1A00, 0x820A1C00);  // la del nombre por jugador (0x820A1B30)
+  cadenas(0x820784B0, 0x82078510);  // las que se leen de un +msg (sub_822787A0)
+  cadenas(0x820A1520, 0x820A1540);  // la de +msg (0x820A152C)
+  cadenas(0x8202B080, 0x8202B200);  // las de +who
+  cadenas(0x82083240, 0x820832A0);
+  // Donde se guardan los descodificadores de direcciones de otros jugadores
+  // (sub_82827868, sub_82827670): tablas de punteros en los datos.
+  for (uint32_t d = 0x82000000; d < 0x82A00000; d += 4) {
+    uint32_t v = Leer32(base, d);
+    if (v == 0x82827868 || v == 0x82827670) {
+      std::string vecinos;
+      for (int k = -8; k <= 8; ++k) vecinos += fmt::format(" {:08X}", Leer32(base, d + k * 4));
+      REXLOG_INFO("[red_sonda] puntero {:08X} en {:08X}:{}", v, d, vecinos);
+    }
+  }
   cadenas(0x8202A3C0, 0x8202AA40);
   cadenas(0x820A0980, 0x820A0A40);
   cadenas(0x820A1500, 0x820A1A00);
@@ -166,4 +197,113 @@ REX_HOOK_RAW(sub_82819F48) {
     REXLOG_INFO("[red_sonda] NetConnStatus('{}') -> {:08X} '{}' | {}", Codigo(codigo), resultado,
                 Codigo(resultado), Estado(base));
   }
+}
+
+// La conexion entre jugadores (ConnApi de EA, puerto 3658): quien la crea
+// (sub_82546E18 -> sub_8284D030), quien la pone en marcha tras gcre/gjoi
+// (sub_82547130 -> sub_8284C6D0) y sus ajustes (sub_8284CBA8, codigo de 4
+// letras en r4). Solo se apunta: entrada (r3..r7) y lo que devuelve.
+#define NFSMW_RED_SONDA_LLAMADA(direccion, nombre)                                             \
+  REX_HOOK_RAW(sub_##direccion) {                                                              \
+    if (!REXCVAR_GET(nfsmw_red_sonda)) {                                                       \
+      __imp__sub_##direccion(ctx, base);                                                       \
+      return;                                                                                  \
+    }                                                                                          \
+    const uint32_t a3 = ctx.r3.u32, a4 = ctx.r4.u32, a5 = ctx.r5.u32, a6 = ctx.r6.u32,          \
+                   a7 = ctx.r7.u32;                                                            \
+    __imp__sub_##direccion(ctx, base);                                                         \
+    REXLOG_INFO("[red_sonda] {} (r3={:08X} r4={:08X} '{}' r5={:08X} r6={:08X} r7={:08X}) -> {:08X}", \
+                nombre, a3, a4, Codigo(a4), a5, a6, a7, ctx.r3.u32);                            \
+  }
+
+NFSMW_RED_SONDA_LLAMADA(82546E18, "crear conexion de jugadores")
+NFSMW_RED_SONDA_LLAMADA(8284D030, "ConnApiCreate")
+NFSMW_RED_SONDA_LLAMADA(82547130, "poner jugadores en marcha")
+NFSMW_RED_SONDA_LLAMADA(8284CBA8, "ConnApiControl")
+NFSMW_RED_SONDA_LLAMADA(8284C770, "ConnApi 8284C770")
+NFSMW_RED_SONDA_LLAMADA(8284C810, "ConnApi 8284C810")
+NFSMW_RED_SONDA_LLAMADA(8284C898, "ConnApi 8284C898")
+NFSMW_RED_SONDA_LLAMADA(8284C8D0, "ConnApi 8284C8D0")
+NFSMW_RED_SONDA_LLAMADA(8284C990, "ConnApi 8284C990")
+
+// ConnApiOnline: antes de llamarla, los dos lados de la comparacion que la hace
+// fallar (sub_82819C78): el XUID que busca la conexion (objeto de r3+56, +128) y
+// la tabla de 4 usuarios de NetConn (0x82911768 -> +72, 32 bytes cada uno:
+// nombre de 16 y XUID de 8 en +16).
+REX_HOOK_RAW(sub_8284C6D0) {
+  if (REXCVAR_GET(nfsmw_red_sonda)) {
+    uint32_t conn = ctx.r3.u32;
+    uint32_t mangle = conn ? Leer32(base, conn + 56) : 0;
+    auto x64 = [&](uint32_t d) {
+      return fmt::format("{:08X}{:08X}", Leer32(base, d), Leer32(base, d + 4));
+    };
+    std::string t = mangle ? fmt::format("busca XUID {} (mangle {:08X})", x64(mangle + 128), mangle)
+                           : std::string("sin mangle");
+    uint32_t nc = Leer32(base, kPunteroNetConn);
+    for (int i = 0; nc && i < 4; ++i) {
+      uint32_t e = nc + 72 + i * 32;
+      std::string nombre;
+      for (int k = 0; k < 16; ++k) {
+        char c = static_cast<char>(*(base + e + k));
+        if (!c) break;
+        nombre += (c >= 0x20 && c < 0x7F) ? c : '.';
+      }
+      t += fmt::format(" | usuario{} '{}' XUID {}", i, nombre, x64(e + 16));
+    }
+    REXLOG_INFO("[red_sonda] antes de ConnApiOnline: {}", t);
+  }
+  const uint32_t a3 = ctx.r3.u32, a4 = ctx.r4.u32, a5 = ctx.r5.u32, a6 = ctx.r6.u32,
+                 a7 = ctx.r7.u32;
+  __imp__sub_8284C6D0(ctx, base);
+  if (REXCVAR_GET(nfsmw_red_sonda)) {
+    REXLOG_INFO("[red_sonda] ConnApiOnline (r3={:08X} r4={:08X} r5={:08X} r6={:08X} r7={:08X}) -> {:08X}",
+                a3, a4, a5, a6, a7, ctx.r3.u32);
+  }
+}
+
+// ConnApiConnect(ref, lista, cuantos, id de partida, ...): la lista de clientes
+// que monta el juego. Se vuelca entera (sin saber aun el tamano de cada uno) y
+// se marca donde aparecen IPs de la LAN 10.0.0.x, para ver de donde saca el
+// enlace de juego (puerto 3658) la direccion del otro.
+REX_HOOK_RAW(sub_8284C768) {
+  const uint32_t a3 = ctx.r3.u32, a4 = ctx.r4.u32, a5 = ctx.r5.u32, a6 = ctx.r6.u32,
+                 a7 = ctx.r7.u32;
+  if (REXCVAR_GET(nfsmw_red_sonda) && a4) {
+    std::string ips;
+    for (uint32_t o = 0; o < 0x400; o += 4) {
+      uint32_t v = Leer32(base, a4 + o);
+      if ((v & 0xFFFFFF00u) == 0x0A000000u) ips += fmt::format(" +{:03X}={:08X}", o, v);
+    }
+    REXLOG_INFO("[red_sonda] ConnApiConnect lista {:08X} x{}: IPs en{}", a4, a5, ips);
+    for (uint32_t o = 0; o < 0x300; o += 32) {
+      std::string linea;
+      for (uint32_t k = 0; k < 32; k += 4) linea += fmt::format("{:08X} ", Leer32(base, a4 + o + k));
+      REXLOG_INFO("[red_sonda]   +{:03X}: {}", o, linea);
+    }
+  }
+  __imp__sub_8284C768(ctx, base);
+  if (REXCVAR_GET(nfsmw_red_sonda)) {
+    REXLOG_INFO("[red_sonda] ConnApiConnect (r3={:08X} r4={:08X} r5={:08X} r6={:08X} r7={:08X}) -> {:08X}",
+                a3, a4, a5, a6, a7, ctx.r3.u32);
+  }
+}
+
+// La tabla 'xmap' de DirtySock (SocketControl 'xmap', sub_8282AB88): al quedar
+// en linea, NetConn (sub_82819600) pone una sola entrada {direccion 0, mascara 0,
+// IP del servicio de EA} y sub_82829AD0 la aplica en SocketSendto y
+// SocketRecvfrom: con mascara 0 casa con todo, asi que el enlace de juego del
+// ConnApi (UDP 3658) se manda al servidor (en Xbox Live, la pasarela segura) y
+// lo que llega parece venir de el. Pero tambien es como se llega al servidor:
+// NetConn pone 'xdns' = 127.0.0.1, el nombre del servidor se resuelve a esa IP
+// y la tabla la cambia por la del servicio. En la LAN el servidor es el PC y
+// nadie escucha ahi el UDP: el que se une mandaba su INIT de CommUDP al PC y a
+// los 10 s se iba con "No se ha podido conectar con el otro jugador". Con
+// red_lan solo se traduce 127.x.x.x (el servidor); las IPs de los otros
+// jugadores se dejan como estan (lo mismo que hace la funcion sin tabla).
+REX_HOOK_RAW(sub_82829AD0) {
+  if (REXCVAR_GET(red_lan) && ctx.r4.u32 && *(base + ctx.r4.u32 + 4) != 127) {
+    ctx.r3.u64 = ctx.r4.u64;
+    return;
+  }
+  __imp__sub_82829AD0(ctx, base);
 }

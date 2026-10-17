@@ -244,6 +244,13 @@ final class MotorNativo {
             a.add("--red_lan=true");
             a.add("--red_live=true");
             a.add("--red_dns=" + servidor);
+            // Diagnostico del multijugador (solo en el APK con registro): las llamadas
+            // de red y la sonda de NetConn/ConnApi al log. Las direcciones de la sonda
+            // se traducen a cada edicion con las del resto de la app (preparar_nativo.py).
+            if (BuildConfig.REGISTRO) {
+                a.add("--red_registro=true");
+                a.add("--nfsmw_red_sonda=true");
+            }
         }
         if (!BuildConfig.DEBUG && !BuildConfig.REGISTRO) {
             a.add("--log_file=/dev/null");

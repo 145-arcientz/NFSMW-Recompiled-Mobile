@@ -75,6 +75,10 @@ REXCVAR_DEFINE_BOOL(rastro_sistema, false, "Kernel",
 #include <mutex>
 #include <ctime>
 #include <unordered_map>
+#include <chrono>
+#include <thread>
+#include <vector>
+#include <rex/system/thread_state.h>
 
 namespace rex {
 bool& RastroSistemaActivo() {
@@ -251,7 +255,7 @@ static std::atomic<uint32_t> g_red_lineas{0};
 // Tope de lineas: un juego sondeando un socket cada fotograma llenaria el log.
 #define RED_LOG(...)                                                              \
   do {                                                                            \
-    if (REXCVAR_GET(red_registro) && g_red_lineas.fetch_add(1) < 4000) {          \
+    if (REXCVAR_GET(red_registro) && g_red_lineas.fetch_add(1) < 20000) {          \
       REXKRNL_INFO("[red] " __VA_ARGS__);                                         \
     }                                                                             \
   } while (0)
@@ -275,6 +279,34 @@ static std::string RedVolcado(const uint8_t* p, int n) {
     txt += (p[i] >= 0x20 && p[i] < 0x7F) ? static_cast<char>(p[i]) : '.';
   }
   return hex + " |" + txt + "|";
+}
+
+// Quien llama: lr y la cadena de marcos del codigo del 360 (cada marco guarda
+// el anterior en 0(sp) y el lr de quien lo llamo en anterior - 8).
+static std::string RedPila() {
+  auto* ts = rex::runtime::ThreadState::Get();
+  auto* c = ts ? ts->context() : nullptr;
+  if (!c) return "";
+  std::string pila = fmt::format("lr={:08X}", static_cast<uint32_t>(c->lr));
+  // Solo dentro de la pila del hilo (PCR: +0x70 tope, +0x74 fondo); el ultimo
+  // marco apunta al tope y leer ahi es salirse de la memoria.
+  auto* hilo = XThread::GetCurrentThread();
+  uint32_t pcr = hilo ? hilo->pcr_ptr() : 0;
+  if (!pcr) return pila;
+  auto* m = REX_KERNEL_MEMORY();
+  uint32_t tope = memory::load_and_swap<uint32_t>(m->TranslateVirtual(pcr + 0x70));
+  uint32_t fondo = memory::load_and_swap<uint32_t>(m->TranslateVirtual(pcr + 0x74));
+  uint32_t sp = c->r1.u32;
+  if (sp < fondo || sp + 4 > tope) return pila;
+  for (int i = 0; i < 8; ++i) {
+    uint32_t anterior =
+        memory::load_and_swap<uint32_t>(REX_KERNEL_MEMORY()->TranslateVirtual(sp));
+    if (anterior <= sp || anterior + 4 > tope) break;
+    pila += fmt::format(" <- {:08X}", memory::load_and_swap<uint32_t>(
+                                          REX_KERNEL_MEMORY()->TranslateVirtual(anterior - 8)));
+    sp = anterior;
+  }
+  return pila;
 }
 
 // errno de POSIX -> codigo de Winsock, que es lo que el juego lee con
@@ -523,25 +555,159 @@ u32 NetDll_WSAGetLastError_entry() {
   return XThread::GetLastError();
 }
 
-u32 NetDll_WSARecvFrom_entry(u32 caller, u32 socket, ppc_ptr_t<XWSABUF> buffers_ptr,
+// PARCHE LOCAL (red): un datagrama recibido, repartido en los bufers del juego.
+// Devuelve los bytes copiados.
+static uint32_t RedRepartir(const uint8_t* datos, uint32_t n, uint32_t buffers_ptr,
+                            uint32_t buffer_count) {
+  uint32_t hecho = 0;
+  for (uint32_t i = 0; i < buffer_count && hecho < n; ++i) {
+    auto* b = REX_KERNEL_MEMORY()->TranslateVirtual<XWSABUF*>(buffers_ptr + i * sizeof(XWSABUF));
+    uint32_t cabe = std::min<uint32_t>(b->len, n - hecho);
+    std::memcpy(REX_KERNEL_MEMORY()->TranslateVirtual(b->buf_ptr), datos + hecho, cabe);
+    hecho += cabe;
+  }
+  return hecho;
+}
+
+static void RedEscribirOrigen(uint32_t from_ptr, uint32_t fromlen_ptr, const N_XSOCKADDR_IN& de) {
+  if (from_ptr) {
+    auto* f = REX_KERNEL_MEMORY()->TranslateVirtual<XSOCKADDR_IN*>(from_ptr);
+    f->sin_family = de.sin_family;
+    f->sin_port = de.sin_port;
+    f->sin_addr = de.sin_addr;
+    std::memset(f->x_sin_zero, 0, sizeof(f->x_sin_zero));
+  }
+  if (fromlen_ptr) {
+    memory::store_and_swap<uint32_t>(REX_KERNEL_MEMORY()->TranslateVirtual(fromlen_ptr), 16);
+  }
+}
+
+// PARCHE LOCAL (red): WSARecvFrom solapada. El enlace de juego de EA (CommUDP del
+// ConnApi, puerto 3658) recibe en un hilo suyo con lecturas solapadas: pide una,
+// espera al evento del OVERLAPPED y recoge con WSAGetOverlappedResult. El
+// original devolvia -1 sin mas y ese hilo dejaba de leer: el que se une nunca
+// oia al anfitrion y a los 3 s se iba con "No se ha podido conectar con el otro
+// jugador". Aqui un hilo nativo espera el datagrama (el socket es no bloqueante),
+// lo copia, rellena el OVERLAPPED (Internal = 0, InternalHigh = bytes) y avisa al
+// evento. Si se cierra el socket, acaba con WSA_OPERATION_ABORTED.
+u32 NetDll_WSARecvFrom_entry(u32 caller, u32 socket_handle, ppc_ptr_t<XWSABUF> buffers_ptr,
                              u32 buffer_count, mapped_u32 num_bytes_recv, mapped_u32 flags_ptr,
-                             ppc_ptr_t<XSOCKADDR_IN> from_addr,
+                             ppc_ptr_t<XSOCKADDR_IN> from_addr, mapped_u32 fromlen_ptr,
                              ppc_ptr_t<XWSAOVERLAPPED> overlapped_ptr,
                              mapped_void completion_routine_ptr) {
-  RED_LOG("WSARecvFrom(socket {:08X}, {} bufs, solapada={}) -> -1 (sin implementar)", socket,
-          buffer_count, overlapped_ptr ? 1 : 0);
-  if (overlapped_ptr) {
-    // auto evt = REX_KERNEL_OBJECTS()->LookupObject<XEvent>(
-    //    overlapped_ptr->event_handle);
+  auto socket = REX_KERNEL_OBJECTS()->LookupObject<XSocket>(socket_handle);
+  if (!socket) {
+    XThread::SetLastError(0x2736);  // WSAENOTSOCK
+    return -1;
+  }
+  const uint32_t bufs = buffers_ptr.guest_address();
+  const uint32_t de_ptr = from_addr.guest_address();
+  // La firma de Xenia no traia lpFromlen: el OVERLAPPED (9.o argumento, en la
+  // pila) se leia de r10, que es el puntero al largo de "from".
+  const uint32_t largo_ptr = fromlen_ptr.guest_address();
+  if (flags_ptr) *flags_ptr = 0;
 
-    // if (evt) {
-    //  //evt->Set(0, false);
-    //}
+  uint32_t capacidad = 0;
+  for (uint32_t i = 0; i < buffer_count; ++i) capacidad += buffers_ptr[i].len;
+  std::vector<uint8_t> tmp(std::max<uint32_t>(capacidad, 1));
+
+  // Si ya hay algo, se entrega en el acto (tambien con OVERLAPPED: Winsock lo
+  // permite y deja el evento senalado).
+  N_XSOCKADDR_IN de;
+  uint32_t de_largo = sizeof(sockaddr_in);
+  int n = socket->RecvFrom(tmp.data(), capacidad, 0, &de, &de_largo);
+  if (n >= 0) {
+    uint32_t hecho = RedRepartir(tmp.data(), n, bufs, buffer_count);
+    RedEscribirOrigen(de_ptr, largo_ptr, de);
+    if (num_bytes_recv) *num_bytes_recv = hecho;
+    if (overlapped_ptr) {
+      overlapped_ptr->internal = 0;
+      overlapped_ptr->internal_high = hecho;
+      auto ev = REX_KERNEL_OBJECTS()->LookupObject<XEvent>(overlapped_ptr->event_handle);
+      if (ev) ev->Set(0, false);
+    }
+    RED_LOG("WSARecvFrom({:08X}) <- {}:{} {} bytes {}", socket_handle, RedIp(htonl(de.sin_addr)),
+            static_cast<uint16_t>(de.sin_port), hecho, RedVolcado(tmp.data(), n));
+    return 0;
+  }
+  uint32_t e = RedFijarError();
+  if (e != 10035 || !overlapped_ptr) {
+    RED_LOG("WSARecvFrom({:08X}) -> falla {}", socket_handle, e);
+    return -1;
   }
 
-  // we're not going to be receiving packets any time soon
-  // return error so we don't wait on that - Cancerous
+  // Sin datos y solapada: queda pendiente.
+  const uint32_t ov = overlapped_ptr.guest_address();
+  overlapped_ptr->internal = 0x103;  // STATUS_PENDING
+  overlapped_ptr->internal_high = 0;
+  XSocket* original = socket.get();
+  std::thread([socket_handle, original, bufs, buffer_count, de_ptr, largo_ptr, ov, capacidad]() {
+    std::vector<uint8_t> datos(std::max<uint32_t>(capacidad, 1));
+    auto* o = REX_KERNEL_MEMORY()->TranslateVirtual<XWSAOVERLAPPED*>(ov);
+    uint32_t estado = 995;  // WSA_OPERATION_ABORTED
+    uint32_t hecho = 0;
+    for (;;) {
+      auto s = REX_KERNEL_OBJECTS()->LookupObject<XSocket>(socket_handle);
+      if (!s || s.get() != original) break;  // cerrado
+      N_XSOCKADDR_IN de;
+      uint32_t de_largo = sizeof(sockaddr_in);
+      int n = s->RecvFrom(datos.data(), capacidad, 0, &de, &de_largo);
+      if (n >= 0) {
+        hecho = RedRepartir(datos.data(), n, bufs, buffer_count);
+        RedEscribirOrigen(de_ptr, largo_ptr, de);
+        estado = 0;
+        RED_LOG("WSARecvFrom({:08X}, solapada) <- {}:{} {} bytes {}", socket_handle,
+                RedIp(htonl(de.sin_addr)), static_cast<uint16_t>(de.sin_port), hecho,
+                RedVolcado(datos.data(), n));
+        break;
+      }
+      int err = errno;
+      if (err != EAGAIN && err != EWOULDBLOCK && err != EINTR) {
+        estado = RedErrorWsa(err);
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    o->internal_high = hecho;
+    o->internal = estado;
+    auto ev = REX_KERNEL_OBJECTS()->LookupObject<XEvent>(o->event_handle);
+    if (ev) ev->Set(0, false);
+  }).detach();
+  XThread::SetLastError(997);  // WSA_IO_PENDING
   return -1;
+}
+
+// PARCHE LOCAL (red): recoge una WSARecvFrom solapada (ver arriba).
+u32 NetDll_WSAGetOverlappedResult_entry(u32 caller, u32 socket_handle,
+                                        ppc_ptr_t<XWSAOVERLAPPED> overlapped_ptr,
+                                        mapped_u32 bytes_ptr, u32 wait, mapped_u32 flags_ptr) {
+  if (!overlapped_ptr) {
+    XThread::SetLastError(10014);  // WSAEFAULT
+    return 0;
+  }
+  if (overlapped_ptr->internal == 0x103) {
+    if (!wait) {
+      XThread::SetLastError(996);  // WSA_IO_INCOMPLETE
+      return 0;
+    }
+    auto ev = REX_KERNEL_OBJECTS()->LookupObject<XEvent>(overlapped_ptr->event_handle);
+    while (overlapped_ptr->internal == 0x103) {
+      if (ev) {
+        uint64_t plazo = static_cast<uint64_t>(-10000LL * 50);  // 50 ms, relativo
+        ev->Wait(0, 0, 1, &plazo);
+      } else {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      }
+    }
+  }
+  if (bytes_ptr) *bytes_ptr = overlapped_ptr->internal_high;
+  if (flags_ptr) *flags_ptr = 0;
+  uint32_t estado = overlapped_ptr->internal;
+  if (estado != 0) {
+    XThread::SetLastError(estado);
+    return 0;
+  }
+  return 1;
 }
 
 // If the socket is a VDP socket, buffer 0 is the game data length, and buffer 1
@@ -590,12 +756,22 @@ u32 NetDll_WSAWaitForMultipleEvents_entry(u32 num_events, mapped_u32 events, u32
     return ~0u;
   }
 
-  uint64_t timeout_wait = (uint64_t)timeout;
+  // PARCHE LOCAL (red): tres fallos del original. (1) fWaitAll se pasaba tal
+  // cual como tipo de espera del kernel, donde 0 es "todos" y 1 "cualquiera": al
+  // reves. El hilo de recepcion de DirtySock (sub_8282A078) espera con
+  // fWaitAll = FALSE al evento global y a los de cada socket, y quedaba parado
+  // hasta que saltasen todos a la vez: el anfitrion recibia el primer INIT de
+  // CommUDP (puerto 3658) y ninguno mas. (2) El plazo va en ms y el kernel lo
+  // quiere en unidades de 100 ns, relativo = negativo; antes era un instante
+  // absoluto ya pasado. (3) Devolvia siempre 0, no WSA_WAIT_EVENT_0 + indice ni
+  // WSA_WAIT_TIMEOUT (0x102): el juego reinicia el evento que cree que salto.
+  uint64_t timeout_wait = static_cast<uint64_t>(-10000LL * static_cast<int64_t>(timeout));
+  const uint32_t tipo = wait_all ? 0 : 1;
 
   X_STATUS result = 0;
   do {
-    result = xboxkrnl::xeNtWaitForMultipleObjectsEx(num_events, events, wait_all, 1, alertable,
-                                                    timeout != -1 ? &timeout_wait : nullptr);
+    result = xboxkrnl::xeNtWaitForMultipleObjectsEx(num_events, events, tipo, 1, alertable,
+                                                    timeout != ~0u ? &timeout_wait : nullptr);
   } while (result == X_STATUS_ALERTED);
 
   if (XFAILED(result)) {
@@ -603,7 +779,9 @@ u32 NetDll_WSAWaitForMultipleEvents_entry(u32 num_events, mapped_u32 events, u32
     XThread::SetLastError(error);
     return ~0u;
   }
-  return 0;
+  // STATUS_WAIT_0 + i, STATUS_ABANDONED_WAIT_0 + i, STATUS_USER_APC (0xC0) y
+  // STATUS_TIMEOUT (0x102) valen lo mismo que sus WSA_WAIT_*.
+  return result;
 }
 
 u32 NetDll_WSACreateEvent_entry() {
@@ -886,6 +1064,21 @@ u32 NetDll_XNetQosLookup_entry(u32 caller, u32 cxna, mapped_void apxna, mapped_v
   RED_LOG("XNetQosLookup({} direcciones, {} servicios, {} sondas) -> todo contactado", cxna, cina,
           cProbes);
   return 0;
+}
+
+// PARCHE LOCAL (red): la XNADDR propia (36 bytes, como XNetGetTitleXnAddr con
+// red_lan), para la informacion de sesion que rellena XSessionCreate (xgi_app.cpp).
+void RedXnAddrPropia(uint8_t* destino) {
+  uint32_t ip = RedIpLocal();
+  const uint8_t* b = reinterpret_cast<const uint8_t*>(&ip);
+  std::memset(destino, 0, 36);
+  std::memcpy(destino, &ip, 4);  // ina, en orden de red
+  const uint8_t mac[6] = {0x00, 0x1D, 0xD8, b[1], b[2], b[3]};
+  std::memcpy(destino + 10, mac, 6);
+}
+
+uint32_t RedIpLocalRed() {
+  return RedIpLocal();
 }
 
 // PARCHE LOCAL (red): eran stubs. El juego los pide al entrar en Xbox Live y al
@@ -1512,6 +1705,18 @@ u32 NetDll_sendto_entry(u32 caller, u32 socket_handle, mapped_void buf_ptr, u32 
     RED_LOG("sendto({:08X}) -> {}:{} {} bytes {}", socket_handle, RedIp(ip), puerto, ret,
             RedVolcado(static_cast<const uint8_t*>(static_cast<void*>(buf_ptr)), buf_len));
   }
+  // La primera vez que un socket manda a un destino, quien lo manda.
+  if (REXCVAR_GET(red_registro)) {
+    static std::mutex m;
+    static std::unordered_map<uint64_t, uint64_t> visto;
+    std::lock_guard<std::mutex> l(m);
+    uint64_t destino = (static_cast<uint64_t>(ip) << 16) | puerto;
+    auto it = visto.find(socket_handle);
+    if (it == visto.end() || it->second != destino) {
+      visto[socket_handle] = destino;
+      RED_LOG("sendto({:08X}) -> {}:{} desde {}", socket_handle, RedIp(ip), puerto, RedPila());
+    }
+  }
   return ret;
 }
 
@@ -1598,7 +1803,8 @@ REX_EXPORT_STUB(__imp__NetDll_UpnpSearchGetDevices);
 REX_EXPORT_STUB(__imp__NetDll_UpnpStartup);
 REX_EXPORT_STUB(__imp__NetDll_WSACancelOverlappedIO);
 REX_EXPORT_STUB(__imp__NetDll_WSAEventSelect);
-REX_EXPORT_STUB(__imp__NetDll_WSAGetOverlappedResult);
+REX_EXPORT(__imp__NetDll_WSAGetOverlappedResult,
+           rex::kernel::xam::NetDll_WSAGetOverlappedResult_entry)
 REX_EXPORT_STUB(__imp__NetDll_WSARecv);
 REX_EXPORT_STUB(__imp__NetDll_WSASend);
 REX_EXPORT_STUB(__imp__NetDll_WSAStartupEx);

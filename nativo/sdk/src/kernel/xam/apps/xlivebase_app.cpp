@@ -12,6 +12,7 @@
 #include <rex/kernel/xam/apps/xlivebase_app.h>
 #include <rex/logging.h>
 #include <rex/thread.h>
+#include <rex/system/xthread.h>
 
 #include <string>
 
@@ -106,6 +107,20 @@ X_HRESULT XLiveBaseApp::DispatchMessageSync(uint32_t message, uint32_t buffer_pt
       REXKRNL_DEBUG("XLiveBaseUnk58046({:08X}, {:08X}) unimplemented", buffer_ptr, buffer_length);
       return X_E_SUCCESS;
     }
+    case 0x0005800E: {
+      // PARCHE LOCAL (red): XUserMuteListQuery(user_index, XUID, BOOL* silenciado).
+      // buffer_ptr apunta a { user_index, pad, XUID (8), resultado }, y
+      // buffer_length es el puntero al BOOL de salida. Most Wanted lo pregunta por
+      // cada jugador de la partida; sin escribir la salida leia basura de la pila y
+      // fallaba con un acceso invalido. Nadie esta silenciado.
+      if (buffer_length) {
+        memory::store_and_swap<uint32_t>(memory_->TranslateVirtual(buffer_length), 0);
+      }
+      if (buffer_ptr) {
+        memory::store_and_swap<uint32_t>(buffer + 16, 0);
+      }
+      return X_E_SUCCESS;
+    }
     case 0x00058037: {
       REXKRNL_DEBUG("XPresenceInitialize({:08X}, {:08X})", buffer_ptr, buffer_length);
       return X_E_SUCCESS;
@@ -126,7 +141,29 @@ X_HRESULT XLiveBaseApp::DispatchMessageSync(uint32_t message, uint32_t buffer_pt
         if (i % 4 == 3) hex += " ";
       }
     }
-    REXKRNL_INFO("[red] XLIVEBASE {:08X} desconocido -> exito. Parametros: {}", message, hex);
+    // Quien lo manda: lr y la cadena de marcos (el codigo del 360 guarda el lr del
+    // que llama en marco_anterior - 8).
+    std::string pila;
+    auto* ts = rex::runtime::ThreadState::Get();
+    if (auto* c = ts ? ts->context() : nullptr) {
+      pila = fmt::format("lr={:08X}", static_cast<uint32_t>(c->lr));
+      // Solo dentro de la pila del hilo (PCR: +0x70 tope, +0x74 fondo).
+      auto* hilo = XThread::GetCurrentThread();
+      uint32_t pcr = hilo ? hilo->pcr_ptr() : 0;
+      uint32_t tope = pcr ? memory::load_and_swap<uint32_t>(memory_->TranslateVirtual(pcr + 0x70)) : 0;
+      uint32_t fondo = pcr ? memory::load_and_swap<uint32_t>(memory_->TranslateVirtual(pcr + 0x74)) : 0;
+      uint32_t sp = c->r1.u32;
+      if (sp < fondo || sp + 4 > tope) sp = 0;
+      for (int i = 0; i < 6 && sp; ++i) {
+        uint32_t anterior = memory::load_and_swap<uint32_t>(memory_->TranslateVirtual(sp));
+        if (anterior <= sp || anterior + 4 > tope) break;
+        pila += fmt::format(" <- {:08X}",
+                            memory::load_and_swap<uint32_t>(memory_->TranslateVirtual(anterior - 8)));
+        sp = anterior;
+      }
+    }
+    REXKRNL_INFO("[red] XLIVEBASE {:08X} desconocido -> exito. Parametros: {} | {}", message, hex,
+                 pila);
     return X_E_SUCCESS;
   }
   return X_E_FAIL;

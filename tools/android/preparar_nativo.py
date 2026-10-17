@@ -329,6 +329,12 @@ def codegen(arbol, rexglue, app, enganchadas=None, tabla=None):
     # integrarlas, y las copias literales contra las que se comparan sus
     # funciones nativas.
     generado = app / "generated" / "default"
+    # Si el codegen no tenia nada que escribir ("up to date"), el codigo sigue con
+    # las llamadas directas de la vez anterior, y llamadas_directas.py solo las
+    # pone, no las quita: una funcion enganchada despues seguiria llamandose sin
+    # su gancho. Se deshacen primero, que es lo mismo que un codegen nuevo.
+    correr(sys.executable, "tools/llamadas_directas.py", "--deshacer", "--gen", generado,
+           cwd=arbol, que="llamadas_directas.py --deshacer")
     correr(sys.executable, "tools/llamadas_directas.py", "--gen", generado,
            *(["--enganchadas", enganchadas] if enganchadas else []), cwd=arbol, que="llamadas_directas.py")
     correr(sys.executable, "tools/copia_literal.py", generado, app / "src" / "copias_literales",

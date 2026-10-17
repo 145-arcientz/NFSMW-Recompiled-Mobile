@@ -134,6 +134,8 @@ public class SetupActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         refrescar();
+        // Si el juego se acaba de cerrar, por que (files/logs/cierre.txt).
+        Cierres.guardar(this);
     }
 
     private View espacio(int altoDp) {
@@ -951,7 +953,9 @@ public class SetupActivity extends AppCompatActivity {
         boolean mirada = ajustes.iso() != null && xex != null;
         boolean incompleta = mirada && ajustes.isoFaltan() > 0;
         boolean otraEdicion = mirada && Ediciones.ajena(xex);
-        if (incompleta) {
+        if (mirada && IsoXex.NO_ES_ISO.equals(xex)) {
+            textoEdicion.setText(R.string.iso_no_es_xbox);
+        } else if (incompleta) {
             textoEdicion.setText(getString(R.string.iso_incompleta,
                     Formatter.formatShortFileSize(this, ajustes.isoFaltan())));
         } else {

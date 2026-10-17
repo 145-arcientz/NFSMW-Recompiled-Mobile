@@ -78,6 +78,9 @@ class Sesion:
         self.escritor = escritor
         self.maddr = ""
         self.opparam = ""
+        self.auxi = ""
+        # User sets a los que esta suscrito: nombre de sala -> ranura (0..4).
+        self.sets = {}
         Sesion.cuenta = getattr(Sesion, "cuenta", 0) + 1
         self.id = Sesion.cuenta
 
@@ -87,11 +90,14 @@ class Servidor:
         self.ip = ip
         self.salas = {}
         self.partidas = {}
+        self.sesiones = set()
         self.siguiente = 1000
 
     def olvidar(self, ses):
         """El jugador se fue: su sala desaparece y deja su partida."""
         self.salir_de_partida(ses)
+        if ses.sala in self.salas:
+            self.avisar_set(self.salas[ses.sala], ses, ses, quitar=True)  # lo suyo, nadie
         if ses.sala in self.salas and self.salas[ses.sala]["O"] == (ses.persona or ses.nombre):
             apuntar(f"   sala {ses.sala} de {self.salas[ses.sala]['O']} borrada")
             del self.salas[ses.sala]
@@ -129,7 +135,68 @@ class Servidor:
     def sele(self, ses, campos):
         # Se le devuelve lo mismo que pide ("si, todo eso") y, detras, su propia
         # ficha (+who): los servidores de EA la mandaban al entrar.
-        return [empaquetar(b"sele", campos), self.ficha(ses)]
+        respuesta = [empaquetar(b"sele", campos), self.ficha(ses)]
+        # USERSETk=<sala>: se suscribe en la ranura k a los miembros de esa sala
+        # (el que se une lo manda antes de ujoi). Se le manda la sala (+ust) y
+        # cada miembro que ya tiene (+usm).
+        for clave, valor in campos.items():
+            if not (clave.startswith("USERSET") and clave[7:].isdigit()):
+                continue
+            ranura = int(clave[7:])
+            ses.sets = {n: k for n, k in ses.sets.items() if k != ranura}
+            if not valor:
+                continue
+            ses.sets[valor] = ranura
+            sala = self.sala_por_nombre(valor)
+            if sala:
+                respuesta.append(empaquetar(b"+ust", self.ficha_sala(sala)))
+                for m in self.miembros(sala):
+                    respuesta.append(self.ficha_miembro(m, ranura))
+        return respuesta
+
+    # -- user sets (las "salas" de ucre/ujoi/ulea/usea) ------------------------
+    # La sala de juego (LobbyGameSessions, lista +360) es la lista de miembros
+    # del user set en la ranura 0 (lista 24 del lobby). Se llena con '+usm'
+    # (sub_8282EB78): S ranura, I, N, F, G y X (registro de 160 bytes,
+    # sub_82826530: +4 nombre, +28 texto auxi con SCF/LT/CD/CE). Sin N, quita
+    # al miembro I. El miembro 0 de la sala de juego es el que se llama como uno
+    # mismo (sub_82544C28): sin su propia entrada la lista sale vacia y no llega
+    # al minimo de jugadores.
+
+    def sala_por_nombre(self, nombre):
+        for sala in self.salas.values():
+            if sala["N"] == nombre:
+                return sala
+        return None
+
+    def miembros(self, sala):
+        return [o for o in self.sesiones if o.sala == sala["I"]]
+
+    def ficha_miembro(self, ses, ranura, quitar=False):
+        if quitar:
+            return empaquetar(b"+usm", {"S": ranura, "I": ses.id})
+        return empaquetar(b"+usm", {
+            "S": ranura,
+            "I": ses.id,
+            "N": ses.persona or ses.nombre,
+            "F": "U",
+            "G": ses.partida["IDENT"] if ses.partida else 0,
+            "X": ses.auxi,
+        })
+
+    def avisar_set(self, sala, ses, quien, quitar=False):
+        """'+usm' de `ses` a los suscritos a `sala`; lo de `quien` se devuelve."""
+        propio = []
+        for o in self.sesiones:
+            ranura = o.sets.get(sala["N"])
+            if ranura is None or not o.escritor:
+                continue
+            msg = self.ficha_miembro(ses, ranura, quitar)
+            if o is quien:
+                propio.append(msg)
+            else:
+                o.escritor.write(msg)
+        return propio
 
     def user(self, ses, campos):
         # Pide la ficha de un perfil (al entrar, la suya).
@@ -222,7 +289,8 @@ class Servidor:
         }
         self.partidas[p["NAME"]] = p
         ses.partida = p
-        return [empaquetar(b"gcre", self.ficha_partida(p, ses))]
+        # Despues, su ficha con G = esta partida (ver ficha()).
+        return [empaquetar(b"gcre", self.ficha_partida(p, ses)), self.ficha(ses)]
 
     def gjoi(self, ses, campos):
         p = self.partidas.get(campos.get("NAME", ""))
@@ -233,24 +301,21 @@ class Servidor:
             p["jugadores"].append(ses)
         ses.partida = p
         self.avisar(p, menos=ses)
-        # La sala de juego del 360 ya es una sesion entre los jugadores
-        # (LobbyGameSessions::JoinSession): sin '+ses' el que entra se queda en
-        # "Esperando a que se conecten los jugadores" y nadie abre la conexion
-        # directa. Se manda a todos en cuanto hay alguien mas.
-        if not p.get("SESS"):
-            p["SESS"] = random.randint(1000000, 9999999)
-        respuesta = [empaquetar(b"gjoi", self.ficha_partida(p, ses))]
-        self.avisar(p, orden=b"+ses", menos=ses)
-        respuesta.append(empaquetar(b"+ses", self.ficha_partida(p, ses)))
-        return respuesta
+        # Solo la ficha: el que entra se conecta al anfitrion con el SESS de esta
+        # (sub_82542400). '+ses' es para cuando el anfitrion arranca (gsta): si le
+        # llega antes, borra su sesion de Xbox.
+        return [empaquetar(b"gjoi", self.ficha_partida(p, ses)), self.ficha(ses)]
 
     def gset(self, ses, campos):
         p = ses.partida
         if not p:
             return [empaquetar(b"gset", {})]
-        for clave in ("PARAMS", "PLATPARAMS", "CUSTFLAGS", "SYSFLAGS", "MINSIZE", "MAXSIZE"):
-            if clave in campos:
-                p[clave] = campos[clave]
+        # Se guarda todo lo que mande el anfitrion. Ojo con SESS: es su sesion de
+        # Xbox codificada ("$..."); el que se une solo se conecta si su ficha trae
+        # un SESS que empiece por '$' (sub_82542400 -> sub_82547838).
+        for clave, valor in campos.items():
+            if clave != "NAME":
+                p[clave] = valor
         self.avisar(p, menos=ses)
         return [empaquetar(b"gset", self.ficha_partida(p, ses))]
 
@@ -282,7 +347,6 @@ class Servidor:
         p = ses.partida
         if not p:
             return [empaquetar(b"gsta", {})]
-        p["SESS"] = random.randint(1000000, 9999999)
         self.avisar(p, orden=b"+ses")
         return [empaquetar(b"gsta", {})]
 
@@ -307,17 +371,49 @@ class Servidor:
             return [empaquetar(b"ujoi", {}, sub=b"nfnd")]
         sala["C"] = int(sala["C"]) + 1
         ses.sala = sala["I"]
-        return [empaquetar(b"ujoi", self.ficha_sala(sala))]
+        # Los que ya estan en la sala reciben la ficha del que entra ('+usr') y el
+        # que entra, la de cada uno de ellos. Con esa ficha (LA, MA) el anfitrion da
+        # de alta al nuevo en su conexion entre jugadores (sub_82547C50 ->
+        # ConnApiAddClient); sin ella no abre sus puertos y no contesta al saludo.
+        respuesta = [empaquetar(b"ujoi", self.ficha_sala(sala))]
+        for otro in self.sesiones:
+            if otro is not ses and otro.sala == sala["I"] and otro.escritor:
+                apuntar(f"   +usr {ses.persona or ses.nombre} -> {otro.persona or otro.nombre}")
+                otro.escritor.write(self.ficha(ses, b"+usr"))
+                respuesta.append(self.ficha(otro, b"+usr"))
+        respuesta.append(self.ficha(ses, b"+usr"))
+        respuesta += self.avisar_set(sala, ses, ses)
+        return respuesta
 
     def ulea(self, ses, campos):
         sala = self.salas.get(ses.sala)
         if sala and int(sala["C"]) > 1:
             sala["C"] = int(sala["C"]) - 1
         ses.sala = None
-        return [empaquetar(b"ulea", {})]
+        respuesta = [empaquetar(b"ulea", {})]
+        if sala:
+            respuesta += self.avisar_set(sala, ses, ses, quitar=True)
+        return respuesta
 
     def mesg(self, ses, campos):
-        # Mensaje a la sala (TEXT=42 ATTR=EGS al crear la partida). Se acepta.
+        # Mensaje a la partida. Al entrar, el que se une manda TEXT=42 ATTR=EGS: el
+        # "he llegado" que hace que el anfitrion lo de de alta en la conexion entre
+        # jugadores (sub_822787A0: busca su ficha +usr por el nombre y llama a
+        # ConnApiAddClient). A los demas les llega como '+msg': N remitente, T
+        # texto, F banderas (la clave de una letra de 0x820A152C).
+        p = ses.partida
+        destinos = [j for j in (p["jugadores"] if p else []) if j is not ses and j.escritor]
+        if not destinos and ses.sala is not None:
+            destinos = [o for o in self.sesiones
+                        if o is not ses and o.sala == ses.sala and o.escritor]
+        for j in destinos:
+            apuntar(f"   +msg {ses.persona or ses.nombre} -> {j.persona or j.nombre}: "
+                    f"{campos.get('TEXT')} {campos.get('ATTR')}")
+            j.escritor.write(empaquetar(b"+msg", {
+                "N": ses.persona or ses.nombre,
+                "T": campos.get("TEXT", ""),
+                "F": campos.get("ATTR", ""),
+            }))
         return [empaquetar(b"mesg", {})]
 
     def uadm(self, ses, campos):
@@ -367,23 +463,53 @@ class Servidor:
         }
         self.salas[sala["I"]] = sala
         ses.sala = sala["I"]
-        return [empaquetar(b"ucre", self.ficha_sala(sala))]
+        # El dueno es miembro de su sala y no manda 'sele USERSET0': se le da la
+        # ranura 0 (la de la sala de juego) y su propia entrada.
+        ses.sets = {n: k for n, k in ses.sets.items() if k != 0}
+        ses.sets[sala["N"]] = 0
+        return [empaquetar(b"ucre", self.ficha_sala(sala)), self.ficha(ses, b"+usr"),
+                self.ficha_miembro(ses, 0)]
 
     def auxi(self, ses, campos):
-        # Texto auxiliar del jugador (su presencia); se guarda y se contesta igual.
+        # Texto auxiliar del jugador (su estado en la sala); se guarda, se contesta
+        # igual y, como cambia su ficha, '+usr' nueva a todos los de su sala, el
+        # incluido.
         ses.auxi = campos.get("TEXT", "")
-        return [empaquetar(b"auxi", campos)]
+        respuesta = [empaquetar(b"auxi", campos)]
+        if ses.sala is not None:
+            for otro in self.sesiones:
+                if otro is not ses and otro.sala == ses.sala and otro.escritor:
+                    otro.escritor.write(self.ficha(ses, b"+usr"))
+            respuesta.append(self.ficha(ses, b"+usr"))
+            sala = self.salas.get(ses.sala)
+            if sala:
+                respuesta += self.avisar_set(sala, ses, ses)
+        return respuesta
 
-    def ficha(self, ses):
-        return empaquetar(b"+who", {
+    def ficha(self, ses, orden=b"+who"):
+        # La ficha del propio jugador. El juego monta con ella su entrada en la
+        # conexion entre jugadores (sub_82548818): LA (IP local) y MA (la MADDR
+        # que mando en auth: "$<XUID>^<XNADDR codificada>"). Sin MA, el ConnApi se
+        # queda con XUID 0 y ConnApiOnline falla.
+        return empaquetar(orden, {
+            "I": ses.id,
             "M": ses.nombre,
             "N": ses.persona or ses.nombre,
+            "MA": ses.maddr,
             "A": ses.ip,
             "LA": ses.ip,
+            # G: la partida en la que esta (su IDENT; 0 = ninguna). El juego lo lee
+            # en su ficha (+304, clave de una letra en 0x8202AA18) al recibir +mgm:
+            # con 0 da la partida por perdida y la desmonta (sub_82542560).
+            "G": ses.partida["IDENT"] if ses.partida else 0,
             "P": 1,
             "F": "U",
             "LO": "esES",
             "PRES": 1,
+            # X: su texto auxi. El juego guarda cada ficha +usr en la lista de la
+            # sala (LobbyGameSessions, +360) y lee de ese texto (registro +28) SCF,
+            # LT, CD y CE: estado de conexion, latencia y estado de carrera.
+            "X": ses.auxi,
         })
 
     def auth(self, ses, campos):
@@ -442,6 +568,7 @@ async def latido(escritor, puerto):
 async def cliente(lector, escritor, servidor, puerto):
     otro = escritor.get_extra_info("peername")
     ses = Sesion(otro[0], escritor)
+    servidor.sesiones.add(ses)
     apuntar(f"[{puerto}] conexion de {otro[0]}:{otro[1]}")
     bufer = b""
     tarea_latido = asyncio.create_task(latido(escritor, puerto)) if puerto == PUERTO_SALAS else None
@@ -475,6 +602,7 @@ async def cliente(lector, escritor, servidor, puerto):
     if tarea_latido:
         tarea_latido.cancel()
     servidor.olvidar(ses)
+    servidor.sesiones.discard(ses)
     apuntar(f"[{puerto}] {otro[0]}:{otro[1]} cerro")
     escritor.close()
 

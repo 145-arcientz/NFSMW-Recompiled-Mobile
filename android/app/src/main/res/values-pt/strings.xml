@@ -77,6 +77,7 @@
     <string name="escalado_fsr">AMD FSR 1.0 · escala mais nítida</string>
     <string name="escalado_cas">AMD CAS · só nitidez</string>
     <string name="iso_incompleta">Esta ISO está incompleta: faltam %1$s de dados do jogo no fim do arquivo, como após um download ou uma extração interrompida. O jogo não carrega com ela.</string>
+    <string name="iso_no_es_xbox">Este arquivo não é uma ISO de Xbox 360: não tem o sistema de arquivos dele. Pode ser a versão de PC ou de PS2, um .zip ou .7z sem descompactar, ou outro jogo. Com ele o jogo fica com a tela preta e fecha.</string>
     <string name="iso_otra_edicion">Esta ISO é de outra edição do jogo. Este APK foi compilado para a edição %1$s e não inicia com outra: escolha a ISO %1$s ou compile o APK com esta ISO.</string>
     <string name="ediciones_apk">Este APK inclui as edições %1$s do jogo.</string>
     <string name="edicion_iso">ISO da edição %1$s. Este APK inclui %2$s.</string>

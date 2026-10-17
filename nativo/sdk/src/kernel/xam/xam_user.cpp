@@ -51,6 +51,24 @@ static uint32_t EstadoSesion(uint32_t estado) {
   return (REXCVAR_GET(red_live) && estado == 1) ? 2 : estado;
 }
 
+// PARCHE LOCAL (red): el XUID es fijo (0xB13EBABEBABEBABE) en todos los aparatos, y
+// en una partida la conexion entre jugadores los distingue por XUID: con dos
+// iguales, el anfitrion se confunde con el que entra y desmonta su sesion. En la
+// LAN el juego ve uno por aparato, sacado de su IP, con el prefijo de los XUID
+// online. Las partidas guardadas no cambian de sitio: xam_content.cpp usa el del
+// perfil, no este.
+REXCVAR_DECLARE(bool, red_lan);
+namespace rex::kernel::xam {
+uint32_t RedIpLocalRed();
+}
+static uint64_t XuidParaElJuego(uint64_t xuid) {
+  if (!REXCVAR_GET(red_lan)) return xuid;
+  uint32_t ip = rex::kernel::xam::RedIpLocalRed();  // en orden de red
+  const uint8_t* b = reinterpret_cast<const uint8_t*>(&ip);
+  return 0x0009000000000000ull | (uint64_t(b[0]) << 24) | (uint64_t(b[1]) << 16) |
+         (uint64_t(b[2]) << 8) | uint64_t(b[3]);
+}
+
 namespace rex {
 namespace kernel {
 namespace xam {
@@ -71,11 +89,11 @@ i32 XamUserGetXUID_entry(u32 user_index, u32 type_mask, mapped_u64 xuid_ptr) {
       auto type = user_profile->type() & type_mask;
       if (type & (2 | 4)) {
         // maybe online profile?
-        xuid = user_profile->xuid();
+        xuid = XuidParaElJuego(user_profile->xuid());
         result = X_E_SUCCESS;
       } else if (type & 1) {
         // maybe offline profile?
-        xuid = user_profile->xuid();
+        xuid = XuidParaElJuego(user_profile->xuid());
         result = X_E_SUCCESS;
       }
     }
@@ -118,7 +136,7 @@ i32 XamUserGetSigninInfo_entry(u32 user_index, u32 flags, ppc_ptr_t<X_USER_SIGNI
   }
 
   const auto& user_profile = REX_KERNEL_STATE()->user_profile();
-  info->xuid = user_profile->xuid();
+  info->xuid = XuidParaElJuego(user_profile->xuid());
   info->signin_state = EstadoSesion(user_profile->signin_state());
   rex::string::copy_truncating(info->name, user_profile->name(), rex::countof(info->name));
   return X_E_SUCCESS;

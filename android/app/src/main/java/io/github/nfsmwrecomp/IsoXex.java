@@ -49,8 +49,20 @@ final class IsoXex {
     private static final int SECTOR = 2048;
     private static final int DIRECTORIO = 0x10;
     private static final byte[] MAGIA = "MICROSOFT*XBOX*MEDIA".getBytes(StandardCharsets.US_ASCII);
-    /** Donde empieza la particion de juego: imagen recortada, XGD2, XGD3 y XGD1. */
-    private static final long[] BASES = {0L, 0x0FD90000L, 0x02080000L, 0x18300000L};
+    /**
+     * Donde empieza la particion de juego: imagen recortada, XGD2, XGD1, XGD3 y
+     * los dos de otras herramientas de volcado. Los mismos que mira el SDK
+     * (DiscImageDevice::Verify): si no, la app daba por buena una ISO que el
+     * juego no podia abrir, o al reves.
+     */
+    private static final long[] BASES = {0L, 0x0FD90000L, 0x02080000L, 0x18300000L, 0x0000FB20L, 0x00020600L};
+
+    /**
+     * xex de una ISO que se abrio bien pero no tiene el XDVDFS de Xbox 360 en
+     * ninguna de las BASES: otro juego, la version de PC o de PS2, un .zip/.7z
+     * o un fichero roto. El juego se queda en negro y se cierra con ella.
+     */
+    static final String NO_ES_ISO = "-";
     private static final int MAX_DIRECTORIO = 1 << 20;
     private static final int MAX_XEX = 64 << 20;
     private static final int MAX_PROFUNDIDAD = 8;
@@ -65,7 +77,8 @@ final class IsoXex {
                 return null;
             }
             try (FileInputStream in = new FileInputStream(pfd.getFileDescriptor())) {
-                return mirar(in.getChannel());
+                Info info = mirar(in.getChannel());
+                return info != null ? info : new Info(NO_ES_ISO, 0);
             }
         } catch (IOException | RuntimeException e) {
             return null;

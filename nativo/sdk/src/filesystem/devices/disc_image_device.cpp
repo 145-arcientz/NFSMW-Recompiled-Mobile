@@ -72,8 +72,10 @@ Entry* DiscImageDevice::ResolvePath(const std::string_view path) {
 
 DiscImageDevice::Error DiscImageDevice::Verify(ParseState* state) {
   // Find sector 32 of the game partition - try at a few points.
+  // PARCHE LOCAL: + 0x18300000 (XGD3), que la app (IsoXex.java) ya daba por
+  // buena; las dos listas tienen que ser la misma.
   static const size_t likely_offsets[] = {
-      0x00000000, 0x0000FB20, 0x00020600, 0x02080000, 0x0FD90000,
+      0x00000000, 0x0000FB20, 0x00020600, 0x02080000, 0x0FD90000, 0x18300000,
   };
   bool magic_found = false;
   for (size_t n = 0; n < rex::countof(likely_offsets); n++) {

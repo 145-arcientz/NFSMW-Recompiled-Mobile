@@ -9,8 +9,9 @@ llegó; el estado y el protocolo están en esta primera sección.
 
 ### Cómo se prueba
 
-1. En el PC: `python tools/red/servidor_ea.py --ip <IP del PC>` (directorio 30960, salas
-   10901; todo al log `out/red/servidor.log`).
+1. En el PC: `python servidor_ea.py --ip <IP del PC>` desde el proyecto aparte
+   `..\nfsmw-servidor-lan` (directorio 30960, salas 10901; todo al log
+   `registros/servidor.log` de ese proyecto; ver `tools/red/README.md`).
 2. En cada móvil, ajustes de la app → "Servidor LAN (multijugador)": la IP del PC. Con eso
    el motor nativo arranca con `--grant_user_privileges --red_lan --red_live
    --red_dns=<IP>` (`MotorNativo.argumentos`). Gamertag distinto en cada uno.
@@ -55,15 +56,34 @@ es `+ses +mgm +msg +who +rom +pop +usr +uss +ust +usm +snp +agm +gam +sst +bud +
 (cada uno con su función). Las claves se leyeron de la memoria del juego en marcha con la
 sonda (`.rdata` no sale en el código traducido).
 
-### Dónde está
+### Dónde está (2026-10-16): carrera completa entre dos móviles
 
-Los dos móviles en la misma sala: el que entra ve la carrera elegida por el anfitrión;
-`gjoi` → `+mgm` al anfitrión y `+ses` a los dos. Pero **la lista de jugadores sale vacía
-en los dos y ninguno abre un socket UDP hacia el otro** (ni `XNetXnAddrToInAddr`). Lo
-siguiente es averiguar por qué no dan por buenos a los jugadores de la ficha: candidatos
-el nombre por jugador (`0x820A1B30`), la ficha `+who` (sin `I`, el id que debería
-coincidir con `OPID`), y que los dos móviles mandan el mismo XUID (`0xB13EBABEBABEBABE`,
-fijo en `user_profile.cpp`).
+El 2026-10-16 un RedMagic (SM8750) y un Galaxy A22 (Mali) corrieron una carrera de circuito
+entera por la LAN, con los dos resultados (`rank`) mandados al acabar, y cambiaron de
+anfitrión sin reiniciar. Los dos últimos muros:
+
+- **El enlace de juego solo traía el primer paquete.** El ConnApi de DirtySock usa CommUDP
+  en el puerto 3658 y recibe en un hilo suyo (`sub_8282A078`) con `WSARecvFrom` solapada:
+  espera a "cualquiera" de sus eventos con `WSAWaitForMultipleEvents` y vuelve a pedir
+  con `sub_82829FA0`. Nuestro `NetDll_WSAWaitForMultipleEvents` pasaba `fWaitAll` tal
+  cual como tipo de espera del kernel (allí 0 es "todos"), el plazo en ms como instante
+  absoluto, y devolvía siempre 0 en vez del índice. Arreglado en `xam_net.cpp`.
+- **La sala de juego salía vacía** ("Espera a que haya un número mínimo de jugadores").
+  Las "salas" `ucre/ujoi/ulea/usea/uadm` son *user sets*. La lista de miembros de la sala
+  de juego (`LobbyGameSessions`, objeto +360) es la del set de la ranura 0 (lista 24 del
+  lobby) y solo se llena con `+usm` (`sub_8282EB78`): `S` ranura, `I`, `N`, `F`, `G` y `X`
+  (registro de 160 bytes de `sub_82826530`: +4 nombre, +28 texto `auxi`, de donde se leen
+  `SCF`, `LT`, `CD` y `CE`). El miembro 0 es el que se llama como uno mismo
+  (`sub_82544C28`). El que se une se suscribe con `sele USERSET0=<sala>` antes de `ujoi`;
+  el anfitrión no manda nada y se le da la ranura 0 al crear. `+usr` (`sub_8282ED40`) es
+  otra cosa: la lista de usuarios del lobby (ahí `X` va a +172).
+
+La tabla de mensajes del lobby está en `0x828F2228` (pares código/función) y se puede
+leer sin el móvil: `tools/ediciones/imagen.py` saca la imagen del XEX
+(`cargar(ruta, cache)` → `(img, huella)`).
+
+Pendiente: si un móvil pasa a segundo plano en carrera, Android lo cierra y el otro
+sigue solo; XGI `0xB0013` (`XSessionLeave`) ya contesta bien, sin probar a fondo.
 
 **Y la versión de 360 no tiene System Link (comprobado el 2026-10-15).** El carrusel del
 menú principal solo trae "Xbox Live"; recorrido opción por opción en el móvil, no hay
