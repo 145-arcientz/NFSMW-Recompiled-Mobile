@@ -10,6 +10,18 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Añadido
 
+- **Un móvil puede ser el servidor de la partida** (motor nativo, 0.5.1): ajuste nuevo
+  **"Anfitrión en este móvil"** en la tarjeta "Servidor LAN". Ese móvil corre el servidor de
+  salas de EA y juega a la vez; los demás ponen su IP, que la pantalla de inicio enseña. Va
+  por Wi-Fi o con el punto de acceso del propio móvil (nunca coge la IP de los datos
+  móviles). El servidor es un port 1:1 a Java de `ea_server.py` de nfsmw-server-lan
+  (`ServidorEa.java`: mismos mensajes, mismo `stats.json`; con dos clientes de prueba los dos
+  contestan exactamente lo mismo) y vive en un servicio en primer plano del proceso principal
+  (`ServidorLanService.java`), así que sigue en marcha mientras el juego corre en el suyo. La
+  notificación dice la IP y cuántos hay en Xbox Live, y tiene un botón para pararlo. El juego
+  del anfitrión entra por su propia IP de la red local, no por 127.0.0.1, porque esa IP es la
+  que el servidor reparte a los demás. Estadísticas en `files/servidor_lan/` y registro en
+  `files/logs/servidor_lan.log`. Un cambio de protocolo va ahora a los dos servidores.
 - **Multijugador en red local** (motor nativo, 0.5.0). La versión de 360 no tiene System
   Link: su online es "Xbox Live" contra los servidores de EA de 2005, que ya no existen. Ahora
   un PC de la misma Wi-Fi hace de ese servidor con
@@ -380,6 +392,8 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Cambiado
 
+- El campo del servidor LAN se llama ahora "IP del servidor" en vez de "IP del PC" (0.5.1):
+  puede ser un PC o un móvil anfitrión.
 - Menús con el dedo (0.5.0): las indicaciones de abajo crecen hacia el espacio libre. En las
   pantallas del online van en filas a unos 4 mm («Ⓐ Cambiar coche» encima de «Ⓑ Atrás») y el
   dedo pulsaba la de al lado. Ahora cada fila llega hasta el centro de la vecina (la primera
@@ -519,6 +533,9 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Arreglado
 
+- El gamertag vacío se veía montado sobre su etiqueta (0.5.1): sin foco, la etiqueta
+  "Gamertag" y el ejemplo "User" se pintaban en el mismo sitio. Ahora la etiqueta va siempre
+  arriba y el ejemplo, en gris, dentro. Lo mismo en el campo del servidor.
 - `preparar_nativo.py` dejaba sin efecto los ganchos nuevos en las otras ediciones (0.5.0): si el
   generador de código no tenía nada que reescribir, las llamadas que una preparación anterior
   había hecho directas seguían saltándose el gancho, porque `llamadas_directas.py` solo las

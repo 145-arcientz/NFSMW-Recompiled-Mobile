@@ -150,6 +150,9 @@
 
     <!-- Advanced -->
     <string name="seccion_avanzado">고급</string>
+    <string name="seccion_multijugador">멀티플레이</string>
+    <string name="seccion_controles">조작</string>
+    <string name="seccion_otras">기타 설정</string>
     <string name="avanzado_resumen">각 항목이 휴대폰에서 얼마나 부하를 주는지 시험하기 위한 설정입니다. 기본값이 권장값입니다.</string>
     <string name="una_pasada">한 번에 장면 그리기</string>
     <string name="una_pasada_resumen">장면을 세 줄로 나누지 않고 한 번에 그립니다. 그리기 호출이 약 30 % 줄고 레이스에서 fps가 약 +25~45 % 오릅니다. 게임의 MSAA를 끄기 때문에 MSAA를 선택하면 꺼집니다.</string>
@@ -184,9 +187,33 @@
     <string name="gamertag_en_uso_pregunta" formatted="true">다른 휴대폰이 %2$s에서 이미 %1$s을(를) 쓰고 있습니다. 온라인 모드 없이 그대로 플레이할까요? Xbox Live를 빼고 모두 즐길 수 있습니다.</string>
     <string name="jugar_sin_online">오프라인으로 플레이</string>
     <string name="servidor_lan">LAN 서버 (멀티플레이)</string>
-    <string name="servidor_lan_resumen">게임의 Xbox Live를 같은 Wi-Fi의 PC에서 실행하는 EA 서버(nfsmw-server-lan)에 연결합니다. 비워 두면: 평소처럼 게임.</string>
-    <string name="servidor_lan_ip">PC IP</string>
-    <string name="servidor_lan_error">10.0.0.4 같은 IPv4 주소</string>
+    <string name="servidor_lan_resumen">게임의 Xbox Live를 같은 Wi-Fi의 EA 서버에 연결합니다: PC(nfsmw-server-lan) 또는 호스트가 되는 휴대폰. 아래에서 하나를 고르거나 이 휴대폰으로 호스트하세요.</string>
+    <string name="servidor_lan_ip">서버 IP 또는 이름</string>
+    <string name="servidor_lan_error">10.0.0.4 같은 IP 또는 my-pc 같은 기기 이름</string>
+    <string name="servidor_anfitrion">이 휴대폰에서 호스트</string>
+    <string name="servidor_anfitrion_resumen">이 휴대폰이 EA 서버를 실행하며, 이 휴대폰으로도 플레이할 수 있습니다. 다른 사람은 LAN 서버에 이 휴대폰의 IP를 입력합니다. Wi-Fi 또는 이 휴대폰의 핫스팟으로.</string>
+    <string name="servidor_anfitrion_ip" formatted="true">다른 휴대폰에 입력할 IP: %1$s</string>
+    <string name="servidor_anfitrion_sin_red">Wi-Fi도 핫스팟도 없습니다: Wi-Fi에 연결하거나 이 휴대폰의 핫스팟을 켜세요.</string>
+    <string name="servidor_notificacion_canal">LAN 서버</string>
+    <string name="servidor_notificacion_titulo">LAN 서버 실행 중</string>
+    <string name="servidor_notificacion_texto" formatted="true">다른 사람은 %1$s 입력 · Xbox Live에 %2$d명</string>
+    <string name="servidor_detener">중지</string>
+    <string name="servidor_error" formatted="true">LAN 서버를 시작할 수 없습니다: %1$s</string>
+    <string name="servidor_anadir">서버 추가</string>
+    <string name="servidor_editar_titulo">서버 편집</string>
+    <string name="servidor_editar" formatted="true">%1$s 편집</string>
+    <string name="servidor_nombre">이름(선택)</string>
+    <string name="servidor_repetido">이미 저장된 서버입니다</string>
+    <string name="servidor_no_encontrado_titulo">서버를 찾을 수 없음</string>
+    <string name="servidor_no_encontrado" formatted="true">이 네트워크에서 %1$s을(를) 찾을 수 없습니다. 이름을 확인하거나 서버의 IP를 사용하세요.</string>
+    <string name="servidor_ninguno">서버 없음</string>
+    <string name="servidor_ninguno_resumen">Xbox Live 없이 평소처럼 게임</string>
+    <string name="guardar">저장</string>
+    <string name="servidor_guardado" formatted="true">%1$s 저장됨</string>
+    <string name="servidor_eliminar" formatted="true">%1$s 삭제</string>
+    <string name="servidor_eliminado" formatted="true">%1$s 삭제됨</string>
+    <string name="deshacer">실행 취소</string>
+    <string name="servidores_guardados">저장된 서버</string>
     <string name="seccion_tactil">터치 조작</string>
     <string name="editar_tactil">터치 조작 편집</string>
     <string name="editar_tactil_resumen">터치 버튼을 옮기고 크기와 불투명도를 바꿉니다.</string>
@@ -197,8 +224,11 @@
     <string name="vibracion_mando_sin_motores">%1$s (%2$s): Android가 이 컨트롤러의 모터를 제공하지 않아 진동할 수 없습니다.</string>
     <string name="vibracion_mando_xbox_usb">%1$s (%2$s): USB 연결에서는 Android가 모터를 제공하지 않아 이 테스트로는 진동시킬 수 없습니다. 게임에서는 SDL이 자체 진동 기능으로 USB를 통해 제어합니다(연결할 때 USB 권한을 요청합니다).</string>
     <string name="vibracion_sin_mandos">연결된 컨트롤러가 없습니다: 휴대폰이 진동합니다.</string>
-    <string name="girar_inclinando">휴대폰을 기울여 조향</string>
-    <string name="girar_inclinando_resumen">레이스와 자유 주행에서 왼쪽 스틱 대신 휴대폰을 핸들처럼 기울입니다(왼쪽 스틱은 숨겨집니다). 드래그 레이스는 차선 화살표를 그대로 씁니다.</string>
+    <string name="giro_carrera">레이스 중 조향</string>
+    <string name="giro_carrera_resumen">레이스, 자유 주행, 추격전에서 씁니다. 화살표는 드래그 레이스의 차선 화살표처럼 끝까지 꺾습니다. 기울이기를 고르면 휴대폰이 핸들이 됩니다. 드래그 레이스는 항상 차선 화살표를 씁니다.</string>
+    <string name="giro_stick">왼쪽 스틱</string>
+    <string name="giro_flechas">화살표</string>
+    <string name="giro_inclinar">휴대폰 기울이기</string>
     <string name="menus_tactiles">손가락으로 메뉴 조작</string>
     <string name="menus_tactiles_resumen">메뉴와 일시 정지 메뉴에서는 패드가 없습니다. 스와이프로 이동하고(옵션 목록에서는 옆으로 밀면 값이 바뀝니다), 항목을 탭해 선택하고, 화살표를 탭해 값을 바꾸고, 아래쪽의 “Ⓐ 확인”이나 “Ⓑ 뒤로” 같은 안내를 탭하면 누를 수 있습니다. 두 손가락은 뒤로. 위쪽의 패드 버튼으로 패드를 다시 불러옵니다.</string>
     <string name="deslizar_invertido">메뉴 스와이프 방향 반전</string>

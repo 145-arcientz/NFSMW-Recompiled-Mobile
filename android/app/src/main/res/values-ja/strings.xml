@@ -150,6 +150,9 @@
 
     <!-- Advanced -->
     <string name="seccion_avanzado">詳細設定</string>
+    <string name="seccion_multijugador">マルチプレイ</string>
+    <string name="seccion_controles">操作</string>
+    <string name="seccion_otras">その他の設定</string>
     <string name="avanzado_resumen">各設定がスマートフォンでどれだけ負荷になるか試すためのものです。既定値が推奨値です。</string>
     <string name="una_pasada">シーンを 1 パスで描画</string>
     <string name="una_pasada_resumen">シーンを 3 つの帯に分けず 1 回で描画します。描画回数が約 30 % 減り、レース中の fps が約 +25～45 % 上がります。ゲームの MSAA を無効にするため、MSAA を選んでいるとオフになります。</string>
@@ -184,9 +187,33 @@
     <string name="gamertag_en_uso_pregunta" formatted="true">別のスマートフォンが %2$s で %1$s をすでに使っています。オンラインモードなしでプレイしますか？Xbox Live 以外はすべて遊べます。</string>
     <string name="jugar_sin_online">オフラインでプレイ</string>
     <string name="servidor_lan">LAN サーバー（マルチプレイ）</string>
-    <string name="servidor_lan_resumen">ゲーム内の Xbox Live を、Wi-Fi 内の PC で動かす EA サーバー（nfsmw-server-lan）につなぎます。空欄：いつもどおりのゲーム。</string>
-    <string name="servidor_lan_ip">PC の IP</string>
-    <string name="servidor_lan_error">10.0.0.4 のような IPv4 アドレス</string>
+    <string name="servidor_lan_resumen">ゲーム内の Xbox Live を、Wi-Fi 内の EA サーバーにつなぎます：PC（nfsmw-server-lan）またはホスト役のスマホ。下から選ぶか、このスマホでホストします。</string>
+    <string name="servidor_lan_ip">サーバーの IP または名前</string>
+    <string name="servidor_lan_error">10.0.0.4 のような IP か、my-pc のような機器名</string>
+    <string name="servidor_anfitrion">このスマホでホスト</string>
+    <string name="servidor_anfitrion_resumen">このスマホが EA サーバーになります。このスマホでもそのままプレイできます。ほかの人は LAN サーバーにこのスマホの IP を入力します。Wi-Fi またはこのスマホのテザリングで。</string>
+    <string name="servidor_anfitrion_ip" formatted="true">ほかのスマホに入力する IP：%1$s</string>
+    <string name="servidor_anfitrion_sin_red">Wi-Fi もテザリングもありません：Wi-Fi に接続するか、このスマホのテザリングをオンにしてください。</string>
+    <string name="servidor_notificacion_canal">LAN サーバー</string>
+    <string name="servidor_notificacion_titulo">LAN サーバー稼働中</string>
+    <string name="servidor_notificacion_texto" formatted="true">ほかの人は %1$s を入力 · Xbox Live に %2$d 人</string>
+    <string name="servidor_detener">停止</string>
+    <string name="servidor_error" formatted="true">LAN サーバーを起動できませんでした：%1$s</string>
+    <string name="servidor_anadir">サーバーを追加</string>
+    <string name="servidor_editar_titulo">サーバーを編集</string>
+    <string name="servidor_editar" formatted="true">%1$s を編集</string>
+    <string name="servidor_nombre">名前（任意）</string>
+    <string name="servidor_repetido">このサーバーはすでに保存されています</string>
+    <string name="servidor_no_encontrado_titulo">サーバーが見つかりません</string>
+    <string name="servidor_no_encontrado" formatted="true">%1$s はこのネットワークで見つかりません。名前を確認するか、サーバーの IP を使ってください。</string>
+    <string name="servidor_ninguno">サーバーなし</string>
+    <string name="servidor_ninguno_resumen">いつもどおりのゲーム（Xbox Live なし）</string>
+    <string name="guardar">保存</string>
+    <string name="servidor_guardado" formatted="true">%1$s を保存しました</string>
+    <string name="servidor_eliminar" formatted="true">%1$s を削除</string>
+    <string name="servidor_eliminado" formatted="true">%1$s を削除しました</string>
+    <string name="deshacer">元に戻す</string>
+    <string name="servidores_guardados">保存したサーバー</string>
     <string name="seccion_tactil">タッチ操作</string>
     <string name="editar_tactil">タッチ操作を編集</string>
     <string name="editar_tactil_resumen">タッチボタンを移動し、サイズと不透明度を変更します。</string>
@@ -197,8 +224,11 @@
     <string name="vibracion_mando_sin_motores">%1$s（%2$s）：Android がこのコントローラーのモーターを公開していないため、振動できません。</string>
     <string name="vibracion_mando_xbox_usb">%1$s（%2$s）：USB 接続では Android がモーターを公開しないため、このテストでは振動させられません。ゲーム内では SDL が独自の振動機能で USB 経由で制御します（接続時に USB の許可を求めます）。</string>
     <string name="vibracion_sin_mandos">コントローラーが接続されていません：スマートフォンが振動します。</string>
-    <string name="girar_inclinando">スマートフォンを傾けてハンドル操作</string>
-    <string name="girar_inclinando_resumen">レースとフリーローム中は、左スティックの代わりにスマートフォンをハンドルのように傾けます（左スティックは非表示になります）。ドラッグレースでは車線の矢印がそのまま残ります。</string>
+    <string name="giro_carrera">レース中のハンドル操作</string>
+    <string name="giro_carrera_resumen">レース、フリーローム、追跡で使います。矢印はドラッグレースの車線の矢印のように、いっぱいまで切ります。傾ける場合はスマートフォンがハンドルになります。ドラッグレースは常に車線の矢印です。</string>
+    <string name="giro_stick">左スティック</string>
+    <string name="giro_flechas">矢印</string>
+    <string name="giro_inclinar">スマートフォンを傾ける</string>
     <string name="menus_tactiles">指でメニュー操作</string>
     <string name="menus_tactiles_resumen">メニューとポーズメニューではパッドは表示されません。スワイプで移動し（オプションの一覧では横方向で値が変わります）、項目をタップして選択、矢印をタップして値を変更し、下部の「Ⓐ 決定」や「Ⓑ 戻る」などの表示をタップすると押せます。2 本指で戻ります。上部のパッドボタンでパッドを戻せます。</string>
     <string name="deslizar_invertido">メニューのスワイプ方向を反転</string>

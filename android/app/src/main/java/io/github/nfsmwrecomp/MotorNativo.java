@@ -254,8 +254,12 @@ final class MotorNativo {
         // Xbox Live del juego contra el servidor de EA de la LAN: los permisos de
         // Live, la red de verdad, la sesion de Live y todos los nombres (los
         // servidores de EA) a esa IP. Solo en este motor: son opciones de su SDK.
-        String servidor = ajustes.servidorLan();
-        if (Ajustes.ipValida(servidor)) {
+        // Un servidor puesto por nombre sale aqui tal cual; SetupActivity.jugar
+        // cambia el red_dns por su IP (el SDK solo entiende IPs).
+        // Con este movil de anfitrion, su propia IP de la LAN (no 127.0.0.1: es la
+        // que el servidor pone en el registro de la partida para los demas).
+        String servidor = ajustes.servidorEfectivo();
+        if (Ajustes.direccionValida(servidor)) {
             a.add("--grant_user_privileges=true");
             a.add("--red_lan=true");
             a.add("--red_live=true");

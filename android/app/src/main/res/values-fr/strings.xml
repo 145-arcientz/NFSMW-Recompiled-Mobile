@@ -150,6 +150,9 @@
 
     <!-- Advanced -->
     <string name="seccion_avanzado">Avancé</string>
+    <string name="seccion_multijugador">Multijoueur</string>
+    <string name="seccion_controles">Commandes</string>
+    <string name="seccion_otras">Autres options</string>
     <string name="avanzado_resumen">Pour tester ce que coûte chaque réglage sur votre téléphone. Les valeurs par défaut sont celles recommandées.</string>
     <string name="una_pasada">Scène en une seule passe</string>
     <string name="una_pasada_resumen">Dessine la scène une seule fois au lieu de trois bandes : ~30 % d\'appels de dessin en moins et environ +25-45 % de fps en course. Il désactive le MSAA du jeu, donc il s\'éteint quand MSAA est sélectionné.</string>
@@ -184,9 +187,33 @@
     <string name="gamertag_en_uso_pregunta" formatted="true">Un autre téléphone a déjà %1$s sur %2$s. Voulez-vous jouer quand même, sans mode en ligne ? Vous pouvez jouer à tout sauf au Xbox Live.</string>
     <string name="jugar_sin_online">Jouer hors ligne</string>
     <string name="servidor_lan">Serveur LAN (multijoueur)</string>
-    <string name="servidor_lan_resumen">Le Xbox Live du jeu, contre le serveur EA que vous lancez sur un PC de votre Wi-Fi (nfsmw-server-lan). Vide : le jeu comme toujours.</string>
-    <string name="servidor_lan_ip">IP du PC</string>
-    <string name="servidor_lan_error">Une adresse IPv4 comme 10.0.0.4</string>
+    <string name="servidor_lan_resumen">Le Xbox Live du jeu, contre un serveur EA de votre Wi-Fi : sur un PC (nfsmw-server-lan) ou sur un téléphone hôte. Choisissez-en un ci-dessous ou hébergez sur ce téléphone.</string>
+    <string name="servidor_lan_ip">IP ou nom du serveur</string>
+    <string name="servidor_lan_error">Une IP comme 10.0.0.4 ou un nom d\'appareil comme mon-pc</string>
+    <string name="servidor_anfitrion">Héberger sur ce téléphone</string>
+    <string name="servidor_anfitrion_resumen">Ce téléphone fait tourner le serveur EA et vous y jouez aussi. Les autres saisissent l\'IP de ce téléphone comme serveur LAN. En Wi-Fi ou via le point d\'accès de ce téléphone.</string>
+    <string name="servidor_anfitrion_ip" formatted="true">Les autres téléphones saisissent : %1$s</string>
+    <string name="servidor_anfitrion_sin_red">Ni Wi-Fi ni point d\'accès : connectez-vous à un Wi-Fi ou activez le point d\'accès de ce téléphone.</string>
+    <string name="servidor_notificacion_canal">Serveur LAN</string>
+    <string name="servidor_notificacion_titulo">Serveur LAN en marche</string>
+    <string name="servidor_notificacion_texto" formatted="true">Les autres saisissent %1$s · %2$d sur Xbox Live</string>
+    <string name="servidor_detener">Arrêter</string>
+    <string name="servidor_error" formatted="true">Le serveur LAN n\'a pas pu démarrer : %1$s</string>
+    <string name="servidor_anadir">Ajouter un serveur</string>
+    <string name="servidor_editar_titulo">Modifier le serveur</string>
+    <string name="servidor_editar" formatted="true">Modifier %1$s</string>
+    <string name="servidor_nombre">Nom (facultatif)</string>
+    <string name="servidor_repetido">Ce serveur est déjà enregistré</string>
+    <string name="servidor_no_encontrado_titulo">Serveur introuvable</string>
+    <string name="servidor_no_encontrado" formatted="true">%1$s est introuvable sur ce réseau. Vérifiez le nom ou utilisez l\'IP du serveur.</string>
+    <string name="servidor_ninguno">Aucun serveur</string>
+    <string name="servidor_ninguno_resumen">Le jeu comme toujours, sans Xbox Live</string>
+    <string name="guardar">Enregistrer</string>
+    <string name="servidor_guardado" formatted="true">%1$s enregistré</string>
+    <string name="servidor_eliminar" formatted="true">Supprimer %1$s</string>
+    <string name="servidor_eliminado" formatted="true">%1$s supprimé</string>
+    <string name="deshacer">Annuler</string>
+    <string name="servidores_guardados">Serveurs enregistrés</string>
     <string name="seccion_tactil">Commandes tactiles</string>
     <string name="editar_tactil">Modifier les commandes tactiles</string>
     <string name="editar_tactil_resumen">Déplacez les boutons tactiles et changez leur taille et leur opacité.</string>
@@ -197,8 +224,11 @@
     <string name="vibracion_mando_sin_motores">%1$s (%2$s) : Android n\'expose aucun moteur pour cette manette, elle ne peut donc pas vibrer.</string>
     <string name="vibracion_mando_xbox_usb">%1$s (%2$s) : en USB, Android n\'expose pas ses moteurs, ce test ne peut donc pas la faire vibrer. En jeu, SDL la pilote en USB avec sa propre vibration (il demande l\'autorisation USB à la connexion).</string>
     <string name="vibracion_sin_mandos">Aucune manette connectée : le téléphone vibre.</string>
-    <string name="girar_inclinando">Diriger en inclinant le téléphone</string>
-    <string name="girar_inclinando_resumen">En course et en balade libre, inclinez le téléphone comme un volant au lieu d\'utiliser le stick gauche, qui est masqué. Les courses de dragster gardent les flèches de voie.</string>
+    <string name="giro_carrera">Direction en course</string>
+    <string name="giro_carrera_resumen">En course, en balade libre et en poursuite. Les flèches braquent à fond, comme les flèches de voie des courses de dragster ; en inclinant, le téléphone devient un volant. Les courses de dragster gardent toujours leurs flèches de voie.</string>
+    <string name="giro_stick">Stick gauche</string>
+    <string name="giro_flechas">Flèches</string>
+    <string name="giro_inclinar">En inclinant le téléphone</string>
     <string name="menus_tactiles">Menus au doigt</string>
     <string name="menus_tactiles_resumen">Dans les menus et le menu de pause, il n\'y a pas de manette : glissez pour vous déplacer (dans une liste d\'options, sur le côté change la valeur), touchez une option pour la choisir, touchez les flèches pour changer sa valeur et touchez les indications en bas, comme « Ⓐ Accepter » ou « Ⓑ Retour », pour les activer. Deux doigts : retour. Le bouton MANETTE en haut fait revenir la manette.</string>
     <string name="deslizar_invertido">Inverser le glissement dans les menus</string>

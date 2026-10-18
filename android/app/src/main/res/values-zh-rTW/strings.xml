@@ -150,6 +150,9 @@
 
     <!-- Advanced -->
     <string name="seccion_avanzado">進階</string>
+    <string name="seccion_multijugador">多人遊戲</string>
+    <string name="seccion_controles">操控</string>
+    <string name="seccion_otras">其他選項</string>
     <string name="avanzado_resumen">用來測試每個項目在你手機上的效能成本。預設值就是建議值。</string>
     <string name="una_pasada">單次繪製場景</string>
     <string name="una_pasada_resumen">一次繪製整個場景，而不是分成三個區塊：繪製呼叫減少約 30 %，比賽中 fps 約提升 25–45 %。它會停用遊戲的 MSAA，所以選擇 MSAA 時會關閉。</string>
@@ -184,9 +187,33 @@
     <string name="gamertag_en_uso_pregunta" formatted="true">另一支手機已在 %2$s 上使用 %1$s。仍要在沒有線上模式的情況下遊戲嗎？除了 Xbox Live 以外都能玩。</string>
     <string name="jugar_sin_online">離線遊戲</string>
     <string name="servidor_lan">區域網路伺服器（多人遊戲）</string>
-    <string name="servidor_lan_resumen">讓遊戲中的 Xbox Live 連到你在 Wi-Fi 內的電腦上執行的 EA 伺服器（nfsmw-server-lan）。留空：照常遊戲。</string>
-    <string name="servidor_lan_ip">電腦的 IP</string>
-    <string name="servidor_lan_error">像 10.0.0.4 這樣的 IPv4 位址</string>
+    <string name="servidor_lan_resumen">讓遊戲中的 Xbox Live 連到 Wi-Fi 內的 EA 伺服器：電腦上的（nfsmw-server-lan），或擔任主機的手機。從下方選一個，或用這支手機當主機。</string>
+    <string name="servidor_lan_ip">伺服器 IP 或名稱</string>
+    <string name="servidor_lan_error">像 10.0.0.4 這樣的 IP，或像 my-pc 這樣的裝置名稱</string>
+    <string name="servidor_anfitrion">由這支手機當主機</string>
+    <string name="servidor_anfitrion_resumen">這支手機執行 EA 伺服器，你也照樣在這支手機上玩。其他人把這支手機的 IP 填為區域網路伺服器。透過 Wi-Fi 或這支手機的熱點。</string>
+    <string name="servidor_anfitrion_ip" formatted="true">其他手機要填：%1$s</string>
+    <string name="servidor_anfitrion_sin_red">沒有 Wi-Fi 也沒有熱點：請連上 Wi-Fi，或開啟這支手機的熱點。</string>
+    <string name="servidor_notificacion_canal">區域網路伺服器</string>
+    <string name="servidor_notificacion_titulo">區域網路伺服器執行中</string>
+    <string name="servidor_notificacion_texto" formatted="true">其他人填 %1$s · Xbox Live 上 %2$d 人</string>
+    <string name="servidor_detener">停止</string>
+    <string name="servidor_error" formatted="true">無法啟動區域網路伺服器：%1$s</string>
+    <string name="servidor_anadir">新增伺服器</string>
+    <string name="servidor_editar_titulo">編輯伺服器</string>
+    <string name="servidor_editar" formatted="true">編輯 %1$s</string>
+    <string name="servidor_nombre">名稱（選填）</string>
+    <string name="servidor_repetido">這個伺服器已經儲存過了</string>
+    <string name="servidor_no_encontrado_titulo">找不到伺服器</string>
+    <string name="servidor_no_encontrado" formatted="true">在這個網路上找不到 %1$s。請檢查名稱，或改用伺服器的 IP。</string>
+    <string name="servidor_ninguno">不使用伺服器</string>
+    <string name="servidor_ninguno_resumen">照常遊戲，不連 Xbox Live</string>
+    <string name="guardar">儲存</string>
+    <string name="servidor_guardado" formatted="true">已儲存 %1$s</string>
+    <string name="servidor_eliminar" formatted="true">移除 %1$s</string>
+    <string name="servidor_eliminado" formatted="true">已移除 %1$s</string>
+    <string name="deshacer">復原</string>
+    <string name="servidores_guardados">已儲存的伺服器</string>
     <string name="seccion_tactil">觸控操作</string>
     <string name="editar_tactil">編輯觸控操作</string>
     <string name="editar_tactil_resumen">移動觸控按鈕，並調整大小與不透明度。</string>
@@ -197,8 +224,11 @@
     <string name="vibracion_mando_sin_motores">%1$s（%2$s）：Android 沒有提供這個控制器的馬達，所以無法震動。</string>
     <string name="vibracion_mando_xbox_usb">%1$s（%2$s）：透過 USB 時 Android 不提供它的馬達，所以這項測試無法讓它震動。遊戲中由 SDL 透過 USB 以自己的震動功能控制（連接時會要求 USB 權限）。</string>
     <string name="vibracion_sin_mandos">沒有連接控制器：由手機震動。</string>
-    <string name="girar_inclinando">傾斜手機來轉向</string>
-    <string name="girar_inclinando_resumen">在比賽和自由駕駛中，像方向盤一樣傾斜手機，取代左搖桿（左搖桿會隱藏）。直線加速賽仍保留換道箭頭。</string>
+    <string name="giro_carrera">比賽中的轉向</string>
+    <string name="giro_carrera_resumen">用於比賽、自由駕駛與追逐。箭頭會像直線加速賽的換道箭頭一樣轉到底；傾斜時，手機就是方向盤。直線加速賽一律使用換道箭頭。</string>
+    <string name="giro_stick">左搖桿</string>
+    <string name="giro_flechas">箭頭</string>
+    <string name="giro_inclinar">傾斜手機</string>
     <string name="menus_tactiles">用手指操作選單</string>
     <string name="menus_tactiles_resumen">在選單和暫停選單中沒有手把：滑動來移動（在選項清單中，橫向滑動會改變數值），點選選項來選擇，點選箭頭來改變數值，點選下方的提示（例如「Ⓐ 確認」或「Ⓑ 返回」）即可按下。兩指點按：返回。上方的手把按鈕會讓手把回來。</string>
     <string name="deslizar_invertido">反轉選單中的滑動方向</string>

@@ -23,6 +23,13 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
+    <!-- El servidor de EA en este movil ("anfitrion", ServidorLanService): un
+         servicio en primer plano para que siga vivo mientras el juego corre en
+         su proceso, y su notificacion (IP y jugadores, boton de parar). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Es un juego: appCategory es lo que leen Android 12+ (modo de juego y
          panel de juegos) y los lanzadores; isGame, el indicador de antes, lo
          siguen mirando los lanzadores de juegos de algunos fabricantes. -->
@@ -49,9 +56,13 @@
              serie no es posible. No cambia nada para quien solo juega. -->
         <profileable android:shell="true" />
 
+        <!-- La pantalla de inicio va en horizontal como la partida: menu de
+             secciones a la izquierda, la elegida a la derecha. -->
         <activity
             android:name=".SetupActivity"
             android:exported="true"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Tema.Inicio">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -80,6 +91,18 @@
             android:exported="false"
             android:screenOrientation="sensorLandscape"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
+
+        <!-- El servidor de salas de EA de la LAN, cuando este movil es el
+             anfitrion. specialUse: ninguno de los otros tipos describe un
+             servidor de juego en la red local. -->
+        <service
+            android:name=".ServidorLanService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Lobby server for local network multiplayer between devices" />
+        </service>
     </application>
 
 </manifest>

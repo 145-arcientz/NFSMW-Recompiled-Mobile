@@ -172,6 +172,9 @@
 
     <!-- Advanced -->
     <string name="seccion_avanzado">Advanced</string>
+    <string name="seccion_multijugador">Multiplayer</string>
+    <string name="seccion_controles">Controls</string>
+    <string name="seccion_otras">Other options</string>
     <string name="avanzado_resumen">To test what each thing costs on your phone. The defaults are the recommended ones.</string>
     <string name="una_pasada">Single-pass scene</string>
     <string name="una_pasada_resumen">Draws the scene once instead of in three strips: ~30 % fewer draws and about +25-45 % fps in races. It disables the game\'s MSAA, so it turns off with MSAA selected.</string>
@@ -207,9 +210,33 @@
     <string name="gamertag_en_uso_pregunta" formatted="true">Another phone already has %1$s on %2$s. Do you want to play anyway, without online mode? You can play everything except Xbox Live.</string>
     <string name="jugar_sin_online">Play offline</string>
     <string name="servidor_lan">LAN server (multiplayer)</string>
-    <string name="servidor_lan_resumen">Xbox Live in the game, against the EA server you run on a PC on your Wi-Fi (nfsmw-server-lan). Empty: the game as always.</string>
-    <string name="servidor_lan_ip">PC IP</string>
-    <string name="servidor_lan_error">An IPv4 address like 10.0.0.4</string>
+    <string name="servidor_lan_resumen">Xbox Live in the game, against an EA server on your Wi-Fi: on a PC (nfsmw-server-lan) or on a phone that hosts. Choose one below or host on this phone.</string>
+    <string name="servidor_lan_ip">Server IP or name</string>
+    <string name="servidor_lan_error">An IP like 10.0.0.4 or a device name like my-pc</string>
+    <string name="servidor_anfitrion">Host on this phone</string>
+    <string name="servidor_anfitrion_resumen">This phone runs the EA server and you play on it too. The others enter this phone\'s IP as their LAN server. Wi-Fi or this phone\'s hotspot.</string>
+    <string name="servidor_anfitrion_ip" formatted="true">Other phones enter: %1$s</string>
+    <string name="servidor_anfitrion_sin_red">No Wi-Fi or hotspot: connect to a Wi-Fi or turn on this phone\'s hotspot.</string>
+    <string name="servidor_notificacion_canal">LAN server</string>
+    <string name="servidor_notificacion_titulo">LAN server running</string>
+    <string name="servidor_notificacion_texto" formatted="true">Others enter %1$s · %2$d in Xbox Live</string>
+    <string name="servidor_detener">Stop</string>
+    <string name="servidor_error" formatted="true">The LAN server could not start: %1$s</string>
+    <string name="servidor_anadir">Add server</string>
+    <string name="servidor_editar_titulo">Edit server</string>
+    <string name="servidor_editar" formatted="true">Edit %1$s</string>
+    <string name="servidor_nombre">Name (optional)</string>
+    <string name="servidor_repetido">This server is already saved</string>
+    <string name="servidor_no_encontrado_titulo">Server not found</string>
+    <string name="servidor_no_encontrado" formatted="true">%1$s could not be found on this network. Check the name, or use the server\'s IP.</string>
+    <string name="servidor_ninguno">No server</string>
+    <string name="servidor_ninguno_resumen">The game as always, without Xbox Live</string>
+    <string name="guardar">Save</string>
+    <string name="servidor_guardado" formatted="true">%1$s saved</string>
+    <string name="servidor_eliminar" formatted="true">Remove %1$s</string>
+    <string name="servidor_eliminado" formatted="true">%1$s removed</string>
+    <string name="deshacer">Undo</string>
+    <string name="servidores_guardados">Saved servers</string>
     <string name="seccion_tactil">Touch controls</string>
     <string name="editar_tactil">Edit touch controls</string>
     <string name="editar_tactil_resumen">Move the touch buttons and change their size and opacity.</string>
@@ -220,8 +247,11 @@
     <string name="vibracion_mando_sin_motores">%1$s (%2$s): Android exposes no motors for this controller, so it can\'t vibrate.</string>
     <string name="vibracion_mando_xbox_usb">%1$s (%2$s): over USB, Android exposes no motors for it, so this test can\'t make it vibrate. In the game SDL drives it over USB with its own vibration (it asks for USB permission when connected).</string>
     <string name="vibracion_sin_mandos">No controller connected: the phone vibrates.</string>
-    <string name="girar_inclinando">Steer by tilting the phone</string>
-    <string name="girar_inclinando_resumen">In races and free roam, tilt the phone like a steering wheel instead of using the left stick, which is hidden. Drag races keep the lane arrows.</string>
+    <string name="giro_carrera">Steering in races</string>
+    <string name="giro_carrera_resumen">In races, free roam and pursuits. The arrows steer all the way, like the lane arrows of drag races; tilting turns the phone into a steering wheel. Drag races always keep their lane arrows.</string>
+    <string name="giro_stick">Left stick</string>
+    <string name="giro_flechas">Arrows</string>
+    <string name="giro_inclinar">Tilting the phone</string>
     <string name="menus_tactiles">Menus by touch</string>
     <string name="menus_tactiles_resumen">In menus and in the pause menu there is no pad: swipe to move (in a list of options, sideways changes the value), tap an option to pick it, tap the arrows to change its value and tap the hints at the bottom, like “Ⓐ Accept” or “Ⓑ Back”, to press them. Two fingers, back. The PAD button at the top brings the pad back.</string>
     <string name="deslizar_invertido">Reverse swipe in menus</string>

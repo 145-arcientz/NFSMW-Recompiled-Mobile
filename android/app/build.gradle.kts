@@ -99,8 +99,8 @@ android {
         // de nombres que necesita. Por debajo no hay Snapdragon que merezca la pena.
         minSdk = 29
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.5.0"
+        versionCode = 10
+        versionName = "0.5.1"
 
         buildConfigField("boolean", "CON_JUEGO", conJuego.toString())
         buildConfigField("String", "MOTOR", "\"$motor\"")

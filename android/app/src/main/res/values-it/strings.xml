@@ -150,6 +150,9 @@
 
     <!-- Advanced -->
     <string name="seccion_avanzado">Avanzate</string>
+    <string name="seccion_multijugador">Multigiocatore</string>
+    <string name="seccion_controles">Controlli</string>
+    <string name="seccion_otras">Altre opzioni</string>
     <string name="avanzado_resumen">Per provare quanto costa ogni cosa sul tuo telefono. I valori predefiniti sono quelli consigliati.</string>
     <string name="una_pasada">Scena in un solo passaggio</string>
     <string name="una_pasada_resumen">Disegna la scena una volta sola invece che in tre fasce: ~30 % di disegni in meno e circa +25-45 % di fps in gara. Disattiva l\'MSAA del gioco, quindi si spegne con MSAA selezionato.</string>
@@ -184,9 +187,33 @@
     <string name="gamertag_en_uso_pregunta" formatted="true">Un altro telefono ha già %1$s su %2$s. Vuoi giocare comunque, senza modalità online? Puoi giocare a tutto tranne Xbox Live.</string>
     <string name="jugar_sin_online">Gioca offline</string>
     <string name="servidor_lan">Server LAN (multigiocatore)</string>
-    <string name="servidor_lan_resumen">Xbox Live nel gioco, contro il server EA che avvii su un PC della tua Wi-Fi (nfsmw-server-lan). Vuoto: il gioco come sempre.</string>
-    <string name="servidor_lan_ip">IP del PC</string>
-    <string name="servidor_lan_error">Un indirizzo IPv4 come 10.0.0.4</string>
+    <string name="servidor_lan_resumen">Xbox Live nel gioco, contro un server EA della tua Wi-Fi: su un PC (nfsmw-server-lan) o su un telefono che fa da host. Scegline uno qui sotto o fai da host con questo telefono.</string>
+    <string name="servidor_lan_ip">IP o nome del server</string>
+    <string name="servidor_lan_error">Un IP come 10.0.0.4 o un nome di dispositivo come mio-pc</string>
+    <string name="servidor_anfitrion">Host su questo telefono</string>
+    <string name="servidor_anfitrion_resumen">Questo telefono fa girare il server EA e ci giochi anche tu. Gli altri inseriscono l\'IP di questo telefono come server LAN. Via Wi-Fi o con l\'hotspot di questo telefono.</string>
+    <string name="servidor_anfitrion_ip" formatted="true">Gli altri telefoni inseriscono: %1$s</string>
+    <string name="servidor_anfitrion_sin_red">Né Wi-Fi né hotspot: connettiti a una Wi-Fi o attiva l\'hotspot di questo telefono.</string>
+    <string name="servidor_notificacion_canal">Server LAN</string>
+    <string name="servidor_notificacion_titulo">Server LAN attivo</string>
+    <string name="servidor_notificacion_texto" formatted="true">Gli altri inseriscono %1$s · %2$d su Xbox Live</string>
+    <string name="servidor_detener">Ferma</string>
+    <string name="servidor_error" formatted="true">Impossibile avviare il server LAN: %1$s</string>
+    <string name="servidor_anadir">Aggiungi server</string>
+    <string name="servidor_editar_titulo">Modifica server</string>
+    <string name="servidor_editar" formatted="true">Modifica %1$s</string>
+    <string name="servidor_nombre">Nome (facoltativo)</string>
+    <string name="servidor_repetido">Questo server è già salvato</string>
+    <string name="servidor_no_encontrado_titulo">Server non trovato</string>
+    <string name="servidor_no_encontrado" formatted="true">%1$s non si trova su questa rete. Controlla il nome o usa l\'IP del server.</string>
+    <string name="servidor_ninguno">Nessun server</string>
+    <string name="servidor_ninguno_resumen">Il gioco come sempre, senza Xbox Live</string>
+    <string name="guardar">Salva</string>
+    <string name="servidor_guardado" formatted="true">%1$s salvato</string>
+    <string name="servidor_eliminar" formatted="true">Rimuovi %1$s</string>
+    <string name="servidor_eliminado" formatted="true">%1$s rimosso</string>
+    <string name="deshacer">Annulla</string>
+    <string name="servidores_guardados">Server salvati</string>
     <string name="seccion_tactil">Comandi touch</string>
     <string name="editar_tactil">Modifica comandi touch</string>
     <string name="editar_tactil_resumen">Sposta i pulsanti touch e cambia dimensione e opacità.</string>
@@ -197,8 +224,11 @@
     <string name="vibracion_mando_sin_motores">%1$s (%2$s): Android non espone motori per questo controller, quindi non può vibrare.</string>
     <string name="vibracion_mando_xbox_usb">%1$s (%2$s): via USB Android non espone i suoi motori, quindi questa prova non può farlo vibrare. Nel gioco lo gestisce SDL via USB con la sua vibrazione (chiede il permesso USB quando lo colleghi).</string>
     <string name="vibracion_sin_mandos">Nessun controller collegato: vibra il telefono.</string>
-    <string name="girar_inclinando">Sterza inclinando il telefono</string>
-    <string name="girar_inclinando_resumen">In gara e in giro libero, inclina il telefono come un volante invece di usare la levetta sinistra, che viene nascosta. Le gare di accelerazione mantengono le frecce di corsia.</string>
+    <string name="giro_carrera">Sterzo in gara</string>
+    <string name="giro_carrera_resumen">In gara, in giro libero e negli inseguimenti. Le frecce sterzano del tutto, come le frecce di corsia delle gare di accelerazione; inclinando, il telefono diventa un volante. Le gare di accelerazione mantengono sempre le frecce di corsia.</string>
+    <string name="giro_stick">Levetta sinistra</string>
+    <string name="giro_flechas">Frecce</string>
+    <string name="giro_inclinar">Inclinando il telefono</string>
     <string name="menus_tactiles">Menu con il dito</string>
     <string name="menus_tactiles_resumen">Nei menu e nel menu di pausa non c\'è il pad: scorri per spostarti (in un elenco di opzioni, di lato cambia il valore), tocca un\'opzione per sceglierla, tocca le frecce per cambiarne il valore e tocca i suggerimenti in basso, come “Ⓐ Accetta” o “Ⓑ Indietro”, per premerli. Con due dita, indietro. Il pulsante PAD in alto riporta il pad.</string>
     <string name="deslizar_invertido">Scorrimento invertito nei menu</string>

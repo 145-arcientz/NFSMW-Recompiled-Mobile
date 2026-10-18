@@ -19,6 +19,7 @@ import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.os.SystemClock;
 import android.os.Build;
 import android.util.SparseArray;
 import android.view.InputDevice;
@@ -45,6 +46,11 @@ import java.util.List;
  * mover cada control con el dedo, cambiar su tamano y la opacidad de todos. En
  * la partida, el juego se queda quieto mientras tanto (TouchControllerBridge.
  * pausarJuego) y al terminar se vuelve a jugar.
+ *
+ * GIRAR CON FLECHAS (Ajustes.modoGiro): en la disposicion de conducir, las
+ * flechas de carril de las de aceleracion en lugar del stick izquierdo, que no
+ * se ve; cada una lo lleva entero a su lado. Tienen su sitio en esa
+ * disposicion, aparte del de aceleracion, y se mueven con el editor.
  *
  * GIRAR INCLINANDO EL MOVIL (Ajustes.girarInclinando): en la disposicion de
  * conducir, el eje X del stick izquierdo sale de lo que se inclina el movil
@@ -147,6 +153,7 @@ public final class TouchControllerView extends View {
     private final Paint label = new Paint(Paint.ANTI_ALIAS_FLAG);
     // El recuadro del control elegido en el editor.
     private final Paint marco = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final RectF recuadroElegido = new RectF();
     // Reutilizado en cada etiqueta: getFontMetrics() sin argumento crea un
     // objeto nuevo en cada llamada, y hay ~17 etiquetas por dibujado.
     private final Paint.FontMetrics metricas = new Paint.FontMetrics();
@@ -273,12 +280,34 @@ public final class TouchControllerView extends View {
     private static final int ICONO_CAMARA = 1;
     private static final int ICONO_RETROVISOR = 2;
     private static final int ICONO_POSICIONES = 3;
+    // En las carreras, los botones: B el nitro, A el freno de mano y X el
+    // Speedbreaker (un reloj). Y no esta: mirar atras ya lo hace LB (retrovisor).
+    private static final int ICONO_NITRO = 4;
+    private static final int ICONO_FRENO_MANO = 5;
+    private static final int ICONO_RELOJ = 6;
     private static final String[] PUESTOS = {"1", "2", "3"};
     // En una carrera de aceleracion: los controles cambian de forma.
     // La disposicion de la parte del juego en que se esta.
     private int dispJuego = NORMAL;
     // El juego en pausa: no se gira inclinando el movil.
     private boolean enPausa;
+
+    // --- Girar con las flechas de carril al conducir (Ajustes.modoGiro).
+    private final boolean flechasAlConducir;
+    // No del todo de golpe: a tope y a velocidad, el coche derrapa de morro y
+    // frena (se notaba al girar con las flechas, no con el stick, que casi
+    // nunca va a tope). Al pisar, un poco; mantenida, a tope en GIRO_FLECHA_MS;
+    // al soltar, recto. Como el teclado en los juegos de carreras.
+    private static final float GIRO_FLECHA_INICIAL = .5f;
+    private static final long GIRO_FLECHA_MS = 300;
+    private float giroFlechas;
+    private long pasoFlechas;
+    private final Runnable rampaFlechas = new Runnable() {
+        @Override
+        public void run() {
+            if (avanzarGiroFlechas()) postOnAnimation(this);
+        }
+    };
 
     // --- Girar inclinando el movil.
     private final boolean inclinar;
@@ -518,6 +547,7 @@ public final class TouchControllerView extends View {
         dientes.setStyle(Paint.Style.STROKE);
         Ajustes ajustes = new Ajustes(context);
         inclinar = ajustes.girarInclinando();
+        flechasAlConducir = ajustes.girarConFlechas();
         senoGiroCompleto = (float) Math.sin(Math.toRadians(Ajustes.anguloGiro(ajustes.sensibilidadGiro())));
         sensores = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
         Sensor sensor = sensores == null ? null : sensores.getDefaultSensor(Sensor.TYPE_GRAVITY);
@@ -699,6 +729,7 @@ public final class TouchControllerView extends View {
         }
         removeCallbacks(ocultarToggle);
         removeCallbacks(mirarContexto);
+        removeCallbacks(rampaFlechas);
         escucharInclinacion(false);
         disconnect();
         super.onDetachedFromWindow();
@@ -729,11 +760,16 @@ public final class TouchControllerView extends View {
         controls.add(leftStick);
         controls.add(rightStick);
         // En las carreras de aceleracion el stick izquierdo solo cambia de
-        // carril: dos botones con flecha en su lugar.
-        leftStick.visibleEn = inclinar ? EN_NORMAL : EN_NORMAL | EN_CONDUCIENDO;
+        // carril: dos botones con flecha en su lugar. Conduciendo, segun
+        // Ajustes.modoGiro: el stick, esas mismas flechas, o nada (inclinando).
+        leftStick.visibleEn = inclinar || flechasAlConducir ? EN_NORMAL : EN_NORMAL | EN_CONDUCIENDO;
         float ladoFlecha = unit * 1.15f;
         carrilIzq = new Flecha("carril_izq", width * .16f, height * .73f, ladoFlecha, -1);
         carrilDer = new Flecha("carril_der", width * .16f, height * .73f, ladoFlecha, 1);
+        if (flechasAlConducir) {
+            carrilIzq.visibleEn |= EN_CONDUCIENDO;
+            carrilDer.visibleEn |= EN_CONDUCIENDO;
+        }
         controls.add(carrilIzq);
         controls.add(carrilDer);
 
@@ -759,6 +795,11 @@ public final class TouchControllerView extends View {
         controls.add(b);
         controls.add(x);
         controls.add(y);
+        // En las carreras: iconos en vez de letras, y sin Y (mirar atras ya es LB).
+        b.icono = ICONO_NITRO;
+        a.icono = ICONO_FRENO_MANO;
+        x.icono = ICONO_RELOJ;
+        y.visibleEn = EN_NORMAL;
 
         float shoulderW = unit * 1.25f;
         float shoulderH = unit * .55f;
@@ -792,34 +833,33 @@ public final class TouchControllerView extends View {
         controls.add(r3);
 
         // --- La de fabrica de las carreras de aceleracion. Sale de la que se
-        // hizo a mano en el movil (2688x1216), hecha simetrica:
-        //   - abajo, sobre la misma linea (pie), los pedales a la derecha y las
-        //     flechas de carril a la izquierda, cada flecha en el reflejo de su
-        //     pedal (la izquierda del acelerador, la derecha del freno), y la
-        //     palanca junto a las flechas;
-        //   - a la derecha, los botones en rombo;
+        // hizo a mano en el movil (2688x1216):
+        //   - abajo, sobre la misma linea (pie), los pedales a la derecha, y a
+        //     la izquierda las flechas de carril, la palanca y los botones, como
+        //     conduciendo (mas abajo, "Igual en las dos");
         //   - arriba a la izquierda, en rejilla: la clasificacion y la camara en
         //     una fila, y el retrovisor debajo de la camara;
         //   - arriba, BACK y START a los lados de OCULTAR/TACTIL y el engranaje,
         //     a la misma distancia.
         // En fracciones de la pantalla y tamanos en 'unit', como la normal.
         float pie = height * .885f;
+        // 'pedal' es la medida con la que se hizo la disposicion: de ella salen
+        // el reflejo de los pedales (el stick izquierdo, las flechas) y lo que el
+        // usuario coloco a partir de ahi. Los pedales se ven a 'tamPedal' (al
+        // 200 %, 2026-10-18): crecen hacia arriba y hacia la izquierda desde el
+        // pie y el borde del acelerador, sin mover lo demas.
         float pedal = 1.5f;
+        float tamPedal = 2f;
         float acelX = width * .885f;
         float frenoX = acelX - (shoulderW * pedal * (.6f + .74f) * .5f + unit * .35f);
-        rightTrigger.porDefecto(ACELERACION, acelX, pie - shoulderW * pedal * 1.15f * .5f, pedal);
-        leftTrigger.porDefecto(ACELERACION, frenoX, pie - shoulderW * pedal * .9f * .5f, pedal);
-        float sobrePie = pie - ladoFlecha * .5f;
-        carrilIzq.porDefecto(ACELERACION, width - acelX, sobrePie, 1f);
-        carrilDer.porDefecto(ACELERACION, width - frenoX, sobrePie, 1f);
-        rightStick.porDefecto(ACELERACION, width - frenoX + ladoFlecha * .5f + unit * .95f, pie - stickRadius, 1f);
+        float frenoGrandeX = acelX - (shoulderW * tamPedal * (.6f + .74f) * .5f + unit * .35f);
+        rightTrigger.porDefecto(ACELERACION, acelX, pie - shoulderW * tamPedal * 1.15f * .5f, tamPedal);
+        leftTrigger.porDefecto(ACELERACION, frenoGrandeX, pie - shoulderW * tamPedal * .9f * .5f, tamPedal);
         float rombo = unit * .82f;
         float romboX = width * .858f;
         float romboY = height * .44f;
+        // Y no esta en las carreras: donde no estorbe si se vuelve a ver.
         y.porDefecto(ACELERACION, romboX, romboY - rombo, 1f);
-        a.porDefecto(ACELERACION, romboX, romboY + rombo, 1f);
-        x.porDefecto(ACELERACION, romboX - rombo, romboY, 1f);
-        b.porDefecto(ACELERACION, romboX + rombo, romboY, 1f);
         float filaRejilla = height * .15f;
         float camaraX = width * .13f;
         rb.porDefecto(ACELERACION, camaraX, filaRejilla, 1f);
@@ -838,20 +878,47 @@ public final class TouchControllerView extends View {
         // --- La de fabrica conduciendo (las demas carreras, la conduccion libre
         // y las persecuciones): la de aceleracion, pero con el stick izquierdo
         // para girar, sobre la misma linea, en el reflejo de los dos pedales y
-        // a 1,5 veces su tamano; el derecho, un stick y no la palanca, a su
-        // derecha y algo mas abajo; y la cruceta, que aqui hace mas que abrir la
-        // clasificacion (abajo recoloca el coche), en el reflejo de los botones
-        // en rombo. Los sticks, como los dejo el usuario en el movil (2688x1216).
-        for (Control c : new Control[] {rightTrigger, leftTrigger, a, b, x, y, rb, lb,
-                                        back, start}) {
+        // a 1,5 veces su tamano; el derecho, un stick y no la palanca; y la
+        // cruceta, que aqui hace mas que abrir la clasificacion (abajo recoloca
+        // el coche), en el reflejo de donde estaban los botones en rombo. El
+        // stick izquierdo, como lo dejo el usuario en el movil (2688x1216).
+        for (Control c : new Control[] {rightTrigger, leftTrigger, y, rb, lb, back, start}) {
             c.porDefecto(CONDUCIENDO, c.fx[ACELERACION], c.fy[ACELERACION], c.fs[ACELERACION]);
         }
         float pedalesIzq = frenoX - shoulderW * pedal * .74f * .5f;
         float pedalesDer = acelX + shoulderW * pedal * .6f * .5f;
         float stickIzqX = width - (pedalesIzq + pedalesDer) * .5f;
         leftStick.porDefecto(CONDUCIENDO, stickIzqX, pie - stickRadius, 1.5f);
-        rightStick.porDefecto(CONDUCIENDO, stickIzqX + unit * 2.94f, pie - stickRadius + unit * .33f, 1f);
         dpad.porDefecto(CONDUCIENDO, width - romboX, romboY, 1f);
+
+        // --- Igual en las dos (aceleracion como conduciendo, 2026-10-18):
+        //   - las flechas, donde iria el stick izquierdo, a sus lados y a 1,5
+        //     veces (en aceleracion cambian de carril; conduciendo, si se elige,
+        //     giran);
+        //   - el stick derecho (en aceleracion, la palanca) y, sin Y, los botones
+        //     X, A y B en diagonal sobre el: como los dejo el usuario en el movil
+        //     (2688x1216), en 'unit' desde el stick izquierdo y la linea del pie.
+        float escalaFlecha = 1.5f;
+        float sobrePieFlechas = pie - ladoFlecha * escalaFlecha * .5f;
+        for (int d : new int[] {ACELERACION, CONDUCIENDO}) {
+            carrilIzq.porDefecto(d, stickIzqX - unit * 1.1f, sobrePieFlechas, escalaFlecha);
+            carrilDer.porDefecto(d, stickIzqX + unit * 1.1f, sobrePieFlechas, escalaFlecha);
+            rightStick.porDefecto(d, stickIzqX + unit * 3.58f, pie - unit * .31f, 1f);
+            x.porDefecto(d, stickIzqX + unit * 1.88f, pie - unit * 3.51f, 1f);
+            a.porDefecto(d, stickIzqX + unit * 3.28f, pie - unit * 3.13f, 1f);
+            b.porDefecto(d, stickIzqX + unit * 4.12f, pie - unit * 2.08f, 1f);
+        }
+        // Conduciendo e inclinando el movil no hay stick izquierdo ni flechas: la
+        // cruceta baja a la esquina, apoyada en el pie, y el stick derecho y los
+        // botones se corren a la izquierda. Como los dejo el usuario en el movil
+        // (2688x1216, 2026-10-18).
+        if (inclinar) {
+            dpad.porDefecto(CONDUCIENDO, width - romboX, pie - unit, 1f);
+            rightStick.porDefecto(CONDUCIENDO, stickIzqX + unit * 2.88f, pie - unit * .31f, 1f);
+            x.porDefecto(CONDUCIENDO, stickIzqX + unit * 1.06f, pie - unit * 3.52f, 1f);
+            a.porDefecto(CONDUCIENDO, stickIzqX + unit * 2.34f, pie - unit * 2.81f, 1f);
+            b.porDefecto(CONDUCIENDO, stickIzqX + unit * 3.38f, pie - unit * 1.95f, 1f);
+        }
 
         for (Control c : controls) cargar(c);
         usarDisposicion(disposicion());
@@ -872,8 +939,14 @@ public final class TouchControllerView extends View {
         }
     }
 
-    private static String clave(Control c, int disposicion) {
-        return PREFIJOS[disposicion] + c.id;
+    /**
+     * Girando inclinando el movil, la de conducir se guarda aparte ("ci_"): sin
+     * stick ni flechas, la cruceta va donde estarian, y al volver al stick o a
+     * las flechas se pisarian.
+     */
+    private String clave(Control c, int disposicion) {
+        String prefijo = inclinar && disposicion == CONDUCIENDO ? "ci_" : PREFIJOS[disposicion];
+        return prefijo + c.id;
     }
 
     /** Cada control, donde va en esa disposicion. */
@@ -992,8 +1065,9 @@ public final class TouchControllerView extends View {
                 if (!control.oculto()) control.draw(canvas);
             }
             if (elegido != null) {
-                float r = elegido.alcance() + dp(6);
-                canvas.drawRect(elegido.cx - r, elegido.cy - r, elegido.cx + r, elegido.cy + r, marco);
+                elegido.ocupa(recuadroElegido);
+                recuadroElegido.inset(-dp(6), -dp(6));
+                canvas.drawRect(recuadroElegido, marco);
             }
             drawEditor(canvas);
             return;
@@ -1707,6 +1781,39 @@ public final class TouchControllerView extends View {
         invalidate();
     }
 
+    /** Se piso o se solto una flecha: conduciendo con flechas, el giro empieza de nuevo. */
+    private void flechaCambiada() {
+        if (!flechasAlConducir) return;
+        removeCallbacks(rampaFlechas);
+        pasoFlechas = SystemClock.uptimeMillis();
+        if (avanzarGiroFlechas()) postOnAnimation(rampaFlechas);
+    }
+
+    /**
+     * Un paso del giro con flechas (ver GIRO_FLECHA_MS) y se manda al juego.
+     * true mientras siga subiendo.
+     */
+    private boolean avanzarGiroFlechas() {
+        int hacia = disposicion() != CONDUCIENDO ? 0
+                : (carrilDer.inUse ? 1 : 0) - (carrilIzq.inUse ? 1 : 0);
+        long ahora = SystemClock.uptimeMillis();
+        // Acotado: si un fotograma tarda, que no salte de golpe al tope.
+        long dt = Math.min(ahora - pasoFlechas, 50);
+        pasoFlechas = ahora;
+        float antes = giroFlechas;
+        if (hacia == 0) {
+            giroFlechas = 0;
+        } else if (Math.signum(giroFlechas) != hacia) {
+            // Acaba de pisarse, o se paso al otro lado.
+            giroFlechas = hacia * GIRO_FLECHA_INICIAL;
+        } else {
+            giroFlechas = hacia * Math.min(1f, Math.abs(giroFlechas)
+                    + dt * (1f - GIRO_FLECHA_INICIAL) / GIRO_FLECHA_MS);
+        }
+        if (giroFlechas != antes) sendState();
+        return hacia != 0 && Math.abs(giroFlechas) < 1f;
+    }
+
     private void sendState() {
         // En el editor no hay juego al que mandarle nada.
         if (editando) return;
@@ -1719,7 +1826,11 @@ public final class TouchControllerView extends View {
         for (Control control : controls) buttons |= control.buttons();
         float lx = leftStick == null ? 0 : leftStick.xValue;
         float ly = leftStick == null ? 0 : leftStick.yValue;
-        if (disposicion() == ACELERACION && carrilIzq != null) {
+        if (carrilIzq != null && disposicion() == CONDUCIENDO && flechasAlConducir) {
+            // El stick no esta: las flechas, poco a poco (avanzarGiroFlechas).
+            lx = giroFlechas;
+            ly = 0;
+        } else if (disposicion() == ACELERACION && carrilIzq != null) {
             // El stick no esta: las flechas lo llevan entero a un lado (las dos, al centro).
             lx = (carrilDer.inUse ? 1 : 0) - (carrilIzq.inUse ? 1 : 0);
             ly = 0;
@@ -1847,8 +1958,11 @@ public final class TouchControllerView extends View {
         /** Recalcula la forma tras moverlo o cambiarle la escala. */
         abstract void colocar();
         void situar(float x, float y) { cx = x; cy = y; colocar(); }
-        /** La mitad de lo que ocupa, para el recuadro del editor. */
-        abstract float alcance();
+        /**
+         * Lo que ocupa, para el recuadro del editor. No un cuadrado: el del
+         * acelerador, alto y estrecho, tapaba medio freno.
+         */
+        abstract void ocupa(RectF r);
         abstract boolean contains(float x, float y);
         void press(float x, float y) { inUse = true; move(x, y); }
         void move(float x, float y) {}
@@ -1885,15 +1999,25 @@ public final class TouchControllerView extends View {
             colocar();
         }
         void colocar() { radius = baseRadius * escala; }
-        float alcance() { return radius; }
+        void ocupa(RectF r) { r.set(cx - radius, cy - radius, cx + radius, cy + radius); }
         boolean contains(float px, float py) {
             float dx = px - cx, dy = py - cy;
             return dx * dx + dy * dy <= radius * radius * 1.35f;
         }
         int buttons() { return inUse ? mask : 0; }
+        // En las carreras (conduciendo y aceleracion), un dibujo de lo que hace en vez de la letra.
+        int icono = SIN_ICONO;
         void draw(Canvas canvas) {
             drawCircle(canvas, cx, cy, radius, inUse);
-            drawLabel(canvas, text, cx, cy, radius * .72f, opacidad);
+            if (icono == ICONO_NITRO && formasDeConducir()) {
+                dibujarNitro(canvas, cx, cy, radius);
+            } else if (icono == ICONO_FRENO_MANO && formasDeConducir()) {
+                dibujarFrenoMano(canvas, cx, cy, radius);
+            } else if (icono == ICONO_RELOJ && formasDeConducir()) {
+                dibujarReloj(canvas, cx, cy, radius);
+            } else {
+                drawLabel(canvas, text, cx, cy, radius * .72f, opacidad);
+            }
         }
     }
 
@@ -1914,7 +2038,7 @@ public final class TouchControllerView extends View {
             float w = baseWidth * escala * .5f, h = baseHeight * escala * .5f;
             bounds.set(cx - w, cy - h, cx + w, cy + h);
         }
-        float alcance() { return Math.max(bounds.width(), bounds.height()) * .5f; }
+        void ocupa(RectF r) { r.set(bounds); }
         boolean contains(float x, float y) { return bounds.contains(x, y); }
         int buttons() { return inUse ? mask : 0; }
         void draw(Canvas canvas) {
@@ -1965,8 +2089,12 @@ public final class TouchControllerView extends View {
             return formasDeConducir() ? pedal.contains(x, y) : super.contains(x, y);
         }
         @Override
-        float alcance() {
-            return formasDeConducir() ? Math.max(pedal.width(), pedal.height()) * .5f : super.alcance();
+        void ocupa(RectF r) {
+            if (formasDeConducir()) {
+                r.set(pedal);
+            } else {
+                super.ocupa(r);
+            }
         }
         @Override
         void draw(Canvas canvas) {
@@ -1995,7 +2123,11 @@ public final class TouchControllerView extends View {
         }
         void colocar() { radius = baseRadius * escala; }
         boolean esPalanca() { return palanca && disposicion() == ACELERACION; }
-        float alcance() { return esPalanca() ? radius * 1.3f : radius; }
+        void ocupa(RectF r) {
+            float ancho = esPalanca() ? radius * .8f : radius;
+            float alto = esPalanca() ? radius * 1.3f : radius;
+            r.set(cx - ancho, cy - alto, cx + ancho, cy + alto);
+        }
         boolean contains(float x, float y) {
             if (esPalanca()) {
                 return Math.abs(x - cx) <= radius * .8f && Math.abs(y - cy) <= radius * 1.3f;
@@ -2079,8 +2211,18 @@ public final class TouchControllerView extends View {
             flecha.lineTo(cx - lado * t * .75f, cy + t);
             flecha.close();
         }
-        float alcance() { return caja.width() * .5f; }
+        void ocupa(RectF r) { r.set(caja); }
         boolean contains(float x, float y) { return caja.contains(x, y); }
+        @Override
+        void press(float x, float y) {
+            super.press(x, y);
+            flechaCambiada();
+        }
+        @Override
+        void release() {
+            super.release();
+            flechaCambiada();
+        }
         void draw(Canvas canvas) {
             float r = Math.min(dp(10), caja.height() * .2f);
             fill.setColor(conOpacidad(inUse ? PULSADO : RELLENO));
@@ -2111,7 +2253,7 @@ public final class TouchControllerView extends View {
             vertical.set(cx - arm, cy - radius, cx + arm, cy + radius);
             horizontal.set(cx - radius, cy - arm, cx + radius, cy + arm);
         }
-        float alcance() { return radius; }
+        void ocupa(RectF r) { r.set(cx - radius, cy - radius, cx + radius, cy + radius); }
         boolean contains(float x, float y) {
             return Math.abs(x - cx) <= radius && Math.abs(y - cy) <= radius;
         }
@@ -2194,6 +2336,45 @@ public final class TouchControllerView extends View {
         canvas.drawRoundRect(trazo, alto * .5f, alto * .5f, stroke);
         canvas.drawLine(x - ancho * .25f, y + alto * .2f, x - ancho * .05f, y - alto * .2f, stroke);
         canvas.drawLine(x - ancho * .05f, y + alto * .2f, x + ancho * .15f, y - alto * .2f, stroke);
+    }
+
+    /** Una botella de nitro: el cuerpo, el cuello y la valvula de arriba. */
+    private void dibujarNitro(Canvas canvas, float x, float y, float r) {
+        stroke.setColor(conOpacidad(BORDE));
+        float ancho = r * .46f;
+        float arriba = y - r * .2f;
+        trazo.set(x - ancho * .5f, arriba, x + ancho * .5f, y + r * .52f);
+        canvas.drawRoundRect(trazo, ancho * .3f, ancho * .3f, stroke);
+        // El hombro de la botella hasta el cuello.
+        trazo.set(x - r * .1f, y - r * .4f, x + r * .1f, arriba);
+        canvas.drawRect(trazo, stroke);
+        canvas.drawLine(x - r * .2f, y - r * .48f, x + r * .2f, y - r * .48f, stroke);
+        // Una franja, como la etiqueta.
+        canvas.drawLine(x - ancho * .5f, y + r * .12f, x + ancho * .5f, y + r * .12f, stroke);
+    }
+
+    /** El freno de mano como en el salpicadero: una P en un circulo, entre parentesis. */
+    private void dibujarFrenoMano(Canvas canvas, float x, float y, float r) {
+        stroke.setColor(conOpacidad(BORDE));
+        float aro = r * .34f;
+        canvas.drawCircle(x, y, aro, stroke);
+        drawLabel(canvas, "P", x, y, aro * 1.25f, opacidad);
+        float fuera = r * .52f;
+        trazo.set(x - fuera, y - fuera, x + fuera, y + fuera);
+        canvas.drawArc(trazo, 140, 80, false, stroke);
+        canvas.drawArc(trazo, -40, 80, false, stroke);
+    }
+
+    /** Un reloj (el Speedbreaker): la esfera, dos agujas y el boton de arriba. */
+    private void dibujarReloj(Canvas canvas, float x, float y, float r) {
+        stroke.setColor(conOpacidad(BORDE));
+        float esfera = r * .44f;
+        float cy = y + r * .05f;
+        canvas.drawCircle(x, cy, esfera, stroke);
+        canvas.drawLine(x, cy, x, cy - esfera * .65f, stroke);
+        canvas.drawLine(x, cy, x + esfera * .5f, cy, stroke);
+        canvas.drawLine(x, cy - esfera, x, cy - esfera - r * .12f, stroke);
+        canvas.drawLine(x - r * .1f, cy - esfera - r * .12f, x + r * .1f, cy - esfera - r * .12f, stroke);
     }
 
     private void drawCircle(Canvas canvas, float x, float y, float radius, boolean pressed) {

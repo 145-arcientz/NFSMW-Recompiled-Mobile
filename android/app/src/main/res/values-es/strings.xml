@@ -145,6 +145,9 @@
 
     <!-- Avanzado -->
     <string name="seccion_avanzado">Avanzado</string>
+    <string name="seccion_multijugador">Multijugador</string>
+    <string name="seccion_controles">Controles</string>
+    <string name="seccion_otras">Otras opciones</string>
     <string name="avanzado_resumen">Para probar qué cuesta cada cosa en tu móvil. Los valores por defecto son los recomendados.</string>
     <string name="una_pasada">Escena en una pasada</string>
     <string name="una_pasada_resumen">Pinta la escena una vez en vez de en tres franjas: ~30 % menos dibujos y unos +25-45 % de fps en carrera. Quita el MSAA del juego, así que se apaga si eliges MSAA.</string>
@@ -179,9 +182,33 @@
     <string name="gamertag_en_uso_pregunta" formatted="true">Otro móvil ya tiene %1$s en %2$s. ¿Quieres jugar de todas formas, sin modo online? Puedes jugar a todo menos a Xbox Live.</string>
     <string name="jugar_sin_online">Jugar sin online</string>
     <string name="servidor_lan">Servidor LAN (multijugador)</string>
-    <string name="servidor_lan_resumen">Xbox Live del juego contra el servidor de EA que pongas en un PC de tu Wi-Fi (nfsmw-server-lan). Vacío: el juego como siempre.</string>
-    <string name="servidor_lan_ip">IP del PC</string>
-    <string name="servidor_lan_error">Una dirección IPv4 como 10.0.0.4</string>
+    <string name="servidor_lan_resumen">Xbox Live del juego contra un servidor de EA de tu Wi-Fi: en un PC (nfsmw-server-lan) o en un móvil que haga de anfitrión. Elige uno abajo o haz de anfitrión con este móvil.</string>
+    <string name="servidor_lan_ip">IP o nombre del servidor</string>
+    <string name="servidor_lan_error">Una IP como 10.0.0.4 o un nombre de equipo como mi-pc</string>
+    <string name="servidor_anfitrion">Anfitrión en este móvil</string>
+    <string name="servidor_anfitrion_resumen">Este móvil lleva el servidor de EA y juegas en él también. Los demás ponen la IP de este móvil como servidor LAN. Por Wi-Fi o con el punto de acceso de este móvil.</string>
+    <string name="servidor_anfitrion_ip" formatted="true">Los demás móviles ponen: %1$s</string>
+    <string name="servidor_anfitrion_sin_red">Sin Wi-Fi ni punto de acceso: conéctate a una Wi-Fi o activa el punto de acceso de este móvil.</string>
+    <string name="servidor_notificacion_canal">Servidor LAN</string>
+    <string name="servidor_notificacion_titulo">Servidor LAN en marcha</string>
+    <string name="servidor_notificacion_texto" formatted="true">Los demás ponen %1$s · %2$d en Xbox Live</string>
+    <string name="servidor_detener">Detener</string>
+    <string name="servidor_error" formatted="true">No se pudo arrancar el servidor LAN: %1$s</string>
+    <string name="servidor_anadir">Añadir servidor</string>
+    <string name="servidor_editar_titulo">Editar servidor</string>
+    <string name="servidor_editar" formatted="true">Editar %1$s</string>
+    <string name="servidor_nombre">Nombre (opcional)</string>
+    <string name="servidor_repetido">Ese servidor ya está guardado</string>
+    <string name="servidor_no_encontrado_titulo">No se encuentra el servidor</string>
+    <string name="servidor_no_encontrado" formatted="true">%1$s no aparece en esta red. Revisa el nombre o usa la IP del servidor.</string>
+    <string name="servidor_ninguno">Sin servidor</string>
+    <string name="servidor_ninguno_resumen">El juego como siempre, sin Xbox Live</string>
+    <string name="guardar">Guardar</string>
+    <string name="servidor_guardado" formatted="true">%1$s guardado</string>
+    <string name="servidor_eliminar" formatted="true">Eliminar %1$s</string>
+    <string name="servidor_eliminado" formatted="true">%1$s eliminado</string>
+    <string name="deshacer">Deshacer</string>
+    <string name="servidores_guardados">Servidores guardados</string>
     <string name="seccion_tactil">Controles táctiles</string>
     <string name="editar_tactil">Editar controles táctiles</string>
     <string name="editar_tactil_resumen">Mueve los botones táctiles y cambia su tamaño y su opacidad.</string>
@@ -192,8 +219,11 @@
     <string name="vibracion_mando_sin_motores">%1$s (%2$s): Android no da motores para este mando, así que no puede vibrar.</string>
     <string name="vibracion_mando_xbox_usb">%1$s (%2$s): por USB, Android no le da motores y esta prueba no puede hacerlo vibrar. En la partida lo maneja SDL directamente por USB, con su vibración (al conectarlo pide permiso de USB).</string>
     <string name="vibracion_sin_mandos">No hay ningún mando conectado: vibra el móvil.</string>
-    <string name="girar_inclinando">Girar inclinando el móvil</string>
-    <string name="girar_inclinando_resumen">En las carreras y conduciendo libre, inclina el móvil como un volante en vez de usar el stick izquierdo, que no se ve. En las de aceleración siguen las flechas de carril.</string>
+    <string name="giro_carrera">Girar en carrera</string>
+    <string name="giro_carrera_resumen">En las carreras, conduciendo libre y en las persecuciones. Las flechas giran del todo, como las de carril de las de aceleración; inclinando, el móvil es un volante. Las de aceleración siempre llevan sus flechas de carril.</string>
+    <string name="giro_stick">Stick izquierdo</string>
+    <string name="giro_flechas">Flechas</string>
+    <string name="giro_inclinar">Inclinando el móvil</string>
     <string name="menus_tactiles">Menús con el dedo</string>
     <string name="menus_tactiles_resumen">En los menús y en la pausa no hay mando: desliza para moverte (en una lista de opciones, a los lados cambia el valor), toca una opción para elegirla, toca las flechas para cambiar su valor y toca las indicaciones de abajo, como «Ⓐ Aceptar» o «Ⓑ Atrás», para pulsarlas. Dos dedos, atrás. El botón MANDO de arriba vuelve a sacar el mando.</string>
     <string name="deslizar_invertido">Deslizar al revés en los menús</string>

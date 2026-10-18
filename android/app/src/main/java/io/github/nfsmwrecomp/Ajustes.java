@@ -3,7 +3,14 @@ package io.github.nfsmwrecomp;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
+import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,17 +33,30 @@ final class Ajustes {
         p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    /**
-     * Mando tactil: girar inclinando el movil, como un volante, en vez de con
-     * el stick izquierdo (en la disposicion de conducir), y con que
-     * sensibilidad: de SENSIBILIDAD_MIN a SENSIBILIDAD_MAX.
-     */
     /** Mando tactil: el movil vibra cuando el juego hace vibrar el mando. */
     boolean vibracion() { return p.getBoolean("vibracion", true); }
     void vibracion(boolean v) { p.edit().putBoolean("vibracion", v).apply(); }
 
+    /**
+     * Mando tactil, en la disposicion de conducir (carreras que no son de
+     * aceleracion, conduccion libre, persecuciones): con que se gira. El stick
+     * izquierdo; dos flechas, como las de carril de las de aceleracion, que lo
+     * llevan entero a un lado; o inclinando el movil, como un volante, con la
+     * sensibilidad de SENSIBILIDAD_MIN a SENSIBILIDAD_MAX. Inclinar sigue en
+     * su clave de antes (girar_inclinando), para no perderlo al actualizar.
+     */
+    static final String GIRO_STICK = "stick";
+    static final String GIRO_FLECHAS = "flechas";
+    static final String GIRO_INCLINAR = "inclinar";
+    String modoGiro() {
+        if (girarInclinando()) return GIRO_INCLINAR;
+        return GIRO_FLECHAS.equals(p.getString("giro_carrera", GIRO_STICK)) ? GIRO_FLECHAS : GIRO_STICK;
+    }
+    void modoGiro(String v) {
+        p.edit().putBoolean("girar_inclinando", GIRO_INCLINAR.equals(v)).putString("giro_carrera", v).apply();
+    }
     boolean girarInclinando() { return p.getBoolean("girar_inclinando", false); }
-    void girarInclinando(boolean v) { p.edit().putBoolean("girar_inclinando", v).apply(); }
+    boolean girarConFlechas() { return GIRO_FLECHAS.equals(modoGiro()); }
     static final int SENSIBILIDAD_MIN = 1;
     static final int SENSIBILIDAD_MAX = 20;
     int sensibilidadGiro() { return p.getInt("sensibilidad_giro", 10); }
@@ -110,12 +130,102 @@ final class Ajustes {
     void gamertag(String v) { p.edit().putString("gamertag", v).apply(); }
 
     /**
-     * IP del PC con el servidor de EA de la LAN (proyecto nfsmw-server-lan, ver tools/red/README.md). Vacia,
-     * el juego va como siempre; con una IP, Xbox Live del juego va a ese servidor:
-     * ver MotorNativo.argumentos y docs/diario/red-y-privilegios.md.
+     * Direccion del servidor de EA de la LAN elegido en la lista de Multijugador
+     * (una IPv4 o un nombre de equipo, ver direccionValida), un PC u otro movil de
+     * anfitrion (proyecto nfsmw-server-lan, ver tools/red/README.md). Vacia, el
+     * juego va como siempre; con una, Xbox Live del juego va a ese servidor: ver
+     * MotorNativo.argumentos y docs/diario/red-y-privilegios.md.
      */
     String servidorLan() { return p.getString("servidor_lan", ""); }
     void servidorLan(String v) { p.edit().putString("servidor_lan", v).apply(); }
+
+    /** Un servidor LAN guardado: su direccion y, si se le puso, un nombre ("Casa", "PC de Juan"). */
+    static final class Servidor {
+        final String nombre;
+        final String direccion;
+
+        Servidor(String nombre, String direccion) {
+            this.nombre = nombre == null ? "" : nombre.trim();
+            this.direccion = direccion;
+        }
+    }
+
+    /**
+     * Servidores LAN guardados por el usuario (la lista de Multijugador), en el
+     * orden en que se guardaron. En JSON: [{"nombre": "...", "direccion": "..."}]
+     * ("ip" en las primeras pruebas). Los de antes (solo IPs, separadas por
+     * comas) se pasan la primera vez. La elegida (servidorLan) siempre esta en la
+     * lista: la de una version sin lista no se pierde.
+     */
+    List<Servidor> servidores() {
+        List<Servidor> l = new ArrayList<>();
+        String json = p.getString("servidores", null);
+        if (json == null) {
+            for (String ip : p.getString("servidores_guardados", "").split(",")) {
+                if (ipValida(ip)) {
+                    l.add(new Servidor("", ip));
+                }
+            }
+        } else {
+            try {
+                JSONArray a = new JSONArray(json);
+                for (int i = 0; i < a.length(); i++) {
+                    JSONObject o = a.getJSONObject(i);
+                    String d = o.optString("direccion", o.optString("ip"));
+                    if (direccionValida(d) && indiceServidor(l, d) < 0) {
+                        l.add(new Servidor(o.optString("nombre"), d));
+                    }
+                }
+            } catch (JSONException ignored) {
+            }
+        }
+        String elegida = servidorLan();
+        if (direccionValida(elegida) && indiceServidor(l, elegida) < 0) {
+            l.add(0, new Servidor("", elegida));
+        }
+        return l;
+    }
+
+    void servidores(List<Servidor> l) {
+        JSONArray a = new JSONArray();
+        try {
+            for (Servidor s : l) {
+                a.put(new JSONObject().put("nombre", s.nombre).put("direccion", s.direccion));
+            }
+        } catch (JSONException ignored) {
+        }
+        p.edit().putString("servidores", a.toString()).remove("servidores_guardados").apply();
+    }
+
+    /** Donde esta esa direccion en la lista (sin mirar mayusculas), o -1. */
+    static int indiceServidor(List<Servidor> l, String direccion) {
+        for (int i = 0; i < l.size(); i++) {
+            if (l.get(i).direccion.equalsIgnoreCase(direccion)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Este movil es el anfitrion: corre el servidor de EA (ServidorLanService) y
+     * el juego va contra el, por la IP de este movil en la Wi-Fi o en su punto de
+     * acceso. Manda sobre servidorLan(), que se queda guardada para cuando se quite.
+     */
+    boolean anfitrionLan() { return p.getBoolean("anfitrion_lan", false); }
+    void anfitrionLan(boolean v) { p.edit().putBoolean("anfitrion_lan", v).apply(); }
+
+    /**
+     * El servidor contra el que va el juego: este movil si es el anfitrion, o la
+     * direccion elegida (IP o nombre: resolverIpv4). Vacio = ninguno.
+     */
+    String servidorEfectivo() {
+        if (anfitrionLan()) {
+            String ip = ServidorEa.ipLocal();
+            return ip != null ? ip : "";
+        }
+        return servidorLan();
+    }
 
     static boolean ipValida(String ip) {
         String[] partes = ip.split("\\.", -1);
@@ -129,6 +239,42 @@ final class Ajustes {
             }
         }
         return true;
+    }
+
+    /**
+     * Una IPv4 o un nombre de equipo ("mi-pc", "servidor.lan"): letras, numeros
+     * y guiones por tramo, separados por puntos. Lo que solo tiene numeros y
+     * puntos tiene que ser una IP entera: "10.0.0" no es un nombre.
+     */
+    static boolean direccionValida(String d) {
+        if (d == null || d.isEmpty() || d.length() > 253) {
+            return false;
+        }
+        if (d.matches("[0-9.]+")) {
+            return ipValida(d);
+        }
+        return d.matches("(?i)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*");
+    }
+
+    /**
+     * La IPv4 de una direccion: ella misma si ya es una IP, o la que da la red
+     * para ese nombre; null si no se encuentra. El juego solo entiende IPs (su
+     * red_dns contesta con ella a todos sus nombres). Bloquea con un nombre:
+     * llamarlo fuera del hilo principal.
+     */
+    static String resolverIpv4(String direccion) {
+        if (ipValida(direccion)) {
+            return direccion;
+        }
+        try {
+            for (InetAddress a : InetAddress.getAllByName(direccion)) {
+                if (a instanceof Inet4Address) {
+                    return a.getHostAddress();
+                }
+            }
+        } catch (IOException | SecurityException ignored) {
+        }
+        return null;
     }
 
     /**

@@ -3,10 +3,17 @@ package io.github.nfsmwrecomp;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.Insets;
+import android.graphics.Rect;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.Uri;
@@ -25,10 +32,17 @@ import android.text.TextWatcher;
 import android.text.format.Formatter;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.InputDevice;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -42,6 +56,7 @@ import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.radiobutton.MaterialRadioButton;
 import com.google.android.material.slider.LabelFormatter;
 import com.google.android.material.slider.Slider;
+import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
@@ -59,17 +74,44 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
- * Pantalla de inicio
+ * Pantalla de inicio, en horizontal: menu de secciones (Juego, Graficos,
+ * Multijugador, Controles, Idioma, Otras opciones, Avanzado) con Jugar debajo.
  */
 public class SetupActivity extends AppCompatActivity {
 
     private static final int PEDIR_ISO = 1;
     private static final int PEDIR_DRIVER = 2;
+    private static final int PEDIR_AVISOS = 3;
 
     private static final int ACENTO = 0xFF6F7432;
+    // El acento sobre fondo oscuro, para iconos y textos: el de siempre se pierde.
+    private static final int ACENTO_CLARO = 0xFFB9BF6A;
     private static final int GRIS = 0xFFA0A0A0;
     private static final int AVISO = 0xFFFFB74D;
-    private static final String ESTADO_AVANZADO = "avanzado_abierto";
+    private static final int FONDO = 0xFF121212;
+    private static final int FONDO_MENU = 0xFF181818;
+    // Lo elegido: la entrada del menu y el servidor en uso.
+    private static final int ELEGIDO = 0xFF2E301E;
+
+    // Las secciones del menu lateral, en su orden.
+    private static final int S_JUEGO = 0;
+    private static final int S_GRAFICOS = 1;
+    private static final int S_MULTIJUGADOR = 2;
+    private static final int S_CONTROLES = 3;
+    private static final int S_IDIOMA = 4;
+    private static final int S_OTRAS = 5;
+    private static final int S_AVANZADO = 6;
+    private static final int[] SECCIONES = {R.string.seccion_juego, R.string.seccion_graficos,
+            R.string.seccion_multijugador, R.string.seccion_controles, R.string.seccion_idioma,
+            R.string.seccion_otras, R.string.seccion_avanzado};
+    private static final int[] ICONOS = {R.drawable.ic_juego, R.drawable.ic_graficos,
+            R.drawable.ic_multijugador, R.drawable.ic_controles, R.drawable.ic_idioma,
+            R.drawable.ic_ajustes, R.drawable.ic_avanzado};
+    // La seccion abierta sobrevive a girar el movil y a cambiar de idioma.
+    private static final String ESTADO_SECCION = "seccion";
+    private int seccion = S_JUEGO;
+    private final View[] paneles = new View[SECCIONES.length];
+    private final LinearLayout[] entradasMenu = new LinearLayout[SECCIONES.length];
 
     private Ajustes ajustes;
     private TextView textoIso;
@@ -79,7 +121,6 @@ public class SetupActivity extends AppCompatActivity {
     private MaterialButton botonJugar;
     private TextView textoInforme;
     private View filaTurbo;
-    private boolean avanzadoAbierto;
 
     // Si el gamertag esta libre en el servidor de la LAN (ComprobacionGamertag).
     // La red, en su hilo; `comprobaciones` cuenta las consultas para tirar las
@@ -97,6 +138,26 @@ public class SetupActivity extends AppCompatActivity {
         }
     };
     private TextInputLayout cajaGamertag;
+    // Servidor LAN: la lista de servidores guardados (pintarServidores) y, si este
+    // movil es el anfitrion, en su lugar la IP que ponen los demas (actualizarAnfitrion).
+    private LinearLayout bloqueServidores;
+    private LinearLayout listaServidores;
+    private MaterialButton botonAnadir;
+    // El formulario de anadir o editar un servidor (abrirEditor), metido en la
+    // lista; null = cerrado. direccionEditada: la del servidor que se edita, "" = uno nuevo.
+    private View editorServidor;
+    private String direccionEditada;
+    private TextView textoAnfitrion;
+    private MaterialSwitch interruptorAnfitrion;
+    // El servicio quita el anfitrion por su cuenta (boton "Detener" de la
+    // notificacion, o no pudo abrir los puertos): el interruptor tiene que verlo
+    // aunque esta pantalla siga delante (bajar la barra no pasa por onResume).
+    private final SharedPreferences.OnSharedPreferenceChangeListener cambioAnfitrion = (prefs, clave) -> {
+        if ("anfitrion_lan".equals(clave) && interruptorAnfitrion != null
+                && interruptorAnfitrion.isChecked() != ajustes.anfitrionLan()) {
+            interruptorAnfitrion.setChecked(ajustes.anfitrionLan());
+        }
+    };
     private boolean gamertagEscritoValido = true;
     private boolean comprobandoParaJugar;
     private int comprobaciones;
@@ -111,8 +172,17 @@ public class SetupActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         ajustes = new Ajustes(this);
         ajustes.aplicarPerfilGpuDebil(this);
-        avanzadoAbierto = savedInstanceState != null
-                && savedInstanceState.getBoolean(ESTADO_AVANZADO, false);
+        if (savedInstanceState != null) {
+            seccion = Math.max(0, Math.min(SECCIONES.length - 1,
+                    savedInstanceState.getInt(ESTADO_SECCION, S_JUEGO)));
+        }
+        if (Build.VERSION.SDK_INT >= 30) {
+            // De borde a borde: las barras y el teclado llegan como insets
+            // (construir) y el teclado no encoge el menu lateral.
+            getWindow().setDecorFitsSystemWindows(false);
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+            getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        }
         setContentView(construir());
         // Una ISO elegida con una version anterior de la app: aun sin mirar.
         mirarIso();
@@ -122,7 +192,7 @@ public class SetupActivity extends AppCompatActivity {
     @Override
     protected void onSaveInstanceState(Bundle estado) {
         super.onSaveInstanceState(estado);
-        estado.putBoolean(ESTADO_AVANZADO, avanzadoAbierto);
+        estado.putInt(ESTADO_SECCION, seccion);
     }
 
     private void bancoDePruebas(Intent in) {
@@ -161,6 +231,12 @@ public class SetupActivity extends AppCompatActivity {
         refrescar();
         // Si el juego se acaba de cerrar, por que (files/logs/cierre.txt).
         Cierres.guardar(this);
+        // El servidor de este movil, si es el anfitrion: al abrir la app tras
+        // reiniciar el movil, o si Android lo cerro. Arrancarlo dos veces no hace nada.
+        if (MotorNativo.ACTIVO && ajustes.anfitrionLan()) {
+            ServidorLanService.arrancar(this);
+        }
+        actualizarAnfitrion();
         // Al volver (otro jugador ha podido entrar con el nombre mientras tanto).
         programarComprobacion();
         hiloPrincipal.removeCallbacks(renovarReserva);
@@ -176,6 +252,8 @@ public class SetupActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        getSharedPreferences(Ajustes.PREFS, MODE_PRIVATE)
+                .unregisterOnSharedPreferenceChangeListener(cambioAnfitrion);
         hiloPrincipal.removeCallbacksAndMessages(null);
         red.shutdownNow();
         super.onDestroy();
@@ -225,31 +303,191 @@ public class SetupActivity extends AppCompatActivity {
         b.setTextColor(0xFFFF6666);
     }
 
+    /**
+     * En horizontal: a la izquierda el menu de secciones con Jugar debajo, que se
+     * ve desde todas; a la derecha, la seccion elegida.
+     */
     @SuppressWarnings("deprecation")
     private View construir() {
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        int m = dp(12);
-        col.setPadding(m, m, m, m);
-        col.setBackgroundColor(0xFF121212);
+        LinearLayout raiz = new LinearLayout(this);
+        raiz.setOrientation(LinearLayout.HORIZONTAL);
+        raiz.setBackgroundColor(FONDO);
+
+        // --- Menu lateral
+        LinearLayout menu = new LinearLayout(this);
+        menu.setOrientation(LinearLayout.VERTICAL);
+        menu.setBackgroundColor(FONDO_MENU);
+        menu.setPadding(dp(12), dp(16), dp(12), dp(12));
 
         TextView titulo = new TextView(this);
         titulo.setText(R.string.app_name);
-        titulo.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28);
+        titulo.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         titulo.setTypeface(Typeface.DEFAULT_BOLD);
         titulo.setTextColor(Color.WHITE);
-        titulo.setPadding(dp(8), dp(16), dp(8), dp(4));
-        col.addView(titulo);
-        
-        TextView tResumen = resumen(BuildConfig.CON_JUEGO ? R.string.apk_con_juego : R.string.apk_sonda);
-        tResumen.setPadding(dp(8), 0, dp(8), dp(12));
-        col.addView(tResumen);
+        titulo.setPadding(dp(12), 0, dp(12), dp(12));
+        menu.addView(titulo);
 
-        // --- Juego
+        // Las entradas se desplazan si no caben (moviles bajos, letra grande);
+        // Jugar se queda siempre abajo.
+        LinearLayout lista = new LinearLayout(this);
+        lista.setOrientation(LinearLayout.VERTICAL);
+        for (int i = 0; i < SECCIONES.length; i++) {
+            entradasMenu[i] = entradaMenu(i);
+            lista.addView(entradasMenu[i]);
+        }
+        ScrollView desplazarMenu = new ScrollView(this);
+        desplazarMenu.setVerticalScrollBarEnabled(false);
+        desplazarMenu.addView(lista);
+        menu.addView(desplazarMenu, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        botonJugar = new MaterialButton(this);
+        botonJugar.setText(R.string.jugar);
+        botonJugar.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        botonJugar.setTypeface(Typeface.DEFAULT_BOLD);
+        botonJugar.setMinHeight(dp(56));
+        botonJugar.setIconResource(R.drawable.ic_jugar);
+        botonJugar.setIconGravity(MaterialButton.ICON_GRAVITY_TEXT_START);
+        estilarBotonPrimario(botonJugar);
+        botonJugar.setIconTint(segunActivado(0xFF808080, 0xFF121212));
+        botonJugar.setOnClickListener(v -> jugar());
+        LinearLayout.LayoutParams lpJugar = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lpJugar.topMargin = dp(8);
+        menu.addView(botonJugar, lpJugar);
+
+        raiz.addView(menu, new LinearLayout.LayoutParams(dp(220), ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // --- La seccion elegida. Todas se construyen al empezar y solo se ve una:
+        // refrescar() y la comprobacion del gamertag tienen siempre sus vistas.
+        FrameLayout contenido = new FrameLayout(this);
+        paneles[S_JUEGO] = panel(tarjetaJuego());
+        paneles[S_GRAFICOS] = panel(tarjetaPantalla(), tarjetaGraficos());
+        paneles[S_MULTIJUGADOR] = panel(tarjetaPerfil(),
+                MotorNativo.ACTIVO ? tarjetaServidorLan() : null);
+        paneles[S_CONTROLES] = panel(tarjetaControles());
+        paneles[S_IDIOMA] = panel(tarjetaIdioma());
+        paneles[S_OTRAS] = panel(soloNativo(tarjetaSonido()), tarjetaRendimiento());
+        paneles[S_AVANZADO] = panel(tarjetaAvanzado());
+        for (View p : paneles) {
+            contenido.addView(p);
+        }
+        raiz.addView(contenido, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+        mostrarSeccion(seccion);
+
+        // Fuera de las barras del sistema y el recorte de la camara. El teclado
+        // solo encoge la seccion: el menu se queda debajo de el tal cual (si se
+        // encogiera, en horizontal no quedaria ni una entrada a la vista).
+        // Para eso la ventana no se redimensiona con el teclado (onCreate): llega
+        // como inset y aqui se aplica solo a la seccion.
+        raiz.setOnApplyWindowInsetsListener((v, ins) -> {
+            if (Build.VERSION.SDK_INT >= 30) {
+                Insets barras = ins.getInsets(WindowInsets.Type.systemBars()
+                        | WindowInsets.Type.displayCutout());
+                Insets teclado = ins.getInsets(WindowInsets.Type.ime());
+                v.setPadding(barras.left, barras.top, barras.right, barras.bottom);
+                contenido.setPadding(0, 0, 0, Math.max(0, teclado.bottom - barras.bottom));
+                // Con el formulario de un servidor abierto, entero a la vista si cabe
+                // (la seccion solo se asegura de ver el campo con el cursor).
+                View editor = editorServidor;
+                if (teclado.bottom > 0 && editor != null) {
+                    editor.post(() -> editor.requestRectangleOnScreen(
+                            new Rect(0, 0, editor.getWidth(), editor.getHeight()), true));
+                }
+            } else {
+                // Android 10: la ventana se encoge entera con el teclado.
+                v.setPadding(ins.getSystemWindowInsetLeft(), ins.getSystemWindowInsetTop(),
+                        ins.getSystemWindowInsetRight(), ins.getSystemWindowInsetBottom());
+            }
+            return ins;
+        });
+        return raiz;
+    }
+
+    /** Una entrada del menu: icono y nombre de la seccion. */
+    private LinearLayout entradaMenu(int i) {
+        LinearLayout fila = new LinearLayout(this);
+        fila.setOrientation(LinearLayout.HORIZONTAL);
+        fila.setGravity(Gravity.CENTER_VERTICAL);
+        fila.setMinimumHeight(dp(48));
+        fila.setPadding(dp(12), dp(6), dp(12), dp(6));
+        ImageView icono = new ImageView(this);
+        icono.setImageResource(ICONOS[i]);
+        fila.addView(icono, new LinearLayout.LayoutParams(dp(22), dp(22)));
+        TextView t = new TextView(this);
+        t.setText(SECCIONES[i]);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        t.setMaxLines(2);
+        LinearLayout.LayoutParams lpTexto = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        lpTexto.leftMargin = dp(14);
+        fila.addView(t, lpTexto);
+        fila.setOnClickListener(v -> mostrarSeccion(i));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = dp(2);
+        fila.setLayoutParams(lp);
+        return fila;
+    }
+
+    /** Ensena una seccion y marca su entrada del menu. */
+    private void mostrarSeccion(int i) {
+        // El teclado de un campo de otra seccion no se queda abierto encima.
+        View foco = getCurrentFocus();
+        if (foco != null && paneles[seccion] != null && seccion != i) {
+            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(foco.getWindowToken(), 0);
+            }
+            foco.clearFocus();
+        }
+        seccion = i;
+        for (int j = 0; j < paneles.length; j++) {
+            boolean esta = j == i;
+            paneles[j].setVisibility(esta ? View.VISIBLE : View.GONE);
+            LinearLayout fila = entradasMenu[j];
+            fila.setSelected(esta);
+            fila.setBackground(fondoFila(esta ? ELEGIDO : Color.TRANSPARENT, 0));
+            ((ImageView) fila.getChildAt(0)).setImageTintList(
+                    ColorStateList.valueOf(esta ? ACENTO_CLARO : GRIS));
+            TextView t = (TextView) fila.getChildAt(1);
+            t.setTextColor(esta ? Color.WHITE : 0xFFC8C8C8);
+            t.setTypeface(esta ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        }
+    }
+
+    /** Fondo redondeado que se ilumina al tocarlo; borde 0 = sin borde. */
+    private Drawable fondoFila(int color, int borde) {
+        GradientDrawable forma = new GradientDrawable();
+        forma.setCornerRadius(dp(12));
+        forma.setColor(color);
+        if (borde != 0) {
+            forma.setStroke(dp(1), borde);
+        }
+        GradientDrawable mascara = new GradientDrawable();
+        mascara.setCornerRadius(dp(12));
+        mascara.setColor(Color.WHITE);
+        return new RippleDrawable(ColorStateList.valueOf(0x22FFFFFF), forma, mascara);
+    }
+
+    /** Las tarjetas de una seccion, una debajo de otra, con desplazamiento. */
+    private ScrollView panel(View... tarjetas) {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setPadding(dp(12), dp(8), dp(12), dp(12));
+        for (View t : tarjetas) {
+            if (t != null) col.addView(t);
+        }
+        ScrollView s = new ScrollView(this);
+        s.addView(col);
+        return s;
+    }
+
+    private View tarjetaJuego() {
         textoIso = new TextView(this);
         textoIso.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         textoIso.setTextColor(Color.WHITE);
-        
+
         // Para que edicion del juego es el APK y, si la ISO es de otra, el aviso.
         textoEdicion = resumen(0);
         textoEdicion.setPadding(0, dp(4), 0, 0);
@@ -264,95 +502,35 @@ public class SetupActivity extends AppCompatActivity {
             startActivityForResult(i, PEDIR_ISO);
         });
 
-        botonJugar = new MaterialButton(this);
-        botonJugar.setText(R.string.jugar);
-        botonJugar.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-        botonJugar.setTypeface(Typeface.DEFAULT_BOLD);
-        botonJugar.setMinHeight(dp(64));
-        estilarBotonPrimario(botonJugar);
-        botonJugar.setOnClickListener(v -> jugar());
-        
-        LinearLayout.LayoutParams lpJugar = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lpJugar.topMargin = dp(16);
-        
+        // Por que Jugar, en el menu, no se puede pulsar.
         avisoJugar = resumen(0);
+        avisoJugar.setTextColor(AVISO);
         avisoJugar.setPadding(0, dp(8), 0, 0);
 
-        LinearLayout boxJugar = new LinearLayout(this);
-        boxJugar.setOrientation(LinearLayout.VERTICAL);
-        boxJugar.addView(botonJugar, lpJugar);
-        boxJugar.addView(avisoJugar);
-        
-        col.addView(tarjeta(
+        TextView apk = resumen(BuildConfig.CON_JUEGO ? R.string.apk_con_juego : R.string.apk_sonda);
+        apk.setPadding(0, 0, 0, dp(12));
+        return tarjeta(
             seccion(R.string.seccion_juego),
+            apk,
             textoIso,
             textoEdicion,
-            espacio(8),
+            espacio(12),
             elegirIso,
-            boxJugar
-        ));
+            avisoJugar
+        );
+    }
 
-        // --- Pantalla
-        col.addView(tarjeta(
+    private View tarjetaPantalla() {
+        return tarjeta(
             seccion(R.string.seccion_pantalla),
             selectorResolucion(),
             interruptor(R.string.estirar, R.string.estirar_resumen, ajustes.estirar(), ajustes::estirar),
             interruptor(R.string.mostrar_fps, R.string.mostrar_fps_resumen, ajustes.mostrarFps(), ajustes::mostrarFps)
-        ));
+        );
+    }
 
-        // --- Controles tactiles: el editor va en su propia pantalla
-        MaterialButton editarTactil = new MaterialButton(this);
-        editarTactil.setText(R.string.editar_tactil);
-        estilarBotonSecundario(editarTactil);
-        editarTactil.setOnClickListener(v -> startActivity(new Intent(this, EditorTactilActivity.class)));
-        MaterialButton probarVibracion = new MaterialButton(this);
-        probarVibracion.setText(R.string.probar_vibracion);
-        estilarBotonSecundario(probarVibracion);
-        TextView vibracionProbada = resumen(0);
-        vibracionProbada.setVisibility(View.GONE);
-        probarVibracion.setOnClickListener(v -> probarVibracion(vibracionProbada));
-        LinearLayout filaVibracion = new LinearLayout(this);
-        filaVibracion.setOrientation(LinearLayout.VERTICAL);
-        filaVibracion.addView(interruptor(R.string.vibracion, R.string.vibracion_resumen,
-                ajustes.vibracion(), ajustes::vibracion));
-        filaVibracion.addView(probarVibracion);
-        filaVibracion.addView(vibracionProbada);
-        col.addView(tarjeta(
-            seccion(R.string.seccion_tactil),
-            resumen(R.string.editar_tactil_resumen),
-            espacio(8),
-            editarTactil,
-            soloNativo(filaVibracion),
-            soloNativo(interruptor(R.string.menus_tactiles, R.string.menus_tactiles_resumen,
-                    ajustes.menusTactiles(), ajustes::menusTactiles)),
-            interruptor(R.string.girar_inclinando, R.string.girar_inclinando_resumen,
-                    ajustes.girarInclinando(), ajustes::girarInclinando),
-            deslizador(R.string.sensibilidad_giro, R.string.sensibilidad_giro_resumen,
-                    Ajustes.SENSIBILIDAD_MIN, Ajustes.SENSIBILIDAD_MAX, ajustes.sensibilidadGiro(),
-                    s -> getString(R.string.sensibilidad_valor, s, Math.round(Ajustes.anguloGiro(s))),
-                    ajustes::sensibilidadGiro)
-        ));
-
-        // --- Perfil de Xbox 360
-        col.addView(tarjeta(
-            seccion(R.string.seccion_perfil),
-            resumen(R.string.gamertag_resumen),
-            espacio(8),
-            campoGamertag()
-        ));
-        // Multijugador en la LAN: solo el motor nativo tiene las opciones de red.
-        if (MotorNativo.ACTIVO) {
-            col.addView(tarjeta(
-                seccion(R.string.servidor_lan),
-                resumen(R.string.servidor_lan_resumen),
-                espacio(8),
-                campoServidorLan()
-            ));
-        }
-
-        // --- Graficos
-        col.addView(tarjeta(
+    private View tarjetaGraficos() {
+        return tarjeta(
             seccion(R.string.seccion_graficos),
             soloNativo(selector(R.string.resolucion_interna, R.string.resolucion_interna_resumen,
                     Arrays.asList(getString(R.string.res_interna_576), getString(R.string.res_interna_720),
@@ -418,21 +596,149 @@ public class SetupActivity extends AppCompatActivity {
                             getString(R.string.filtro_imagen_noir), getString(R.string.filtro_imagen_crt)),
                     Arrays.asList("apagado", "cine", "vivo", "calido", "frio", "sepia", "noir", "crt"),
                     ajustes.filtroImagen(), ajustes::filtroImagen))
-        ));
+        );
+    }
 
-        // --- Sonido (motor nativo: por donde sale el audio)
-        col.addView(soloNativo(tarjeta(
+    private View tarjetaPerfil() {
+        return tarjeta(
+            seccion(R.string.seccion_perfil),
+            resumen(R.string.gamertag_resumen),
+            espacio(8),
+            campoGamertag()
+        );
+    }
+
+    /**
+     * Multijugador en la LAN (solo el motor nativo tiene red): ser el anfitrion
+     * o elegir uno de los servidores guardados.
+     */
+    private View tarjetaServidorLan() {
+        View filaAnfitrion = interruptor(R.string.servidor_anfitrion, R.string.servidor_anfitrion_resumen,
+                ajustes.anfitrionLan(), this::cambiarAnfitrion);
+        interruptorAnfitrion = (MaterialSwitch) ((LinearLayout) filaAnfitrion).getChildAt(0);
+        textoAnfitrion = resumen(0);
+        textoAnfitrion.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        textoAnfitrion.setPadding(0, dp(4), 0, 0);
+
+        // Tocar un servidor lo elige; el lapiz lo edita y la papelera lo quita.
+        listaServidores = new LinearLayout(this);
+        listaServidores.setOrientation(LinearLayout.VERTICAL);
+        botonAnadir = new MaterialButton(this);
+        botonAnadir.setText(R.string.servidor_anadir);
+        botonAnadir.setIconResource(R.drawable.ic_anadir);
+        estilarBotonSecundario(botonAnadir);
+        botonAnadir.setIconTint(ColorStateList.valueOf(Color.WHITE));
+        botonAnadir.setOnClickListener(v -> abrirEditor(null));
+        LinearLayout.LayoutParams lpAnadir = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lpAnadir.topMargin = dp(10);
+        bloqueServidores = new LinearLayout(this);
+        bloqueServidores.setOrientation(LinearLayout.VERTICAL);
+        bloqueServidores.addView(titulo(R.string.servidores_guardados));
+        bloqueServidores.addView(listaServidores);
+        bloqueServidores.addView(botonAnadir, lpAnadir);
+        pintarServidores();
+
+        getSharedPreferences(Ajustes.PREFS, MODE_PRIVATE)
+                .registerOnSharedPreferenceChangeListener(cambioAnfitrion);
+        View t = tarjeta(
+            seccion(R.string.servidor_lan),
+            resumen(R.string.servidor_lan_resumen),
+            filaAnfitrion,
+            textoAnfitrion,
+            espacio(4),
+            bloqueServidores
+        );
+        actualizarAnfitrion();
+        return t;
+    }
+
+    /** Controles tactiles: el editor va en su propia pantalla. */
+    private View tarjetaControles() {
+        MaterialButton editarTactil = new MaterialButton(this);
+        editarTactil.setText(R.string.editar_tactil);
+        estilarBotonSecundario(editarTactil);
+        editarTactil.setOnClickListener(v -> startActivity(new Intent(this, EditorTactilActivity.class)));
+        MaterialButton probarVibracion = new MaterialButton(this);
+        probarVibracion.setText(R.string.probar_vibracion);
+        estilarBotonSecundario(probarVibracion);
+        TextView vibracionProbada = resumen(0);
+        vibracionProbada.setVisibility(View.GONE);
+        probarVibracion.setOnClickListener(v -> probarVibracion(vibracionProbada));
+        LinearLayout filaVibracion = new LinearLayout(this);
+        filaVibracion.setOrientation(LinearLayout.VERTICAL);
+        filaVibracion.addView(interruptor(R.string.vibracion, R.string.vibracion_resumen,
+                ajustes.vibracion(), ajustes::vibracion));
+        filaVibracion.addView(probarVibracion);
+        filaVibracion.addView(vibracionProbada);
+        return tarjeta(
+            seccion(R.string.seccion_tactil),
+            resumen(R.string.editar_tactil_resumen),
+            espacio(8),
+            editarTactil,
+            soloNativo(filaVibracion),
+            soloNativo(interruptor(R.string.menus_tactiles, R.string.menus_tactiles_resumen,
+                    ajustes.menusTactiles(), ajustes::menusTactiles)),
+            selectorGiro()
+        );
+    }
+
+    /**
+     * Con que se gira en las carreras (Ajustes.modoGiro). La sensibilidad solo
+     * cuenta inclinando el movil: con lo demas no se ve.
+     */
+    private View selectorGiro() {
+        View sensibilidad = deslizador(R.string.sensibilidad_giro, R.string.sensibilidad_giro_resumen,
+                Ajustes.SENSIBILIDAD_MIN, Ajustes.SENSIBILIDAD_MAX, ajustes.sensibilidadGiro(),
+                s -> getString(R.string.sensibilidad_valor, s, Math.round(Ajustes.anguloGiro(s))),
+                ajustes::sensibilidadGiro);
+        sensibilidad.setPadding(dp(32), sensibilidad.getPaddingTop(), 0, sensibilidad.getPaddingBottom());
+        Consumer<String> mostrar = modo -> sensibilidad.setVisibility(
+                Ajustes.GIRO_INCLINAR.equals(modo) ? View.VISIBLE : View.GONE);
+        mostrar.accept(ajustes.modoGiro());
+        LinearLayout caja = new LinearLayout(this);
+        caja.setOrientation(LinearLayout.VERTICAL);
+        caja.addView(selector(R.string.giro_carrera, R.string.giro_carrera_resumen,
+                Arrays.asList(getString(R.string.giro_stick), getString(R.string.giro_flechas),
+                        getString(R.string.giro_inclinar)),
+                Arrays.asList(Ajustes.GIRO_STICK, Ajustes.GIRO_FLECHAS, Ajustes.GIRO_INCLINAR),
+                ajustes.modoGiro(), true, modo -> {
+                    ajustes.modoGiro(modo);
+                    mostrar.accept(modo);
+                }));
+        caja.addView(sensibilidad);
+        return caja;
+    }
+
+    /** Todos los idiomas a la vista; al elegir uno, la pantalla se rehace en el. */
+    private View tarjetaIdioma() {
+        return tarjeta(
+            seccion(R.string.seccion_idioma),
+            selector(0, 0, nombresIdiomas(), Arrays.asList(Idioma.CODIGOS), Idioma.elegido(this), false,
+                    codigo -> {
+                        if (!codigo.equals(Idioma.elegido(this))) {
+                            Idioma.elegir(this, codigo);
+                            recreate();
+                        }
+                    })
+        );
+    }
+
+    /** Sonido (motor nativo: por donde sale el audio). */
+    private View tarjetaSonido() {
+        return tarjeta(
             seccion(R.string.seccion_sonido),
             interruptor(R.string.audio_aaudio, R.string.audio_aaudio_resumen,
                     ajustes.audioAAudio(), ajustes::audioAAudio)
-        )));
+        );
+    }
 
-        // --- Rendimiento
+    private View tarjetaRendimiento() {
         grupoDrivers = new RadioGroup(this);
         LinearLayout filaDriver = new LinearLayout(this);
         filaDriver.setOrientation(LinearLayout.HORIZONTAL);
         filaDriver.setPadding(0, dp(8), 0, dp(8));
-        
+
         MaterialButton importar = new MaterialButton(this);
         importar.setText(R.string.importar_driver);
         estilarBotonSecundario(importar);
@@ -442,7 +748,7 @@ public class SetupActivity extends AppCompatActivity {
             i.setType("application/zip");
             startActivityForResult(i, PEDIR_DRIVER);
         });
-        
+
         MaterialButton borrar = new MaterialButton(this);
         borrar.setText(R.string.borrar_driver);
         estilarBotonPeligro(borrar);
@@ -454,16 +760,16 @@ public class SetupActivity extends AppCompatActivity {
                 refrescar();
             }
         });
-        
+
         LinearLayout.LayoutParams lpBotones = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         lpBotones.rightMargin = dp(8);
         filaDriver.addView(importar, lpBotones);
         LinearLayout.LayoutParams lpBorrar = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         filaDriver.addView(borrar, lpBorrar);
-        
+
         filaTurbo = interruptor(R.string.turbo, R.string.turbo_resumen, ajustes.turbo(), ajustes::turbo);
-        
-        col.addView(tarjeta(
+
+        return tarjeta(
             seccion(R.string.seccion_rendimiento),
             interruptor(R.string.fijar_hilos, R.string.fijar_hilos_resumen, ajustes.fijarHilos(), ajustes::fijarHilos),
             titulo(R.string.driver),
@@ -471,47 +777,25 @@ public class SetupActivity extends AppCompatActivity {
             grupoDrivers,
             filaDriver,
             filaTurbo
-        ));
+        );
+    }
 
-        // --- Idioma
-        col.addView(tarjeta(
-            seccion(R.string.seccion_idioma),
-            desplegable(0, 0, nombresIdiomas(), Arrays.asList(Idioma.CODIGOS), Idioma.elegido(this),
-                    codigo -> {
-                        if (!codigo.equals(Idioma.elegido(this))) {
-                            Idioma.elegir(this, codigo);
-                            recreate();
-                        }
-                    })
-        ));
-
-        // --- Avanzado
-        LinearLayout cabecera = seccion(R.string.seccion_avanzado);
-        TextView textoCabecera = (TextView) cabecera.getChildAt(0);
-        LinearLayout avanzado = new LinearLayout(this);
-        avanzado.setOrientation(LinearLayout.VERTICAL);
-        Runnable pintarPlegado = () -> {
-            avanzado.setVisibility(avanzadoAbierto ? View.VISIBLE : View.GONE);
-            textoCabecera.setText((avanzadoAbierto ? "▾ " : "▸ ") + getString(R.string.seccion_avanzado));
-        };
-        cabecera.setOnClickListener(v -> {
-            avanzadoAbierto = !avanzadoAbierto;
-            pintarPlegado.run();
-        });
-        pintarPlegado.run();
-        
+    /** Avanzado: ya en su propia seccion, sin plegar. */
+    private View tarjetaAvanzado() {
         MaterialButton sonda = new MaterialButton(this);
         sonda.setText(R.string.probar_vulkan);
         estilarBotonSecundario(sonda);
         sonda.setOnClickListener(v -> lanzar(true));
-        
+
         textoInforme = new TextView(this);
         textoInforme.setTypeface(Typeface.MONOSPACE);
         textoInforme.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         textoInforme.setTextColor(0xFFCCCCCC);
         textoInforme.setTextIsSelectable(true);
         textoInforme.setPadding(0, dp(12), 0, 0);
-        
+
+        LinearLayout avanzado = new LinearLayout(this);
+        avanzado.setOrientation(LinearLayout.VERTICAL);
         avanzado.addView(resumen(R.string.avanzado_resumen));
         // Los de la GPU de Xbox 360 imitada: con el motor nativo no existen.
         avanzado.addView(soloXenos(interruptor(R.string.una_pasada, R.string.una_pasada_resumen, ajustes.unaPasada(), ajustes::unaPasada)));
@@ -534,17 +818,7 @@ public class SetupActivity extends AppCompatActivity {
         avanzado.addView(sonda);
         avanzado.addView(textoInforme);
 
-        col.addView(tarjeta(cabecera, avanzado));
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(0xFF121212);
-        scroll.addView(col);
-        scroll.setOnApplyWindowInsetsListener((v, ins) -> {
-            col.setPadding(m + ins.getSystemWindowInsetLeft(), m + ins.getSystemWindowInsetTop(),
-                    m + ins.getSystemWindowInsetRight(), m + ins.getSystemWindowInsetBottom());
-            return ins;
-        });
-        return scroll;
+        return tarjeta(seccion(R.string.seccion_avanzado), avanzado);
     }
 
     /**
@@ -564,8 +838,15 @@ public class SetupActivity extends AppCompatActivity {
         texto.setSingleLine(true);
         texto.setTextColor(Color.WHITE);
         texto.setFilters(new InputFilter[] {new InputFilter.LengthFilter(15)});
+        // En horizontal, sin el teclado a pantalla completa: se ve el campo y
+        // debajo si el nombre esta libre en el servidor.
+        texto.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_DONE);
         texto.setText(ajustes.gamertag());
-        texto.setHint("User");
+        // El ejemplo va en la caja, no en el campo: con el campo vacio y sin
+        // foco, la etiqueta y su pista se pintaban una encima de otra. Asi la
+        // etiqueta se queda arriba y el ejemplo, en gris, dentro.
+        caja.setExpandedHintEnabled(false);
+        caja.setPlaceholderText("User");
         texto.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
@@ -591,39 +872,315 @@ public class SetupActivity extends AppCompatActivity {
     }
 
     /**
-     * La IP del PC con el servidor de EA de la LAN. Como el gamertag: se guarda
-     * segun se escribe si es una IPv4 valida, y vacia la quita.
+     * La lista de servidores LAN: "Sin servidor" y los guardados. El elegido
+     * (Ajustes.servidorLan) va marcado.
      */
-    private View campoServidorLan() {
-        TextInputLayout caja = new TextInputLayout(this, null,
+    private void pintarServidores() {
+        if (listaServidores == null) {
+            return;
+        }
+        listaServidores.removeAllViews();
+        String elegida = ajustes.servidorLan();
+        List<Ajustes.Servidor> guardados = ajustes.servidores();
+        listaServidores.addView(filaServidor(null, Ajustes.indiceServidor(guardados, elegida) < 0));
+        for (Ajustes.Servidor s : guardados) {
+            // El que se edita: el formulario en su sitio.
+            listaServidores.addView(editorServidor != null && s.direccion.equals(direccionEditada)
+                    ? editorServidor : filaServidor(s, s.direccion.equals(elegida)));
+        }
+        if (editorServidor != null && editorServidor.getParent() == null) {
+            listaServidores.addView(editorServidor);
+        }
+        botonAnadir.setVisibility(editorServidor == null ? View.VISIBLE : View.GONE);
+    }
+
+    /** Una fila de la lista; s null = "Sin servidor", que no se edita ni se quita. */
+    private View filaServidor(Ajustes.Servidor s, boolean elegido) {
+        LinearLayout fila = new LinearLayout(this);
+        fila.setOrientation(LinearLayout.HORIZONTAL);
+        fila.setGravity(Gravity.CENTER_VERTICAL);
+        fila.setMinimumHeight(dp(56));
+        fila.setPadding(dp(4), dp(4), dp(4), dp(4));
+        fila.setBackground(fondoFila(elegido ? ELEGIDO : 0xFF262626, elegido ? ACENTO : 0));
+
+        // La marca la pone la fila entera: el boton solo se ve.
+        MaterialRadioButton marca = new MaterialRadioButton(this);
+        marca.setChecked(elegido);
+        marca.setClickable(false);
+        marca.setFocusable(false);
+        marca.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        marca.setButtonTintList(new ColorStateList(
+                new int[][] {{android.R.attr.state_checked}, {}},
+                new int[] {ACENTO_CLARO, 0xFF9E9E9E}));
+        fila.addView(marca);
+
+        String etiqueta = s == null ? getString(R.string.servidor_ninguno)
+                : s.nombre.isEmpty() ? s.direccion : s.nombre;
+        LinearLayout textos = new LinearLayout(this);
+        textos.setOrientation(LinearLayout.VERTICAL);
+        TextView principal = new TextView(this);
+        principal.setText(etiqueta);
+        principal.setTextColor(Color.WHITE);
+        principal.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        if (elegido) principal.setTypeface(Typeface.DEFAULT_BOLD);
+        textos.addView(principal);
+        String detalle = s == null ? getString(R.string.servidor_ninguno_resumen)
+                : s.nombre.isEmpty() ? null : s.direccion;
+        if (detalle != null) {
+            TextView segundo = resumen(0);
+            segundo.setText(detalle);
+            textos.addView(segundo);
+        }
+        fila.addView(textos, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        if (s != null) {
+            fila.addView(botonIcono(R.drawable.ic_editar, getString(R.string.servidor_editar, etiqueta),
+                    v -> abrirEditor(s)));
+            fila.addView(botonIcono(R.drawable.ic_eliminar, getString(R.string.servidor_eliminar, etiqueta),
+                    v -> eliminarServidor(s)));
+        }
+        fila.setOnClickListener(v -> elegirServidor(s == null ? "" : s.direccion));
+        fila.setSelected(elegido);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(6);
+        fila.setLayoutParams(lp);
+        return fila;
+    }
+
+    private ImageButton botonIcono(int icono, String descripcion, View.OnClickListener alPulsar) {
+        ImageButton b = new ImageButton(this);
+        b.setImageResource(icono);
+        b.setImageTintList(ColorStateList.valueOf(0xFFD0D0D0));
+        b.setContentDescription(descripcion);
+        TypedValue fondo = new TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, fondo, true);
+        b.setBackgroundResource(fondo.resourceId);
+        b.setOnClickListener(alPulsar);
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
+        return b;
+    }
+
+    /** "" = sin servidor: el juego como siempre. */
+    private void elegirServidor(String ip) {
+        if (ip.equals(ajustes.servidorLan())) {
+            return;
+        }
+        ajustes.servidorLan(ip);
+        pintarServidores();
+        // Otro servidor, otros jugadores: el nombre puede estar en uso alli.
+        programarComprobacion();
+    }
+
+    /**
+     * Anadir (editando null) o editar un servidor: nombre opcional e IP. No en un
+     * dialogo: en horizontal el teclado lo deja sin sitio para los campos. El
+     * formulario va en la propia lista, en el sitio del servidor que se edita
+     * (o al final, si es nuevo), con la IP y el nombre en una fila para que
+     * quepan encima del teclado. Guardar solo se puede con una IPv4 valida que
+     * no este ya en la lista. Uno nuevo queda elegido; al editar el elegido,
+     * sigue elegido con su IP nueva.
+     */
+    private void abrirEditor(Ajustes.Servidor editando) {
+        cerrarEditor();
+        direccionEditada = editando == null ? "" : editando.direccion;
+
+        TextInputLayout cajaIp = new TextInputLayout(this, null,
                 com.google.android.material.R.attr.textInputOutlinedStyle);
-        caja.setHint(R.string.servidor_lan_ip);
-        caja.setBoxStrokeColor(ACENTO);
-        caja.setHintTextColor(ColorStateList.valueOf(ACENTO));
-        TextInputEditText texto = new TextInputEditText(caja.getContext());
-        texto.setSingleLine(true);
-        texto.setTextColor(Color.WHITE);
-        texto.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        texto.setFilters(new InputFilter[] {new InputFilter.LengthFilter(15)});
-        texto.setText(ajustes.servidorLan());
-        texto.setHint("10.0.0.4");
-        texto.addTextChangedListener(new TextWatcher() {
+        cajaIp.setHint(R.string.servidor_lan_ip);
+        cajaIp.setBoxStrokeColor(ACENTO);
+        cajaIp.setHintTextColor(ColorStateList.valueOf(ACENTO_CLARO));
+        cajaIp.setExpandedHintEnabled(false);
+        cajaIp.setPlaceholderText("10.0.0.4");
+        TextInputEditText ip = new TextInputEditText(cajaIp.getContext());
+        ip.setSingleLine(true);
+        ip.setTextColor(Color.WHITE);
+        // Una IP o un nombre de equipo: teclado de direcciones (con el punto a
+        // mano y sin autocorregir), no solo numeros.
+        ip.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        ip.setFilters(new InputFilter[] {new InputFilter.LengthFilter(253)});
+        ip.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_NEXT);
+        cajaIp.addView(ip);
+
+        TextInputLayout cajaNombre = new TextInputLayout(this, null,
+                com.google.android.material.R.attr.textInputOutlinedStyle);
+        cajaNombre.setHint(R.string.servidor_nombre);
+        cajaNombre.setBoxStrokeColor(ACENTO);
+        cajaNombre.setHintTextColor(ColorStateList.valueOf(ACENTO_CLARO));
+        TextInputEditText nombre = new TextInputEditText(cajaNombre.getContext());
+        nombre.setSingleLine(true);
+        nombre.setTextColor(Color.WHITE);
+        nombre.setFilters(new InputFilter[] {new InputFilter.LengthFilter(24)});
+        nombre.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_DONE);
+        cajaNombre.addView(nombre);
+
+        if (editando != null) {
+            ip.setText(editando.direccion);
+            nombre.setText(editando.nombre);
+        }
+
+        LinearLayout campos = new LinearLayout(this);
+        campos.setOrientation(LinearLayout.HORIZONTAL);
+        campos.addView(cajaIp, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams lpNombre = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.3f);
+        lpNombre.leftMargin = dp(8);
+        campos.addView(cajaNombre, lpNombre);
+
+        // Los botones en la linea del titulo, bajos: con el teclado abierto, en
+        // horizontal, debajo de los campos quedarian tapados.
+        MaterialButton cancelar = new MaterialButton(this);
+        cancelar.setText(android.R.string.cancel);
+        estilarBotonSecundario(cancelar);
+        cancelar.setOnClickListener(v -> cerrarEditor());
+        MaterialButton guardar = new MaterialButton(this);
+        guardar.setText(R.string.guardar);
+        estilarBotonPrimario(guardar);
+        TextView titulo = titulo(editando == null ? R.string.servidor_anadir : R.string.servidor_editar_titulo);
+        titulo.setPadding(dp(4), 0, 0, 0);
+        LinearLayout cabecera = new LinearLayout(this);
+        cabecera.setOrientation(LinearLayout.HORIZONTAL);
+        cabecera.setGravity(Gravity.CENTER_VERTICAL);
+        cabecera.setPadding(0, 0, 0, dp(6));
+        cabecera.addView(titulo, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        for (MaterialButton b : new MaterialButton[] {cancelar, guardar}) {
+            b.setInsetTop(0);
+            b.setInsetBottom(0);
+            b.setMinHeight(dp(40));
+            b.setMinimumHeight(dp(40));
+            LinearLayout.LayoutParams lpBoton = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(40));
+            lpBoton.leftMargin = dp(8);
+            cabecera.addView(b, lpBoton);
+        }
+
+        LinearLayout editor = new LinearLayout(this);
+        editor.setOrientation(LinearLayout.VERTICAL);
+        editor.setPadding(dp(12), dp(8), dp(12), dp(4));
+        GradientDrawable fondo = new GradientDrawable();
+        fondo.setCornerRadius(dp(12));
+        fondo.setColor(0xFF262626);
+        fondo.setStroke(dp(1), ACENTO);
+        editor.setBackground(fondo);
+        editor.addView(cabecera);
+        editor.addView(campos);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(6);
+        editor.setLayoutParams(lp);
+
+        // La direccion que se puede guardar, o null (y el porque, bajo el campo).
+        java.util.function.Supplier<String> ipValidada = () -> {
+            String t = ip.getText().toString().trim();
+            boolean valida = Ajustes.direccionValida(t);
+            boolean repetida = valida && (editando == null || !t.equalsIgnoreCase(editando.direccion))
+                    && Ajustes.indiceServidor(ajustes.servidores(), t) >= 0;
+            cajaIp.setError(t.isEmpty() ? null : !valida ? getString(R.string.servidor_lan_error)
+                    : repetida ? getString(R.string.servidor_repetido) : null);
+            boolean vale = valida && !repetida;
+            guardar.setEnabled(vale);
+            return vale ? t : null;
+        };
+        ip.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
-            @Override public void afterTextChanged(Editable s) {
-                String ip = s.toString().trim();
-                if (ip.isEmpty() || Ajustes.ipValida(ip)) {
-                    caja.setError(null);
-                    ajustes.servidorLan(ip);
-                    // Otro servidor, otros jugadores: el nombre puede estar en uso alli.
-                    programarComprobacion();
-                } else {
-                    caja.setError(getString(R.string.servidor_lan_error));
-                }
+            @Override public void afterTextChanged(Editable s) { ipValidada.get(); }
+        });
+        ipValidada.get();
+        Runnable aceptar = () -> {
+            String nueva = ipValidada.get();
+            if (nueva == null) {
+                ip.requestFocus();
+                return;
+            }
+            List<Ajustes.Servidor> l = ajustes.servidores();
+            Ajustes.Servidor s = new Ajustes.Servidor(nombre.getText().toString(), nueva);
+            int donde = editando == null ? -1 : Ajustes.indiceServidor(l, editando.direccion);
+            if (donde >= 0) {
+                l.set(donde, s);
+            } else {
+                l.add(s);
+            }
+            boolean eraElegido = editando != null && editando.direccion.equals(ajustes.servidorLan());
+            // Primero la lista: servidores() mete la IP elegida si no esta.
+            ajustes.servidores(l);
+            if (editando == null || eraElegido) {
+                ajustes.servidorLan(nueva);
+                programarComprobacion();
+            }
+            cerrarEditor();
+        };
+        guardar.setOnClickListener(v -> aceptar.run());
+        nombre.setOnEditorActionListener((v, accion, e) -> {
+            if (accion == EditorInfo.IME_ACTION_DONE) {
+                aceptar.run();
+                return true;
+            }
+            return false;
+        });
+
+        editorServidor = editor;
+        pintarServidores();
+        ip.requestFocus();
+        ip.setSelection(ip.length());
+        ip.post(() -> {
+            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(ip, InputMethodManager.SHOW_IMPLICIT);
             }
         });
-        caja.addView(texto);
-        return caja;
+    }
+
+    /** Quita el formulario de la lista (sin guardar) y el teclado. */
+    private void cerrarEditor() {
+        if (editorServidor == null) {
+            return;
+        }
+        View foco = editorServidor.findFocus();
+        if (foco != null) {
+            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(foco.getWindowToken(), 0);
+            }
+            foco.clearFocus();
+        }
+        editorServidor = null;
+        direccionEditada = null;
+        pintarServidores();
+    }
+
+    /** Quita un servidor guardado, con la opcion de deshacerlo. Si era el elegido, queda "Sin servidor". */
+    private void eliminarServidor(Ajustes.Servidor s) {
+        List<Ajustes.Servidor> l = ajustes.servidores();
+        int donde = Ajustes.indiceServidor(l, s.direccion);
+        if (donde < 0) {
+            return;
+        }
+        boolean eraElegido = s.direccion.equals(ajustes.servidorLan());
+        l.remove(donde);
+        if (eraElegido) {
+            ajustes.servidorLan("");
+            programarComprobacion();
+        }
+        ajustes.servidores(l);
+        pintarServidores();
+        String etiqueta = s.nombre.isEmpty() ? s.direccion : s.nombre;
+        Snackbar.make(listaServidores, getString(R.string.servidor_eliminado, etiqueta), Snackbar.LENGTH_LONG)
+                .setAction(R.string.deshacer, v -> {
+                    List<Ajustes.Servidor> ahora = ajustes.servidores();
+                    if (Ajustes.indiceServidor(ahora, s.direccion) >= 0) {
+                        return;
+                    }
+                    ahora.add(Math.min(donde, ahora.size()), s);
+                    ajustes.servidores(ahora);
+                    if (eraElegido && ajustes.servidorLan().isEmpty()) {
+                        ajustes.servidorLan(s.direccion);
+                        programarComprobacion();
+                    }
+                    pintarServidores();
+                })
+                .show();
     }
 
     @SuppressWarnings("deprecation")
@@ -1109,11 +1666,52 @@ public class SetupActivity extends AppCompatActivity {
         ((LinearLayout) filaTurbo).getChildAt(1).setAlpha(propio ? 1f : 0.5f);
     }
 
-    /** Medio segundo despues de dejar de escribir: no una consulta por tecla. */
+    /**
+     * Medio segundo despues de dejar de escribir: no una consulta por tecla. Con
+     * este movil de anfitrion, algo mas: su servidor acaba de arrancar.
+     */
     private void programarComprobacion() {
         hiloPrincipal.removeCallbacks(comprobacionPendiente);
         comprobaciones++;
-        hiloPrincipal.postDelayed(comprobacionPendiente, 500);
+        hiloPrincipal.postDelayed(comprobacionPendiente,
+                MotorNativo.ACTIVO && ajustes.anfitrionLan() ? 1500 : 500);
+    }
+
+    /** El interruptor de anfitrion: arranca o para el servidor de este movil. */
+    private void cambiarAnfitrion(boolean si) {
+        ajustes.anfitrionLan(si);
+        if (si) {
+            // Sin permiso el servidor va igual; solo no se ve su notificacion.
+            if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(
+                    android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[] {android.Manifest.permission.POST_NOTIFICATIONS}, PEDIR_AVISOS);
+            }
+            ServidorLanService.arrancar(this);
+        } else {
+            ServidorLanService.parar(this);
+        }
+        actualizarAnfitrion();
+        // Otro servidor, otros jugadores.
+        programarComprobacion();
+    }
+
+    /**
+     * Con este movil de anfitrion: la IP que ponen los demas (o que no hay red), y
+     * sin la lista de servidores. La IP se mira cada vez: cambia con la Wi-Fi.
+     */
+    private void actualizarAnfitrion() {
+        if (textoAnfitrion == null) {
+            return;
+        }
+        boolean anfitrion = ajustes.anfitrionLan();
+        bloqueServidores.setVisibility(anfitrion ? View.GONE : View.VISIBLE);
+        textoAnfitrion.setVisibility(anfitrion ? View.VISIBLE : View.GONE);
+        if (anfitrion) {
+            String ip = ServidorEa.ipLocal();
+            textoAnfitrion.setText(ip != null ? getString(R.string.servidor_anfitrion_ip, ip)
+                    : getString(R.string.servidor_anfitrion_sin_red));
+            textoAnfitrion.setTextColor(ip != null ? Color.WHITE : AVISO);
+        }
     }
 
     /**
@@ -1125,8 +1723,9 @@ public class SetupActivity extends AppCompatActivity {
         if (cajaGamertag == null || !gamertagEscritoValido) {
             return;
         }
-        String ip = ajustes.servidorLan();
-        if (!MotorNativo.ACTIVO || !Ajustes.ipValida(ip)) {
+        // IP o nombre: el socket de la comprobacion resuelve el nombre.
+        String ip = ajustes.servidorEfectivo();
+        if (!MotorNativo.ACTIVO || !Ajustes.direccionValida(ip)) {
             cajaGamertag.setError(null);
             cajaGamertag.setHelperText(null);
             return;
@@ -1168,11 +1767,12 @@ public class SetupActivity extends AppCompatActivity {
      * Jugar. Con servidor de la LAN se pregunta otra vez antes de entrar (otro
      * jugador ha podido conectarse con ese nombre desde que se escribio) y, si
      * esta en uso, no se entra. Sin servidor configurado, o si no contesta, se
-     * juega como siempre.
+     * juega como siempre. Un servidor puesto por nombre se pasa aqui a su IP: el
+     * juego solo entiende IPs. Si la red no lo encuentra, se pregunta.
      */
     private void jugar() {
-        String ip = ajustes.servidorLan();
-        if (!MotorNativo.ACTIVO || !Ajustes.ipValida(ip)) {
+        String servidor = ajustes.servidorEfectivo();
+        if (!MotorNativo.ACTIVO || !Ajustes.direccionValida(servidor)) {
             lanzar(false);
             return;
         }
@@ -1184,7 +1784,9 @@ public class SetupActivity extends AppCompatActivity {
         String gamertag = ajustes.gamertag();
         final int n = ++comprobaciones;
         red.execute(() -> {
-            ComprobacionGamertag.Resultado r = ComprobacionGamertag.comprobar(ip, gamertag);
+            String ip = Ajustes.resolverIpv4(servidor);
+            ComprobacionGamertag.Resultado r = ip == null ? ComprobacionGamertag.Resultado.SIN_RESPUESTA
+                    : ComprobacionGamertag.comprobar(ip, gamertag);
             hiloPrincipal.post(() -> {
                 comprobandoParaJugar = false;
                 if (isFinishing() || isDestroyed()) {
@@ -1192,15 +1794,29 @@ public class SetupActivity extends AppCompatActivity {
                 }
                 refrescar();
                 if (n == comprobaciones) {
-                    mostrarComprobacion(ip, gamertag, r);
+                    mostrarComprobacion(servidor, gamertag, r);
                 }
-                if (r == ComprobacionGamertag.Resultado.EN_USO) {
-                    preguntarJugarSinOnline(ip, gamertag);
+                if (ip == null) {
+                    preguntarServidorNoEncontrado(servidor);
                     return;
                 }
-                lanzar(false);
+                if (r == ComprobacionGamertag.Resultado.EN_USO) {
+                    preguntarJugarSinOnline(servidor, gamertag);
+                    return;
+                }
+                lanzar(false, false, ip);
             });
         });
+    }
+
+    /** El nombre del servidor no da ninguna IP en esta red: o se corrige, o se juega sin online. */
+    private void preguntarServidorNoEncontrado(String servidor) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.servidor_no_encontrado_titulo)
+                .setMessage(getString(R.string.servidor_no_encontrado, servidor))
+                .setPositiveButton(R.string.jugar_sin_online, (d, w) -> lanzar(false, true, null))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     /**
@@ -1212,16 +1828,17 @@ public class SetupActivity extends AppCompatActivity {
                 .setTitle(R.string.gamertag_en_uso_titulo)
                 .setMessage(getString(R.string.gamertag_en_uso_pregunta,
                         ComprobacionGamertag.efectivo(gamertag), ip))
-                .setPositiveButton(R.string.jugar_sin_online, (d, w) -> lanzar(false, true))
+                .setPositiveButton(R.string.jugar_sin_online, (d, w) -> lanzar(false, true, null))
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
     private void lanzar(boolean sonda) {
-        lanzar(sonda, false);
+        lanzar(sonda, false, null);
     }
 
-    private void lanzar(boolean sonda, boolean sinOnline) {
+    /** ipServidor: la IP a la que jugar() resolvio el servidor, si se puso por nombre. */
+    private void lanzar(boolean sonda, boolean sinOnline, String ipServidor) {
         if (sonda) {
             Ajustes.informeSonda(this).delete();
         }
@@ -1231,6 +1848,8 @@ public class SetupActivity extends AppCompatActivity {
         List<String> argumentos = ajustes.argumentos(this, sonda);
         if (sinOnline) {
             MotorNativo.quitarRed(argumentos);
+        } else if (ipServidor != null) {
+            argumentos.replaceAll(a -> a.startsWith("--red_dns=") ? "--red_dns=" + ipServidor : a);
         }
         i.putExtra(GameActivity.EXTRA_ARGUMENTOS, argumentos.toArray(new String[0]));
         i.putExtra(GameActivity.EXTRA_EDICION, edicion.id);
