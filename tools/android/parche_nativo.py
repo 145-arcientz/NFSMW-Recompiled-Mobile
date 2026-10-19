@@ -390,10 +390,13 @@ CONTEXTO_NUEVO = '''// PARCHE LOCAL (NFSMW Recompiled): las direcciones del jueg
 //   [6] Attrib: donde esta el valor de un nodo
 //   [7] FEManager::mPauseRequest: cuantas peticiones de pausa hay (menu de pausa, mensajes...)
 //   [8] FEManager::RequestPauseSimulation: mPauseReason[mPauseRequest++] = motivo
+//   [9] NISActivity::JoyHandle: INIS::mInstance (la cinematica en marcha) y HUDACTION_SKIPNIS
+//   [10] NISActivity::SkipOverNIS: el estado de la cinematica
 // La app comprueba esas instrucciones antes de fiarse de los desplazamientos.
-extern "C" const uint32_t g_nfsmw_android_contexto[9] = {0x82A39AD8, 0x82A2CB18, 0x820E5E28,
-                                                         0x8233A000, 0x8290D828, 0x821485E8,
-                                                         0x82145C50, 0x82A2C5CC, 0x82285B80};
+extern "C" const uint32_t g_nfsmw_android_contexto[11] = {0x82A39AD8, 0x82A2CB18, 0x820E5E28,
+                                                          0x8233A000, 0x8290D828, 0x821485E8,
+                                                          0x82145C50, 0x82A2C5CC, 0x82285B80,
+                                                          0x824790B8, 0x82479440};
 
 namespace nfsmw::recortes_carrera {
 namespace {

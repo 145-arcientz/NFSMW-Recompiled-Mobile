@@ -101,6 +101,8 @@
     <string name="res_nativa">Natywna · %1$d×%2$d</string>
     <string name="estirar">Rozciągnij na cały ekran</string>
     <string name="estirar_resumen">Wyłączone: obraz 16:9 z Xbox 360, z czarnymi pasami. Włączone: wypełnia ekran, ale zniekształca obraz.</string>
+    <string name="panoramico">Szeroki ekran (prototyp)</string>
+    <string name="panoramico_resumen">Rysuje grę w proporcjach twojego ekranu: kamera widzi więcej po bokach, bez pasów i bez rozciągania. Więcej pikseli do narysowania. Na razie HUD i menu są rozciągnięte.</string>
     <string name="mostrar_fps">Pokaż FPS</string>
     <string name="mostrar_fps_resumen">Licznik w rogu: klatki na sekundę i milisekundy na klatkę.</string>
 
@@ -214,6 +216,13 @@
     <string name="servidor_eliminado" formatted="true">Usunięto %1$s</string>
     <string name="deshacer">Cofnij</string>
     <string name="servidores_guardados">Zapisane serwery</string>
+    <string name="servidor_buscar">Szukaj w sieci</string>
+    <string name="servidor_buscando">Szukanie…</string>
+    <string name="servidores_encontrados">Znalezione w Twojej sieci</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · %2$d w Xbox Live</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · %2$d w Xbox Live · już zapisany</string>
+    <string name="servidor_encontrado_anadir" formatted="true">Dodaj %1$s</string>
+    <string name="servidor_ninguno_encontrado">Żaden serwer nie odpowiedział. Musi być w tej samej sieci Wi-Fi (lub w hotspocie tego telefonu) i aktualny; w przeciwnym razie dodaj go po IP.</string>
     <string name="seccion_tactil">Sterowanie dotykowe</string>
     <string name="editar_tactil">Edytuj sterowanie dotykowe</string>
     <string name="editar_tactil_resumen">Przesuwaj przyciski dotykowe i zmieniaj ich rozmiar oraz przezroczystość.</string>
@@ -230,7 +239,7 @@
     <string name="giro_flechas">Strzałki</string>
     <string name="giro_inclinar">Przechylanie telefonu</string>
     <string name="menus_tactiles">Menu palcem</string>
-    <string name="menus_tactiles_resumen">W menu i menu pauzy nie ma pada: przesuń palcem, aby się poruszać (na liście opcji w bok zmienia wartość), dotknij opcji, aby ją wybrać, dotknij strzałek, aby zmienić wartość, i dotknij podpowiedzi na dole, jak „Ⓐ Akceptuj” lub „Ⓑ Wstecz”, aby je nacisnąć. Dwoma palcami: wstecz. Przycisk PAD na górze przywraca pad.</string>
+    <string name="menus_tactiles_resumen">W menu i menu pauzy nie ma pada: przesuń palcem, aby się poruszać (na liście opcji w bok zmienia wartość), dotknij opcji, aby ją wybrać, dotknij strzałek, aby zmienić wartość, i dotknij podpowiedzi na dole, jak „Ⓐ Akceptuj” lub „Ⓑ Wstecz”, aby je nacisnąć. Dwoma palcami: wstecz. Przycisk PAD na górze przywraca pad. Przerywniki filmowe pomijasz dotknięciem.</string>
     <string name="deslizar_invertido">Odwrócone przesuwanie w menu</string>
     <string name="deslizar_invertido_resumen">Wyłączone: jak przy przewracaniu stron, przesunięcie w lewo przechodzi do opcji po prawej. Włączone: przesunięcie w prawo przechodzi do tej po prawej.</string>
     <string name="sensibilidad_giro">Czułość skrętu</string>

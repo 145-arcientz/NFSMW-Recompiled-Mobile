@@ -101,6 +101,8 @@
     <string name="res_nativa">Nativ · %1$d×%2$d</string>
     <string name="estirar">Auf Vollbild strecken</string>
     <string name="estirar_resumen">Aus: das 16:9-Bild der Xbox 360 mit schwarzen Balken. An: füllt den Bildschirm, verzerrt aber das Bild.</string>
+    <string name="panoramico">Breitbild (Prototyp)</string>
+    <string name="panoramico_resumen">Zeichnet das Spiel im Seitenverhältnis deines Bildschirms: Die Kamera sieht seitlich mehr, ohne Balken und ohne Verzerrung. Mehr Pixel zu zeichnen. Vorerst werden HUD und Menüs gestreckt.</string>
     <string name="mostrar_fps">FPS anzeigen</string>
     <string name="mostrar_fps_resumen">Zähler in der Ecke: Bilder pro Sekunde und Millisekunden pro Bild.</string>
 
@@ -214,6 +216,13 @@
     <string name="servidor_eliminado" formatted="true">%1$s entfernt</string>
     <string name="deshacer">Rückgängig</string>
     <string name="servidores_guardados">Gespeicherte Server</string>
+    <string name="servidor_buscar">Im Netzwerk suchen</string>
+    <string name="servidor_buscando">Suche…</string>
+    <string name="servidores_encontrados">In deinem Netzwerk gefunden</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · %2$d in Xbox Live</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · %2$d in Xbox Live · bereits gespeichert</string>
+    <string name="servidor_encontrado_anadir" formatted="true">%1$s hinzufügen</string>
+    <string name="servidor_ninguno_encontrado">Kein Server hat geantwortet. Er muss im selben WLAN (oder im Hotspot dieses Handys) und aktuell sein; sonst füge ihn über seine IP hinzu.</string>
     <string name="seccion_tactil">Touch-Steuerung</string>
     <string name="editar_tactil">Touch-Steuerung bearbeiten</string>
     <string name="editar_tactil_resumen">Verschiebe die Touch-Tasten und ändere ihre Größe und Deckkraft.</string>
@@ -230,7 +239,7 @@
     <string name="giro_flechas">Pfeile</string>
     <string name="giro_inclinar">Handy neigen</string>
     <string name="menus_tactiles">Menüs per Finger</string>
-    <string name="menus_tactiles_resumen">In Menüs und im Pausenmenü gibt es kein Pad: Wische, um dich zu bewegen (in einer Optionsliste ändert seitliches Wischen den Wert), tippe auf eine Option, um sie zu wählen, tippe auf die Pfeile, um ihren Wert zu ändern, und tippe auf die Hinweise unten wie „Ⓐ Bestätigen“ oder „Ⓑ Zurück“, um sie zu drücken. Mit zwei Fingern zurück. Die Taste PAD oben bringt das Pad zurück.</string>
+    <string name="menus_tactiles_resumen">In Menüs und im Pausenmenü gibt es kein Pad: Wische, um dich zu bewegen (in einer Optionsliste ändert seitliches Wischen den Wert), tippe auf eine Option, um sie zu wählen, tippe auf die Pfeile, um ihren Wert zu ändern, und tippe auf die Hinweise unten wie „Ⓐ Bestätigen“ oder „Ⓑ Zurück“, um sie zu drücken. Mit zwei Fingern zurück. Die Taste PAD oben bringt das Pad zurück. Zwischensequenzen überspringst du mit einem Tippen.</string>
     <string name="deslizar_invertido">Wischen in Menüs umkehren</string>
     <string name="deslizar_invertido_resumen">Aus: wie beim Umblättern führt Wischen nach links zur Option rechts. An: Wischen nach rechts führt zur rechten.</string>
     <string name="sensibilidad_giro">Lenkempfindlichkeit</string>

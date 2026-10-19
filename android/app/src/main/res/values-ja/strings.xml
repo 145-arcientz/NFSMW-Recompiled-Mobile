@@ -101,6 +101,8 @@
     <string name="res_nativa">ネイティブ · %1$d×%2$d</string>
     <string name="estirar">全画面に引き伸ばす</string>
     <string name="estirar_resumen">オフ：黒帯付きの Xbox 360 の 16:9 映像。オン：画面いっぱいに表示しますが、映像がゆがみます。</string>
+    <string name="panoramico">ワイド画面（試作）</string>
+    <string name="panoramico_resumen">画面の縦横比でゲームを描画します。黒帯や引き伸ばしなしで、カメラが左右をより広く映します。描画するピクセルが増えます。現時点では HUD とメニューは引き伸ばされます。</string>
     <string name="mostrar_fps">FPS を表示</string>
     <string name="mostrar_fps_resumen">隅のカウンター：1 秒あたりのフレーム数と 1 フレームあたりのミリ秒。</string>
 
@@ -214,6 +216,13 @@
     <string name="servidor_eliminado" formatted="true">%1$s を削除しました</string>
     <string name="deshacer">元に戻す</string>
     <string name="servidores_guardados">保存したサーバー</string>
+    <string name="servidor_buscar">ネットワークを検索</string>
+    <string name="servidor_buscando">検索中…</string>
+    <string name="servidores_encontrados">ネットワーク上で見つかったサーバー</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · Xbox Live に %2$d 人</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · Xbox Live に %2$d 人 · 保存済み</string>
+    <string name="servidor_encontrado_anadir" formatted="true">%1$s を追加</string>
+    <string name="servidor_ninguno_encontrado">応答したサーバーはありません。同じ Wi-Fi（またはこのスマホのテザリング）にあり、最新版である必要があります。見つからない場合は IP で追加してください。</string>
     <string name="seccion_tactil">タッチ操作</string>
     <string name="editar_tactil">タッチ操作を編集</string>
     <string name="editar_tactil_resumen">タッチボタンを移動し、サイズと不透明度を変更します。</string>
@@ -230,7 +239,7 @@
     <string name="giro_flechas">矢印</string>
     <string name="giro_inclinar">スマートフォンを傾ける</string>
     <string name="menus_tactiles">指でメニュー操作</string>
-    <string name="menus_tactiles_resumen">メニューとポーズメニューではパッドは表示されません。スワイプで移動し（オプションの一覧では横方向で値が変わります）、項目をタップして選択、矢印をタップして値を変更し、下部の「Ⓐ 決定」や「Ⓑ 戻る」などの表示をタップすると押せます。2 本指で戻ります。上部のパッドボタンでパッドを戻せます。</string>
+    <string name="menus_tactiles_resumen">メニューとポーズメニューではパッドは表示されません。スワイプで移動し（オプションの一覧では横方向で値が変わります）、項目をタップして選択、矢印をタップして値を変更し、下部の「Ⓐ 決定」や「Ⓑ 戻る」などの表示をタップすると押せます。2 本指で戻ります。上部のパッドボタンでパッドを戻せます。 カットシーンはタップでスキップできます。</string>
     <string name="deslizar_invertido">メニューのスワイプ方向を反転</string>
     <string name="deslizar_invertido_resumen">オフ：ページをめくるように、左へスワイプすると右の項目へ移動します。オン：右へスワイプすると右の項目へ移動します。</string>
     <string name="sensibilidad_giro">ハンドル感度</string>

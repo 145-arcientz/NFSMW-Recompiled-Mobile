@@ -8,7 +8,7 @@ preparadas (USA, Japon, las PAL alemana, francesa, italiana e inglesa...).
     python tools/android/apk_ediciones.py --registro         # con el log del juego
 
 Antes, cada edicion preparada con tools/android/preparar_nativo.py (la PAL
-Espana primero). Sale out/apk/nfsmw-ediciones-<version>-release.apk (la versionName
+Espana primero). Sale out/apk/nfsmw-all-<version>-release.apk (la versionName
 de android/app/build.gradle.kts). Como todo APK
 con el juego dentro, NO SE PUBLICA.
 
@@ -127,11 +127,11 @@ def carpeta_nativa(app_nativa):
 
 
 def salida():
-    """out/apk/nfsmw-ediciones-<versionName>-release.apk, como los de una edicion
+    """out/apk/nfsmw-all-<versionName>-release.apk, como los de una edicion
     (nfsmw-pal_es-0.4.1-release.apk)."""
     texto = (APP / "build.gradle.kts").read_text(encoding="utf-8")
     version = re.search(r'versionName\s*=\s*"([^"]+)"', texto).group(1)
-    return RAIZ / "out" / "apk" / f"nfsmw-ediciones-{version}-release.apk"
+    return RAIZ / "out" / "apk" / f"nfsmw-all-{version}-release.apk"
 
 
 def ndk():

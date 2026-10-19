@@ -101,6 +101,8 @@
     <string name="res_nativa">原生 · %1$d×%2$d</string>
     <string name="estirar">延展至全螢幕</string>
     <string name="estirar_resumen">關閉：Xbox 360 的 16:9 畫面，帶黑邊。開啟：填滿螢幕，但畫面會變形。</string>
+    <string name="panoramico">寬螢幕（原型）</string>
+    <string name="panoramico_resumen">以螢幕的比例繪製遊戲：鏡頭能看到更多兩側畫面，沒有黑邊也不變形。需要繪製的像素較多。目前 HUD 與選單會被拉伸。</string>
     <string name="mostrar_fps">顯示 FPS</string>
     <string name="mostrar_fps_resumen">角落計數器：每秒影格數與每個影格的毫秒數。</string>
 
@@ -214,6 +216,13 @@
     <string name="servidor_eliminado" formatted="true">已移除 %1$s</string>
     <string name="deshacer">復原</string>
     <string name="servidores_guardados">已儲存的伺服器</string>
+    <string name="servidor_buscar">搜尋網路</string>
+    <string name="servidor_buscando">搜尋中…</string>
+    <string name="servidores_encontrados">在你的網路上找到</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · Xbox Live 上 %2$d 人</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · Xbox Live 上 %2$d 人 · 已儲存</string>
+    <string name="servidor_encontrado_anadir" formatted="true">新增 %1$s</string>
+    <string name="servidor_ninguno_encontrado">沒有伺服器回應。伺服器必須在同一個 Wi-Fi（或這支手機的熱點）上並且是最新版本；否則請用 IP 新增。</string>
     <string name="seccion_tactil">觸控操作</string>
     <string name="editar_tactil">編輯觸控操作</string>
     <string name="editar_tactil_resumen">移動觸控按鈕，並調整大小與不透明度。</string>
@@ -230,7 +239,7 @@
     <string name="giro_flechas">箭頭</string>
     <string name="giro_inclinar">傾斜手機</string>
     <string name="menus_tactiles">用手指操作選單</string>
-    <string name="menus_tactiles_resumen">在選單和暫停選單中沒有手把：滑動來移動（在選項清單中，橫向滑動會改變數值），點選選項來選擇，點選箭頭來改變數值，點選下方的提示（例如「Ⓐ 確認」或「Ⓑ 返回」）即可按下。兩指點按：返回。上方的手把按鈕會讓手把回來。</string>
+    <string name="menus_tactiles_resumen">在選單和暫停選單中沒有手把：滑動來移動（在選項清單中，橫向滑動會改變數值），點選選項來選擇，點選箭頭來改變數值，點選下方的提示（例如「Ⓐ 確認」或「Ⓑ 返回」）即可按下。兩指點按：返回。上方的手把按鈕會讓手把回來。過場動畫點一下即可跳過。</string>
     <string name="deslizar_invertido">反轉選單中的滑動方向</string>
     <string name="deslizar_invertido_resumen">關閉：像翻頁一樣，向左滑會到右邊的選項。開啟：向右滑會到右邊的選項。</string>
     <string name="sensibilidad_giro">轉向靈敏度</string>

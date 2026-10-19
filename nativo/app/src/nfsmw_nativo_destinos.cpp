@@ -1474,7 +1474,18 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
             uint32_t(DesplazamientoMosaico2D(int32_t(base_x), int32_t(base_y), pitch_destino, 2));
         dx = uint32_t(x0) - base_x;
         dy = uint32_t(y0) - base_y;
-        resuelta = ObtenerResuelta(base & 0x1FFFFFFF, pitch_destino, alto_destino, formato_destino,
+        // The copy register only carries the pitch, a multiple of 32 texels: a texture 600 wide has a pitch of
+        // 608. The console samples its 600 columns with UVs 0..1; an image as wide as the pitch was sampled
+        // squeezed by 600/608. With nfsmw_proporcion_pantalla (2400x1080) that moved the glow (600x270), the
+        // half-size reflection (1200x540) and the 1/8 texture (300x135) a little to the left: a dark ghost of
+        // every object against the sky. At 1280 and 1920 those widths are already multiples of 32. When the
+        // copy starts at column 0 and its width rounded up to 32 is the pitch, the image takes the copy's width.
+        const uint32_t ancho_copia = uint32_t(x1 - x0);
+        const uint32_t ancho_imagen =
+            x0 == 0 && ancho_copia < pitch_destino && ((ancho_copia + 31) & ~uint32_t(31)) == pitch_destino
+                ? ancho_copia
+                : pitch_destino;
+        resuelta = ObtenerResuelta(base & 0x1FFFFFFF, ancho_imagen, alto_destino, formato_destino,
                                    (info_destino >> 24) & 0x1);
         base_resuelta = base & 0x1FFFFFFF;
         if (resuelta) {
@@ -2151,8 +2162,11 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     auto entrada_llamada = antes_refresco;
     auto salida_llamada = antes_refresco;
     bool llamada = false;
+    // The display proportion: 16:9, or the front buffer's own when it is wider (nfsmw_proporcion_pantalla).
+    const bool mas_ancha = uint64_t(w) * 9 > uint64_t(h) * 16 + h;
     presentador->RefreshGuestOutput(
-        w, h, 1280, 720, [&](rex::ui::Presenter::GuestOutputRefreshContext& base_contexto) {
+        w, h, mas_ancha ? w : 1280, mas_ancha ? h : 720,
+        [&](rex::ui::Presenter::GuestOutputRefreshContext& base_contexto) {
           entrada_llamada = std::chrono::steady_clock::now();
           llamada = true;
           auto& contexto =

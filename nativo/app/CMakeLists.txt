@@ -19,6 +19,8 @@ set(NFSMW_SOURCES
     # The scene is drawn a single time: without the Xbox 360's 3-strip tiling or MSAA
     # (cvar nfsmw_render_sin_mosaico, on by default on Switch).
     src/nfsmw_render_targets.cpp
+    # Wider than 16:9 (cvar nfsmw_proporcion_pantalla): the camera sees more at the sides (Hor+).
+    src/nfsmw_panoramico.cpp
     # Race-time reductions: road reflection and faces of the car's cubemap
     # (cvars nfsmw_reflejo_carretera and nfsmw_cubemap_caras_max).
     src/nfsmw_recortes_carrera.cpp

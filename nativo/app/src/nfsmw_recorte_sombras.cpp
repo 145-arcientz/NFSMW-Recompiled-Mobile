@@ -569,10 +569,17 @@ void Aplicar(uint8_t* base, uint32_t vista) {
  * sub_82441100 calls it once per active view per frame, before drawing anything. Hooking here is the
  * only way to guarantee our value is the last one written.
  */
+namespace nfsmw::panoramico {
+void EntrarUpdate(uint32_t bloque);  // nfsmw_panoramico.cpp: the view block for the Hor+ camera
+void SalirUpdate();
+}  // namespace nfsmw::panoramico
+
 REX_EXTERN(__imp__sub_8243EC28);
 REX_HOOK_RAW(sub_8243EC28) {
   const uint32_t vista = ctx.r4.u32;  // r4 may be clobbered inside: save it first
+  nfsmw::panoramico::EntrarUpdate(ctx.r3.u32);
   __imp__sub_8243EC28(ctx, base);
+  nfsmw::panoramico::SalirUpdate();
   nfsmw::escena_detalle::Aplicar(base, vista);
 }
 

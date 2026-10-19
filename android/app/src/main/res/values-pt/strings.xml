@@ -96,6 +96,8 @@
     <string name="res_nativa">Nativa · %1$d×%2$d</string>
     <string name="estirar">Esticar para a tela inteira</string>
     <string name="estirar_resumen">Desligado: a imagem 16:9 do Xbox 360, com barras pretas. Ligado: preenche a tela, mas distorce a imagem.</string>
+    <string name="panoramico">Tela ampla (protótipo)</string>
+    <string name="panoramico_resumen">Desenha o jogo na proporção da sua tela: a câmera vê mais pelos lados, sem barras nem distorção. São mais pixels para desenhar. Por enquanto o HUD e os menus ficam esticados.</string>
     <string name="mostrar_fps">Mostrar FPS</string>
     <string name="mostrar_fps_resumen">Contador no canto: quadros por segundo e milissegundos por quadro.</string>
 
@@ -209,6 +211,13 @@
     <string name="servidor_eliminado" formatted="true">%1$s removido</string>
     <string name="deshacer">Desfazer</string>
     <string name="servidores_guardados">Servidores salvos</string>
+    <string name="servidor_buscar">Procurar na rede</string>
+    <string name="servidor_buscando">Procurando…</string>
+    <string name="servidores_encontrados">Encontrados na sua rede</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · %2$d no Xbox Live</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · %2$d no Xbox Live · já salvo</string>
+    <string name="servidor_encontrado_anadir" formatted="true">Adicionar %1$s</string>
+    <string name="servidor_ninguno_encontrado">Nenhum servidor respondeu. Ele precisa estar no mesmo Wi-Fi (ou no ponto de acesso deste celular) e atualizado; senão, adicione-o pelo IP.</string>
     <string name="seccion_tactil">Controles de toque</string>
     <string name="editar_tactil">Editar controles de toque</string>
     <string name="editar_tactil_resumen">Mova os botões de toque e mude o tamanho e a opacidade.</string>
@@ -225,7 +234,7 @@
     <string name="giro_flechas">Setas</string>
     <string name="giro_inclinar">Inclinando o celular</string>
     <string name="menus_tactiles">Menus com o dedo</string>
-    <string name="menus_tactiles_resumen">Nos menus e na pausa não há controle: deslize para se mover (numa lista de opções, para os lados muda o valor), toque numa opção para escolhê-la, toque nas setas para mudar o valor e toque nas indicações de baixo, como “Ⓐ Aceitar” ou “Ⓑ Voltar”, para apertá-las. Dois dedos, voltar. O botão CONTROLE de cima traz o controle de volta.</string>
+    <string name="menus_tactiles_resumen">Nos menus e na pausa não há controle: deslize para se mover (numa lista de opções, para os lados muda o valor), toque numa opção para escolhê-la, toque nas setas para mudar o valor e toque nas indicações de baixo, como “Ⓐ Aceitar” ou “Ⓑ Voltar”, para apertá-las. Dois dedos, voltar. O botão CONTROLE de cima traz o controle de volta. Nas cinemáticas, um toque as pula.</string>
     <string name="deslizar_invertido">Deslizar ao contrário nos menus</string>
     <string name="deslizar_invertido_resumen">Desligado: como ao virar páginas, deslizar para a esquerda vai para a opção da direita. Ligado: deslizar para a direita vai para a da direita.</string>
     <string name="sensibilidad_giro">Sensibilidade do volante</string>

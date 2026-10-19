@@ -101,6 +101,8 @@
     <string name="res_nativa">네이티브 · %1$d×%2$d</string>
     <string name="estirar">전체 화면으로 늘이기</string>
     <string name="estirar_resumen">끔: 검은 띠가 있는 Xbox 360의 16:9 화면. 켬: 화면을 꽉 채우지만 이미지가 왜곡됩니다.</string>
+    <string name="panoramico">와이드 화면 (프로토타입)</string>
+    <string name="panoramico_resumen">화면 비율에 맞춰 게임을 그립니다. 검은 띠나 늘어남 없이 카메라가 양옆을 더 넓게 봅니다. 그릴 픽셀이 늘어납니다. 지금은 HUD와 메뉴가 늘어납니다.</string>
     <string name="mostrar_fps">FPS 표시</string>
     <string name="mostrar_fps_resumen">모서리 카운터: 초당 프레임 수와 프레임당 밀리초.</string>
 
@@ -214,6 +216,13 @@
     <string name="servidor_eliminado" formatted="true">%1$s 삭제됨</string>
     <string name="deshacer">실행 취소</string>
     <string name="servidores_guardados">저장된 서버</string>
+    <string name="servidor_buscar">네트워크 검색</string>
+    <string name="servidor_buscando">검색 중…</string>
+    <string name="servidores_encontrados">네트워크에서 찾은 서버</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · Xbox Live에 %2$d명</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · Xbox Live에 %2$d명 · 이미 저장됨</string>
+    <string name="servidor_encontrado_anadir" formatted="true">%1$s 추가</string>
+    <string name="servidor_ninguno_encontrado">응답한 서버가 없습니다. 같은 Wi-Fi(또는 이 휴대폰의 핫스팟)에 있고 최신 버전이어야 합니다. 아니면 IP로 추가하세요.</string>
     <string name="seccion_tactil">터치 조작</string>
     <string name="editar_tactil">터치 조작 편집</string>
     <string name="editar_tactil_resumen">터치 버튼을 옮기고 크기와 불투명도를 바꿉니다.</string>
@@ -230,7 +239,7 @@
     <string name="giro_flechas">화살표</string>
     <string name="giro_inclinar">휴대폰 기울이기</string>
     <string name="menus_tactiles">손가락으로 메뉴 조작</string>
-    <string name="menus_tactiles_resumen">메뉴와 일시 정지 메뉴에서는 패드가 없습니다. 스와이프로 이동하고(옵션 목록에서는 옆으로 밀면 값이 바뀝니다), 항목을 탭해 선택하고, 화살표를 탭해 값을 바꾸고, 아래쪽의 “Ⓐ 확인”이나 “Ⓑ 뒤로” 같은 안내를 탭하면 누를 수 있습니다. 두 손가락은 뒤로. 위쪽의 패드 버튼으로 패드를 다시 불러옵니다.</string>
+    <string name="menus_tactiles_resumen">메뉴와 일시 정지 메뉴에서는 패드가 없습니다. 스와이프로 이동하고(옵션 목록에서는 옆으로 밀면 값이 바뀝니다), 항목을 탭해 선택하고, 화살표를 탭해 값을 바꾸고, 아래쪽의 “Ⓐ 확인”이나 “Ⓑ 뒤로” 같은 안내를 탭하면 누를 수 있습니다. 두 손가락은 뒤로. 위쪽의 패드 버튼으로 패드를 다시 불러옵니다. 컷신은 탭하면 건너뜁니다.</string>
     <string name="deslizar_invertido">메뉴 스와이프 방향 반전</string>
     <string name="deslizar_invertido_resumen">끔: 책장을 넘기듯 왼쪽으로 밀면 오른쪽 항목으로 갑니다. 켬: 오른쪽으로 밀면 오른쪽 항목으로 갑니다.</string>
     <string name="sensibilidad_giro">조향 감도</string>

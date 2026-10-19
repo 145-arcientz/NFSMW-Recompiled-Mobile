@@ -12,6 +12,8 @@ final class TouchControllerBridge {
     static final int CONTEXTO_ACELERACION = 2;
     // En el mundo, con el juego en pausa (su menu, un mensaje...).
     static final int CONTEXTO_PAUSA = 3;
+    // En el mundo, con una cinematica del motor en marcha (la presentacion de la carrera...).
+    static final int CONTEXTO_CINEMATICA = 4;
 
     /**
      * Lo que devuelven menuTocar() y menuRumbo() (nativo_android.cpp, seccion 10):

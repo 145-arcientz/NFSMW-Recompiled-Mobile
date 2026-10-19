@@ -143,6 +143,15 @@ public class SetupActivity extends AppCompatActivity {
     private LinearLayout bloqueServidores;
     private LinearLayout listaServidores;
     private MaterialButton botonAnadir;
+    private MaterialButton botonBuscar;
+    private View filaBotonesServidores;
+    // La busqueda de servidores en la red (BuscadorServidores): lo que contesto
+    // la ultima (null = no se ha buscado o ya se eligio uno), si este movil no
+    // estaba en ninguna red y si hay una en marcha.
+    private LinearLayout listaEncontrados;
+    private List<BuscadorServidores.Encontrado> encontrados;
+    private boolean busquedaSinRed;
+    private boolean buscando;
     // El formulario de anadir o editar un servidor (abrirEditor), metido en la
     // lista; null = cerrado. direccionEditada: la del servidor que se edita, "" = uno nuevo.
     private View editorServidor;
@@ -221,6 +230,7 @@ public class SetupActivity extends AppCompatActivity {
         i.putExtra(GameActivity.EXTRA_EDICION, edicion.id);
         i.putExtra(GameActivity.EXTRA_RESOLUCION, resolucion);
         i.putExtra(GameActivity.EXTRA_ESTIRAR, ajustes.estirar());
+        i.putExtra(GameActivity.EXTRA_PANORAMICO, ajustes.panoramicoEfectivo());
         i.putExtra(GameActivity.EXTRA_MOSTRAR_FPS, true);
         startActivity(i);
     }
@@ -521,10 +531,34 @@ public class SetupActivity extends AppCompatActivity {
     }
 
     private View tarjetaPantalla() {
+        // Estirar y pantalla ancha se excluyen: las dos llenan la pantalla, una
+        // deformando y la otra no. Encender una apaga la otra. Si venian las dos
+        // encendidas (antes de esto), se queda la pantalla ancha.
+        boolean conPanoramico = MotorNativo.ACTIVO;
+        if (conPanoramico && ajustes.estirar() && ajustes.panoramico()) {
+            ajustes.estirar(false);
+        }
+        MaterialSwitch[] interruptores = new MaterialSwitch[2];
+        View estirar = interruptor(R.string.estirar, R.string.estirar_resumen, ajustes.estirar(), v -> {
+            ajustes.estirar(v);
+            if (v && conPanoramico && interruptores[1] != null) {
+                interruptores[1].setChecked(false);
+            }
+        });
+        View panoramico = interruptor(R.string.panoramico, R.string.panoramico_resumen, ajustes.panoramico(),
+                v -> {
+                    ajustes.panoramico(v);
+                    if (v && interruptores[0] != null) {
+                        interruptores[0].setChecked(false);
+                    }
+                });
+        interruptores[0] = (MaterialSwitch) ((ViewGroup) estirar).getChildAt(0);
+        interruptores[1] = (MaterialSwitch) ((ViewGroup) panoramico).getChildAt(0);
         return tarjeta(
             seccion(R.string.seccion_pantalla),
             selectorResolucion(),
-            interruptor(R.string.estirar, R.string.estirar_resumen, ajustes.estirar(), ajustes::estirar),
+            estirar,
+            soloNativo(panoramico),
             interruptor(R.string.mostrar_fps, R.string.mostrar_fps_resumen, ajustes.mostrarFps(), ajustes::mostrarFps)
         );
     }
@@ -629,14 +663,33 @@ public class SetupActivity extends AppCompatActivity {
         estilarBotonSecundario(botonAnadir);
         botonAnadir.setIconTint(ColorStateList.valueOf(Color.WHITE));
         botonAnadir.setOnClickListener(v -> abrirEditor(null));
+        // Buscar: los que contestan salen debajo de los guardados, y tocar uno lo
+        // guarda y lo elige.
+        botonBuscar = new MaterialButton(this);
+        botonBuscar.setText(R.string.servidor_buscar);
+        botonBuscar.setIconResource(R.drawable.ic_buscar);
+        estilarBotonSecundario(botonBuscar);
+        botonBuscar.setIconTint(ColorStateList.valueOf(Color.WHITE));
+        botonBuscar.setOnClickListener(v -> buscarServidores());
+        listaEncontrados = new LinearLayout(this);
+        listaEncontrados.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout botones = new LinearLayout(this);
+        botones.setOrientation(LinearLayout.HORIZONTAL);
+        botones.addView(botonBuscar);
         LinearLayout.LayoutParams lpAnadir = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lpAnadir.topMargin = dp(10);
+        lpAnadir.leftMargin = dp(8);
+        botones.addView(botonAnadir, lpAnadir);
+        filaBotonesServidores = botones;
+        LinearLayout.LayoutParams lpBotones = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lpBotones.topMargin = dp(10);
         bloqueServidores = new LinearLayout(this);
         bloqueServidores.setOrientation(LinearLayout.VERTICAL);
         bloqueServidores.addView(titulo(R.string.servidores_guardados));
         bloqueServidores.addView(listaServidores);
-        bloqueServidores.addView(botonAnadir, lpAnadir);
+        bloqueServidores.addView(listaEncontrados);
+        bloqueServidores.addView(botones, lpBotones);
         pintarServidores();
 
         getSharedPreferences(Ajustes.PREFS, MODE_PRIVATE)
@@ -891,7 +944,121 @@ public class SetupActivity extends AppCompatActivity {
         if (editorServidor != null && editorServidor.getParent() == null) {
             listaServidores.addView(editorServidor);
         }
-        botonAnadir.setVisibility(editorServidor == null ? View.VISIBLE : View.GONE);
+        filaBotonesServidores.setVisibility(editorServidor == null ? View.VISIBLE : View.GONE);
+        // "Ya guardado" depende de la lista.
+        pintarEncontrados();
+    }
+
+    /** Busca servidores en la red (BuscadorServidores, ~1,5 s) y los pone bajo los guardados. */
+    private void buscarServidores() {
+        if (buscando) {
+            return;
+        }
+        buscando = true;
+        pintarEncontrados();
+        new Thread(() -> {
+            List<BuscadorServidores.Encontrado> r = BuscadorServidores.buscar();
+            hiloPrincipal.post(() -> {
+                if (isDestroyed()) {
+                    return;
+                }
+                buscando = false;
+                busquedaSinRed = r == null;
+                encontrados = r == null ? new ArrayList<>() : r;
+                pintarEncontrados();
+            });
+        }, "buscar-servidores").start();
+    }
+
+    /** Lo que encontro la ultima busqueda, o por que no hay nada. */
+    private void pintarEncontrados() {
+        if (listaEncontrados == null) {
+            return;
+        }
+        botonBuscar.setEnabled(!buscando);
+        botonBuscar.setText(buscando ? R.string.servidor_buscando : R.string.servidor_buscar);
+        listaEncontrados.removeAllViews();
+        if (encontrados == null) {
+            listaEncontrados.setVisibility(View.GONE);
+            return;
+        }
+        listaEncontrados.setVisibility(View.VISIBLE);
+        listaEncontrados.addView(titulo(R.string.servidores_encontrados));
+        if (encontrados.isEmpty()) {
+            TextView nada = resumen(busquedaSinRed ? R.string.servidor_anfitrion_sin_red
+                    : R.string.servidor_ninguno_encontrado);
+            nada.setPadding(0, dp(4), 0, 0);
+            listaEncontrados.addView(nada);
+            return;
+        }
+        List<Ajustes.Servidor> guardados = ajustes.servidores();
+        for (BuscadorServidores.Encontrado e : encontrados) {
+            listaEncontrados.addView(filaEncontrado(e, Ajustes.indiceServidor(guardados, e.ip) >= 0));
+        }
+    }
+
+    /** Un servidor que contesto a la busqueda; tocarlo lo guarda (si no lo estaba) y lo elige. */
+    private View filaEncontrado(BuscadorServidores.Encontrado e, boolean guardado) {
+        LinearLayout fila = new LinearLayout(this);
+        fila.setOrientation(LinearLayout.HORIZONTAL);
+        fila.setGravity(Gravity.CENTER_VERTICAL);
+        fila.setMinimumHeight(dp(56));
+        fila.setPadding(dp(12), dp(4), dp(4), dp(4));
+        fila.setBackground(fondoFila(0xFF262626, 0));
+
+        ImageView icono = new ImageView(this);
+        icono.setImageResource(R.drawable.ic_servidor);
+        icono.setImageTintList(ColorStateList.valueOf(ACENTO_CLARO));
+        icono.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        LinearLayout.LayoutParams lpIcono = new LinearLayout.LayoutParams(dp(24), dp(24));
+        lpIcono.rightMargin = dp(12);
+        fila.addView(icono, lpIcono);
+
+        String etiqueta = e.nombre.isEmpty() ? e.ip : e.nombre;
+        LinearLayout textos = new LinearLayout(this);
+        textos.setOrientation(LinearLayout.VERTICAL);
+        TextView principal = new TextView(this);
+        principal.setText(etiqueta);
+        principal.setTextColor(Color.WHITE);
+        principal.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        textos.addView(principal);
+        TextView segundo = resumen(0);
+        segundo.setText(getString(guardado ? R.string.servidor_encontrado_guardado
+                : R.string.servidor_encontrado_detalle, e.ip, e.jugadores));
+        textos.addView(segundo);
+        fila.addView(textos, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        if (!guardado) {
+            fila.addView(botonIcono(R.drawable.ic_anadir, getString(R.string.servidor_encontrado_anadir, etiqueta),
+                    v -> usarEncontrado(e)));
+        }
+        fila.setOnClickListener(v -> usarEncontrado(e));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(6);
+        fila.setLayoutParams(lp);
+        return fila;
+    }
+
+    private void usarEncontrado(BuscadorServidores.Encontrado e) {
+        cerrarEditor();
+        List<Ajustes.Servidor> l = ajustes.servidores();
+        boolean nuevo = Ajustes.indiceServidor(l, e.ip) < 0;
+        if (nuevo) {
+            // El nombre, con el limite del formulario.
+            String n = e.nombre.length() > 24 ? e.nombre.substring(0, 24) : e.nombre;
+            l.add(new Ajustes.Servidor(n, e.ip));
+            ajustes.servidores(l);
+        }
+        // Ya esta en la lista de arriba, elegido: la busqueda ha cumplido.
+        encontrados = null;
+        elegirServidor(e.ip);
+        pintarServidores();
+        if (nuevo) {
+            Snackbar.make(listaServidores, getString(R.string.servidor_guardado,
+                    e.nombre.isEmpty() ? e.ip : e.nombre), Snackbar.LENGTH_SHORT).show();
+        }
     }
 
     /** Una fila de la lista; s null = "Sin servidor", que no se edita ni se quita. */
@@ -1857,6 +2024,7 @@ public class SetupActivity extends AppCompatActivity {
             i.putExtra(GameActivity.EXTRA_ISO, ajustes.iso());
             i.putExtra(GameActivity.EXTRA_RESOLUCION, ajustes.resolucion());
             i.putExtra(GameActivity.EXTRA_ESTIRAR, ajustes.estirar());
+            i.putExtra(GameActivity.EXTRA_PANORAMICO, ajustes.panoramicoEfectivo());
             i.putExtra(GameActivity.EXTRA_MOSTRAR_FPS, ajustes.mostrarFps());
         }
         startActivity(i);

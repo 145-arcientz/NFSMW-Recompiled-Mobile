@@ -10,6 +10,34 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Añadido
 
+- **Buscar servidores en la red** (0.5.2): botón **"Buscar en la red"** en Multijugador. La app
+  pregunta por UDP 10902 (`NFSMW_DISCOVER`) por broadcast, tres veces, y a cada IP de la /24 de
+  la Wi-Fi o del punto de acceso (hay routers que se comen los broadcast), y escucha 1,5 s
+  (`BuscadorServidores.java`). Contestan el servidor del PC (nfsmw-server-lan, con su nombre de
+  equipo o `--name`) y un móvil anfitrión (con su gamertag), con cuántos hay en Xbox Live.
+  Tocar uno lo guarda y lo elige. En Android, mandar a una IP sin nadie bloquea el socket
+  mientras espera al ARP: los envíos van en hilos aparte, con un búfer de 1 MB, para no pasarse
+  del plazo sin leer las respuestas (la primera versión no encontraba el servidor de Python).
+  El anfitrión coge un `MulticastLock` para recibir los broadcast. El servidor del PC necesita
+  la versión nueva y, en Windows, permitir UDP en el cortafuegos.
+- **Lista de servidores guardados** (0.5.2): la tarjeta Multijugador guarda varios servidores
+  con un nombre opcional ("Casa", "PC de Juan"), y se elige uno o "Sin servidor". Vale una IP o
+  un nombre de equipo (`mi-pc`), que se resuelve al jugar. Editar, eliminar con deshacer; la IP
+  de la versión anterior pasa a la lista.
+- **Saltar las cinemáticas con un toque** (0.5.2, menús con el dedo): en la presentación de
+  cada carrera y en las escenas de la historia no hay mando en pantalla y un toque pulsa A, que
+  es lo que las salta en el 360 (`HUDACTION_SKIPNIS` en el mapa "hud" del mando, leído de
+  `attributes.bin`). El contexto nuevo (`CONTEXTO_CINEMATICA`) sale de `INIS::mInstance` y su
+  `mState` (5 = en marcha); la dirección de `INIS::mInstance` va en .bss y no está en las tablas
+  de las ediciones, así que se saca de las instrucciones de `NISActivity::JoyHandle`, como la de
+  las pausas. Comprobado en las seis ediciones (en la japonesa se mueve); sin probar jugando.
+- **Girar con flechas** (0.5.2): el ajuste "Girar en carrera" elige entre el stick izquierdo,
+  dos flechas (las de carril de las de aceleración, que giran del todo, poco a poco al pisarlas
+  para que el coche no derrape de morro) o inclinar el móvil.
+- **Pantalla ancha (prototipo)** (0.5.2, motor nativo, apagado por defecto): el juego dibuja a
+  la proporción de la pantalla (1600x720 en un 20:9) y la cámara ve más por los lados (Hor+, en
+  `sub_8243EB70`, `nfsmw_panoramico.cpp`), sin barras ni deformar. El HUD, los menús y los
+  vídeos, de momento, se estiran. Solo visto en los menús del RedMagic.
 - **Un móvil puede ser el servidor de la partida** (motor nativo, 0.5.1): ajuste nuevo
   **"Anfitrión en este móvil"** en la tarjeta "Servidor LAN". Ese móvil corre el servidor de
   salas de EA y juega a la vez; los demás ponen su IP, que la pantalla de inicio enseña. Va
@@ -392,6 +420,12 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Cambiado
 
+- El launcher va por secciones con iconos (0.5.2): Multijugador, Controles y Otras opciones.
+- Los controles táctiles de fábrica en carrera (0.5.2): pedales al doble de tamaño; los
+  botones con iconos (B el nitro, A el freno de mano, X el Speedbreaker) y sin Y, porque mirar
+  atrás ya es LB; flechas, stick derecho y botones en el mismo sitio en las de aceleración y en
+  las demás. Inclinando el móvil, la cruceta baja a la esquina.
+- Menús con el dedo (0.5.2): en las cinemáticas también se quita el mando (ver arriba).
 - El campo del servidor LAN se llama ahora "IP del servidor" en vez de "IP del PC" (0.5.1):
   puede ser un PC o un móvil anfitrión.
 - Menús con el dedo (0.5.0): las indicaciones de abajo crecen hacia el espacio libre. En las

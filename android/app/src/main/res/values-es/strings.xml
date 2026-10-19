@@ -96,6 +96,8 @@
     <string name="res_nativa">Nativa · %1$d×%2$d</string>
     <string name="estirar">Estirar a pantalla completa</string>
     <string name="estirar_resumen">Apagado: la imagen 16:9 de la Xbox 360, con barras negras. Encendido: llena la pantalla, pero deforma la imagen.</string>
+    <string name="panoramico">Pantalla ancha (prototipo)</string>
+    <string name="panoramico_resumen">Dibuja el juego a la proporción de tu pantalla: la cámara ve más por los lados, sin barras ni deformar. Son más píxeles que dibujar. De momento el HUD y los menús se estiran.</string>
     <string name="mostrar_fps">Mostrar fps</string>
     <string name="mostrar_fps_resumen">Contador en la esquina: fotogramas por segundo y milisegundos por fotograma.</string>
 
@@ -209,6 +211,13 @@
     <string name="servidor_eliminado" formatted="true">%1$s eliminado</string>
     <string name="deshacer">Deshacer</string>
     <string name="servidores_guardados">Servidores guardados</string>
+    <string name="servidor_buscar">Buscar en la red</string>
+    <string name="servidor_buscando">Buscando…</string>
+    <string name="servidores_encontrados">Encontrados en tu red</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · %2$d en Xbox Live</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · %2$d en Xbox Live · ya guardado</string>
+    <string name="servidor_encontrado_anadir" formatted="true">Añadir %1$s</string>
+    <string name="servidor_ninguno_encontrado">No ha contestado ningún servidor. Tiene que estar en la misma Wi-Fi (o en el punto de acceso de este móvil) y actualizado; si no, añádelo por su IP.</string>
     <string name="seccion_tactil">Controles táctiles</string>
     <string name="editar_tactil">Editar controles táctiles</string>
     <string name="editar_tactil_resumen">Mueve los botones táctiles y cambia su tamaño y su opacidad.</string>
@@ -225,7 +234,7 @@
     <string name="giro_flechas">Flechas</string>
     <string name="giro_inclinar">Inclinando el móvil</string>
     <string name="menus_tactiles">Menús con el dedo</string>
-    <string name="menus_tactiles_resumen">En los menús y en la pausa no hay mando: desliza para moverte (en una lista de opciones, a los lados cambia el valor), toca una opción para elegirla, toca las flechas para cambiar su valor y toca las indicaciones de abajo, como «Ⓐ Aceptar» o «Ⓑ Atrás», para pulsarlas. Dos dedos, atrás. El botón MANDO de arriba vuelve a sacar el mando.</string>
+    <string name="menus_tactiles_resumen">En los menús y en la pausa no hay mando: desliza para moverte (en una lista de opciones, a los lados cambia el valor), toca una opción para elegirla, toca las flechas para cambiar su valor y toca las indicaciones de abajo, como «Ⓐ Aceptar» o «Ⓑ Atrás», para pulsarlas. Dos dedos, atrás. El botón MANDO de arriba vuelve a sacar el mando. En las cinemáticas, un toque las salta.</string>
     <string name="deslizar_invertido">Deslizar al revés en los menús</string>
     <string name="deslizar_invertido_resumen">Apagado: como al pasar páginas, deslizar a la izquierda va a la opción de la derecha. Encendido: deslizar a la derecha va a la de la derecha.</string>
     <string name="sensibilidad_giro">Sensibilidad del giro</string>

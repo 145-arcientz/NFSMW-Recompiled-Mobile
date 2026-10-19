@@ -16,7 +16,8 @@
 //      en vez de por el de SDL de su SDK.
 //   7. Parar el juego y el audio mientras la app esta en segundo plano.
 //   8. En que parte del juego se esta (TouchControllerBridge.contexto), para
-//      cambiar los controles tactiles en las carreras de aceleracion.
+//      cambiar los controles tactiles en las carreras de aceleracion y saltar
+//      las cinematicas con un toque.
 //   9. La vibracion del mando tactil: el movil vibra con lo que el juego le
 //      pide al mando (GameActivity.vibrarMando).
 //  10. Los menus con el dedo: que hay debajo de un toque (las indicaciones de
@@ -475,6 +476,15 @@ Java_io_github_nfsmwrecomp_GameActivity_nativeMsPorFotograma(JNIEnv*, jclass) {
 // pequenas: se recorren nodo a nodo en vez de copiar su hash, y con claves
 // unicas da lo mismo. Se calcula una vez por carrera.
 //
+// Y si hay una cinematica del motor (NIS: la presentacion antes de cada
+// carrera, las escenas de la historia, las de una persecucion), por el
+// INIS::mInstance del juego, con NISActivity::mState en +684 de ese INIS
+// (5 = NISACTIVITY_PLAYING). El 360 la salta con HUDACTION_SKIPNIS, que en el
+// mapa "hud" del mando (attributes.bin) es A: con los menus con el dedo, un
+// toque en la pantalla pulsa A. La direccion de INIS::mInstance no esta en las
+// tablas de las ediciones (va en .bss); sale de las instrucciones de
+// NISActivity::JoyHandle, que la lee para saltarla, como la de las pausas.
+//
 // Las direcciones las pone su app (parche_nativo.py, g_nfsmw_android_contexto),
 // traducidas a la edicion del juego. Los desplazamientos son los del 360, y
 // antes de fiarse de ellos se comprueban las instrucciones del juego de las que
@@ -484,7 +494,7 @@ Java_io_github_nfsmwrecomp_GameActivity_nativeMsPorFotograma(JNIEnv*, jclass) {
 
 // Su app (nfsmw_recortes_carrera.cpp, con parche_nativo.py). Debil: sin el
 // parche, el contexto es desconocido y los controles son los de siempre.
-extern "C" const uint32_t g_nfsmw_android_contexto[9] __attribute__((weak));
+extern "C" const uint32_t g_nfsmw_android_contexto[11] __attribute__((weak));
 
 namespace {
 
@@ -494,6 +504,7 @@ constexpr jint kContextoMenus = 0;       // menus y pantallas de carga
 constexpr jint kContextoMundo = 1;       // conduciendo: libre o en otra carrera
 constexpr jint kContextoAceleracion = 2; // carrera de aceleracion
 constexpr jint kContextoPausa = 3;       // en el mundo, con el juego en pausa (su menu, un mensaje...)
+constexpr jint kContextoCinematica = 4;  // en el mundo, con una cinematica (NIS) en marcha
 
 // Los indices de g_nfsmw_android_contexto.
 enum Direccion {
@@ -506,6 +517,8 @@ enum Direccion {
   kDatoDeNodo = 6,       // Attrib: el valor de un nodo
   kPausas = 7,           // FEManager::mPauseRequest
   kPedirPausa = 8,       // FEManager::RequestPauseSimulation
+  kCinematicaMando = 9,  // NISActivity::JoyHandle: INIS::mInstance y HUDACTION_SKIPNIS
+  kSaltarCinematica = 10, // NISActivity::SkipOverNIS (desde INIS): mState
 };
 
 constexpr uint32_t kEstadoEnElMundo = 6;     // GAMEFLOW_STATE_RACING
@@ -535,6 +548,9 @@ constexpr uint8_t kNodoEnFija = 0x10;        // el dato es un desplazamiento en 
 constexpr uint8_t kNodoDentro = 0x20;        // el valor va en el propio nodo
 constexpr uint32_t kMaxNodos = 4096;         // una tabla mas grande no es lo que se espera
 constexpr uint32_t kMaxPadres = 8;
+// NISActivity, desde su INIS (360).
+constexpr uint32_t kOffEstadoCinematica = 684;  // mState
+constexpr uint32_t kCinematicaEnCurso = 5;      // NISACTIVITY_PLAYING
 
 // Las instrucciones de las que salen esos desplazamientos (iguales en las tres
 // ediciones): si no estan, el ejecutable no es el que se espera y no se lee nada.
@@ -562,6 +578,16 @@ constexpr Instruccion kInstrucciones[] = {
     {kDatoDeNodo, 0x00, 0x8963000B},        // lbz r11,11(r3)       banderas
     {kDatoDeNodo, 0x24, 0x38630004},        // addi r3,r3,4         valor dentro del nodo
 };
+
+// Las de la cinematica, aparte: si no estan, lo demas del contexto sigue valiendo.
+constexpr Instruccion kInstruccionesCinematica[] = {
+    {kCinematicaMando, 0x164, 0x2F0B0032},  // cmpwi cr6,r11,50     HUDACTION_SKIPNIS
+    {kSaltarCinematica, 0x58, 0x811F02AC},  // lwz r8,684(r31)      mState
+    {kSaltarCinematica, 0x5C, 0x2F080005},  // cmpwi cr6,r8,5       NISACTIVITY_PLAYING
+};
+// En NISActivity::JoyHandle, lis r30,ALTA y lwz r3,BAJA(r30): INIS::mInstance.
+constexpr uint32_t kOffAltaCinematica = 0x11C;
+constexpr uint32_t kOffBajaCinematica = 0x130;
 
 bool Legible(rex::memory::Memory* memoria, uint32_t direccion, uint32_t bytes) {
   if (direccion == 0 || bytes == 0 || uint64_t(direccion) + bytes > 0x100000000ull) {
@@ -732,6 +758,8 @@ struct Lectura {
   char nombre[24] = "";
   int tipo = kTipoDesconocido;
   const char* via = "";
+  uint32_t cinematica = 0;         // INIS::mInstance
+  uint32_t estado_cinematica = 0;  // su mState
 };
 
 // El tipo de una carrera, como GRaceParameters::GetRaceType.
@@ -760,6 +788,8 @@ int TipoDeCarrera(rex::memory::Memory* memoria, const uint32_t* direcciones, uin
 // -1 sin comprobar, 0 no coinciden, 1 bien. Solo lo toca el hilo de Java que pregunta.
 int g_instrucciones_bien = -1;
 jint g_ultimo_contexto = kContextoDesconocido - 1;
+// INIS::mInstance: 0 sin comprobar aun, 1 si no se puede (otro ejecutable).
+uint32_t g_dir_cinematica = 0;
 // El tipo, una vez por carrera: la misma carrera tiene los mismos parametros y la misma coleccion.
 uint32_t g_cache_parametros = 0;
 uint32_t g_cache_coleccion = 0;
@@ -816,6 +846,42 @@ bool InstruccionesBien(rex::memory::Memory* memoria, const uint32_t* direcciones
   return g_instrucciones_bien == 1;
 }
 
+// Donde esta INIS::mInstance, o 0 si las instrucciones no son las que se esperan.
+uint32_t DireccionCinematica(rex::memory::Memory* memoria, const uint32_t* direcciones) {
+  if (g_dir_cinematica == 0) {
+    uint32_t palabra = 0;
+    for (const auto& i : kInstruccionesCinematica) {
+      if (!Leer32(memoria, direcciones[i.funcion] + i.desplazamiento, &palabra) || palabra == 0) {
+        return 0;  // el ejecutable aun no esta en memoria
+      }
+    }
+    g_dir_cinematica = 1;
+    bool bien = true;
+    for (const auto& i : kInstruccionesCinematica) {
+      const uint32_t direccion = direcciones[i.funcion] + i.desplazamiento;
+      if (!Leer32(memoria, direccion, &palabra) || palabra != i.palabra) {
+        REXLOG_WARN("[contexto] en {:08X} esperaba {:08X} y hay {:08X}: sin saltar cinematicas",
+                    direccion, i.palabra, palabra);
+        bien = false;
+        break;
+      }
+    }
+    // Como la pausa: la parte alta y la baja, de sus instrucciones (en la
+    // japonesa .bss se mueve).
+    uint32_t lis = 0, lwz = 0;
+    const uint32_t f = direcciones[kCinematicaMando];
+    if (bien && Leer32(memoria, f + kOffAltaCinematica, &lis) && Leer32(memoria, f + kOffBajaCinematica, &lwz) &&
+        (lis & 0xFFFF0000) == 0x3FC00000 && (lwz & 0xFFFF0000) == 0x807E0000) {
+      g_dir_cinematica = (lis << 16) + uint32_t(int32_t(int16_t(lwz & 0xFFFF)));
+      REXLOG_INFO("[contexto] INIS::mInstance en {:08X}", g_dir_cinematica);
+    } else if (bien) {
+      REXLOG_WARN("[contexto] INIS::mInstance no esta donde se espera ({:08X} {:08X}): sin saltar cinematicas",
+                  lis, lwz);
+    }
+  }
+  return g_dir_cinematica > 1 ? g_dir_cinematica : 0;
+}
+
 const uint32_t* Direcciones() {
   // Simbolo debil: sin el parche su direccion es nula, y el compilador no
   // tiene que darla por buena.
@@ -839,6 +905,13 @@ jint LeerContexto(Lectura& l) {
   // menus, sin girar inclinando. Un numero raro es que no es eso: se ignora.
   if (Leer32(memoria, direcciones[kPausas], &l.pausas) && l.pausas > 0 && l.pausas <= 8) {
     return kContextoPausa;
+  }
+  // Una cinematica en marcha: un toque la salta.
+  const uint32_t cinematica = DireccionCinematica(memoria, direcciones);
+  if (cinematica && Leer32(memoria, cinematica, &l.cinematica) && l.cinematica &&
+      Leer32(memoria, l.cinematica + kOffEstadoCinematica, &l.estado_cinematica) &&
+      l.estado_cinematica == kCinematicaEnCurso) {
+    return kContextoCinematica;
   }
   // En el mundo. Sin carrera (o sin poder leerla), conduciendo libre.
   if (!Leer32(memoria, direcciones[kCarrera], &l.carrera) ||
@@ -872,7 +945,8 @@ extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBrid
   Lectura l;
   const jint contexto = LeerContexto(l);
   if (contexto != g_ultimo_contexto) {
-    static constexpr const char* kNombres[] = {"desconocido", "menus", "conduciendo", "aceleracion", "pausa"};
+    static constexpr const char* kNombres[] = {"desconocido", "menus", "conduciendo",
+                                               "aceleracion", "pausa", "cinematica"};
     REXLOG_INFO("[contexto] {} (estado {}, tipo {} por {})", kNombres[contexto + 1], l.estado, l.tipo,
                 l.via);
     g_ultimo_contexto = contexto;
@@ -889,9 +963,10 @@ Java_io_github_nfsmwrecomp_TouchControllerBridge_contextoDiagnostico(JNIEnv* env
   const jint contexto = LeerContexto(l);
   char linea[256];
   std::snprintf(linea, sizeof(linea),
-                "contexto=%d instr=%d estado=%u pausas=%u fObj=%08X parms=%08X idx=%08X col=%08X tipo=%d (%s \"%s\")",
-                int(contexto), g_instrucciones_bien, l.estado, l.pausas, l.carrera, l.parametros, l.indice,
-                l.coleccion, l.tipo, l.via, l.nombre);
+                "contexto=%d instr=%d estado=%u pausas=%u nis=%08X/%u fObj=%08X parms=%08X idx=%08X col=%08X "
+                "tipo=%d (%s \"%s\")",
+                int(contexto), g_instrucciones_bien, l.estado, l.pausas, l.cinematica, l.estado_cinematica,
+                l.carrera, l.parametros, l.indice, l.coleccion, l.tipo, l.via, l.nombre);
   return env->NewStringUTF(linea);
 }
 

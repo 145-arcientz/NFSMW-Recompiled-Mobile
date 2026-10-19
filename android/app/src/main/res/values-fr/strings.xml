@@ -101,6 +101,8 @@
     <string name="res_nativa">Native · %1$d×%2$d</string>
     <string name="estirar">Étirer en plein écran</string>
     <string name="estirar_resumen">Désactivé : l\'image 16:9 de la Xbox 360, avec des bandes noires. Activé : remplit l\'écran, mais déforme l\'image.</string>
+    <string name="panoramico">Écran large (prototype)</string>
+    <string name="panoramico_resumen">Affiche le jeu au format de ton écran : la caméra voit plus sur les côtés, sans bandes ni déformation. Plus de pixels à dessiner. Pour l\'instant, le HUD et les menus sont étirés.</string>
     <string name="mostrar_fps">Afficher les FPS</string>
     <string name="mostrar_fps_resumen">Compteur dans le coin : images par seconde et millisecondes par image.</string>
 
@@ -214,6 +216,13 @@
     <string name="servidor_eliminado" formatted="true">%1$s supprimé</string>
     <string name="deshacer">Annuler</string>
     <string name="servidores_guardados">Serveurs enregistrés</string>
+    <string name="servidor_buscar">Rechercher sur le réseau</string>
+    <string name="servidor_buscando">Recherche…</string>
+    <string name="servidores_encontrados">Trouvés sur votre réseau</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · %2$d sur Xbox Live</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · %2$d sur Xbox Live · déjà enregistré</string>
+    <string name="servidor_encontrado_anadir" formatted="true">Ajouter %1$s</string>
+    <string name="servidor_ninguno_encontrado">Aucun serveur n\'a répondu. Il doit être sur le même Wi-Fi (ou le point d\'accès de ce téléphone) et à jour ; sinon, ajoutez-le par son IP.</string>
     <string name="seccion_tactil">Commandes tactiles</string>
     <string name="editar_tactil">Modifier les commandes tactiles</string>
     <string name="editar_tactil_resumen">Déplacez les boutons tactiles et changez leur taille et leur opacité.</string>
@@ -230,7 +239,7 @@
     <string name="giro_flechas">Flèches</string>
     <string name="giro_inclinar">En inclinant le téléphone</string>
     <string name="menus_tactiles">Menus au doigt</string>
-    <string name="menus_tactiles_resumen">Dans les menus et le menu de pause, il n\'y a pas de manette : glissez pour vous déplacer (dans une liste d\'options, sur le côté change la valeur), touchez une option pour la choisir, touchez les flèches pour changer sa valeur et touchez les indications en bas, comme « Ⓐ Accepter » ou « Ⓑ Retour », pour les activer. Deux doigts : retour. Le bouton MANETTE en haut fait revenir la manette.</string>
+    <string name="menus_tactiles_resumen">Dans les menus et le menu de pause, il n\'y a pas de manette : glissez pour vous déplacer (dans une liste d\'options, sur le côté change la valeur), touchez une option pour la choisir, touchez les flèches pour changer sa valeur et touchez les indications en bas, comme « Ⓐ Accepter » ou « Ⓑ Retour », pour les activer. Deux doigts : retour. Le bouton MANETTE en haut fait revenir la manette. Dans les cinématiques, une touche les passe.</string>
     <string name="deslizar_invertido">Inverser le glissement dans les menus</string>
     <string name="deslizar_invertido_resumen">Désactivé : comme pour tourner une page, glisser vers la gauche va à l\'option de droite. Activé : glisser vers la droite va à celle de droite.</string>
     <string name="sensibilidad_giro">Sensibilité de la direction</string>

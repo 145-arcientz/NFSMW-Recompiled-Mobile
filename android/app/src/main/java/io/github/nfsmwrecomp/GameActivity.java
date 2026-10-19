@@ -4,8 +4,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
+import android.graphics.Point;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -19,6 +22,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -47,6 +51,8 @@ public class GameActivity extends SDLActivity {
     static final String EXTRA_RESOLUCION = "io.github.nfsmwrecomp.RESOLUCION";
     /** Llenar la pantalla entera en vez de 16:9 con barras. */
     static final String EXTRA_ESTIRAR = "io.github.nfsmwrecomp.ESTIRAR";
+    /** Dibujar a la proporcion de la pantalla (Ajustes.panoramico): llena la pantalla sin deformar. */
+    static final String EXTRA_PANORAMICO = "io.github.nfsmwrecomp.PANORAMICO";
     static final String EXTRA_MOSTRAR_FPS = "io.github.nfsmwrecomp.MOSTRAR_FPS";
     /** El id de la edicion del juego de la ISO (Ediciones); sin el, la principal. */
     static final String EXTRA_EDICION = "io.github.nfsmwrecomp.EDICION";
@@ -111,13 +117,26 @@ public class GameActivity extends SDLActivity {
             MotorNativo.preparar(this, edicion);
         }
 
+        // Pantalla ancha: la pantalla entera, tambien la franja de la camara, y su
+        // proporcion al juego, que dibuja a ella (nfsmw_proporcion_pantalla).
+        boolean panoramico = intent.getBooleanExtra(EXTRA_PANORAMICO, false);
+        if (panoramico) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                WindowManager.LayoutParams atributos = getWindow().getAttributes();
+                atributos.layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                getWindow().setAttributes(atributos);
+            }
+            lista.add(String.format(Locale.ROOT, "--nfsmw_proporcion_pantalla=%.4f", proporcionPantalla()));
+        }
+
         argumentos = lista.toArray(new String[0]);
         // Release: sin registro (ver Ajustes.argumentos).
         if (BuildConfig.DEBUG) Log.i(TAG, "Argumentos: " + String.join(" ", argumentos));
         super.onCreate(savedInstanceState);
 
-        ajustarSuperficie(intent.getStringExtra(EXTRA_RESOLUCION),
-                intent.getBooleanExtra(EXTRA_ESTIRAR, false));
+        boolean estirar = intent.getBooleanExtra(EXTRA_ESTIRAR, false) || panoramico;
+        ajustarSuperficie(intent.getStringExtra(EXTRA_RESOLUCION), estirar, panoramico);
         if (intent.getBooleanExtra(EXTRA_MOSTRAR_FPS, true)) {
             ponerContadorFps();
         }
@@ -134,7 +153,8 @@ public class GameActivity extends SDLActivity {
         touchController = new TouchControllerView(this);
         // Los toques en los menus van a la imagen del juego, que sin estirar es el
         // 16:9 del centro (ajustarSuperficie).
-        touchController.estirar(intent.getBooleanExtra(EXTRA_ESTIRAR, false));
+        touchController.estirar(intent.getBooleanExtra(EXTRA_ESTIRAR, false)
+                || intent.getBooleanExtra(EXTRA_PANORAMICO, false));
         mLayout.addView(touchController, new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
@@ -196,7 +216,7 @@ public class GameActivity extends SDLActivity {
      * la vista encogia al tamano del bufer, en una esquina. Por eso aqui la
      * vista lleva siempre un tamano exacto.
      */
-    private void ajustarSuperficie(String resolucion, boolean estirar) {
+    private void ajustarSuperficie(String resolucion, boolean estirar, boolean panoramico) {
         if (mSurface == null || mLayout == null) {
             return;
         }
@@ -233,11 +253,20 @@ public class GameActivity extends SDLActivity {
                         h = ancho * 9 / 16;
                     }
                 }
+                // Panoramico con un bufer fijo: del alto fijo, y del ancho que da la
+                // vista; si no, el juego (ya ancho) se encogeria a 16:9 y se estiraria.
+                int anchoPanoramico = panoramico && anchoBufer > 0
+                        ? Math.round(altoBufer * (float) w / h) & ~1 : 0;
                 RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(w, h);
                 lp.addRule(RelativeLayout.CENTER_IN_PARENT);
                 // Cambiar la maquetacion desde su propio aviso no se aplica
                 // hasta la siguiente pasada: se pide despues.
-                v.post(() -> mSurface.setLayoutParams(lp));
+                v.post(() -> {
+                    if (anchoPanoramico > 0) {
+                        mSurface.getHolder().setFixedSize(anchoPanoramico, altoBufer);
+                    }
+                    mSurface.setLayoutParams(lp);
+                });
                 if (BuildConfig.DEBUG) {
                     Log.i(TAG, "Superficie: vista " + w + "x" + h + ", bufer "
                             + (anchoBufer > 0 ? anchoBufer + "x" + altoBufer : w + "x" + h)
@@ -245,6 +274,23 @@ public class GameActivity extends SDLActivity {
                 }
             }
         });
+    }
+
+    /** Ancho entre alto de la pantalla entera, en horizontal. */
+    private double proporcionPantalla() {
+        int ancho;
+        int alto;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Rect r = getWindowManager().getMaximumWindowMetrics().getBounds();
+            ancho = r.width();
+            alto = r.height();
+        } else {
+            Point p = new Point();
+            getWindowManager().getDefaultDisplay().getRealSize(p);
+            ancho = p.x;
+            alto = p.y;
+        }
+        return Math.max(ancho, alto) / (double) Math.max(1, Math.min(ancho, alto));
     }
 
     /** Un rotulo en la esquina con los fps del juego, cada medio segundo. */

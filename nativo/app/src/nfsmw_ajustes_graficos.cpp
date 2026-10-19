@@ -13,6 +13,10 @@
 #include <string>
 #include <vector>
 
+namespace nfsmw::render_targets {
+bool Panoramico();  // nfsmw_render_targets.cpp
+}
+
 #if REX_PLATFORM_ANDROID
 constexpr char kResolucionInternaPredeterminada[] = "1024x576";
 #else
@@ -273,7 +277,10 @@ void AplicarAjustesGraficos() {
   // 720p, which is what is presented. Setting the video mode to 1920x1080 so that the game's front buffer
   // would grow with it was tried and does not work: the front buffer is registered earlier and stays at
   // 1280x720.
-  const bool interno_1080p = resolucion == "1920x1080" || resolucion == "automatico";
+  // Panoramic (nfsmw_proporcion_pantalla) too: its size is imposed the same way, on top of the 720p video mode
+  // (with 1024x576 the game would take its SD path and never look at the big mode).
+  const bool interno_1080p =
+      resolucion == "1920x1080" || resolucion == "automatico" || nfsmw::render_targets::Panoramico();
   const std::string modo_video = interno_1080p ? std::string("1280x720") : resolucion;
   const size_t x = modo_video.find('x');
   if (x != std::string::npos) {

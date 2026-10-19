@@ -106,6 +106,8 @@
     <string name="res_nativa">Native · %1$d×%2$d</string>
     <string name="estirar">Stretch to full screen</string>
     <string name="estirar_resumen">Off: the Xbox 360\'s 16:9 image, with black bars. On: fills the screen, but distorts the image.</string>
+    <string name="panoramico">Widescreen (prototype)</string>
+    <string name="panoramico_resumen">Draws the game at your screen\'s proportion: the camera sees more at the sides, with no bars and no stretching. More pixels to draw. For now the HUD and menus are stretched.</string>
     <string name="mostrar_fps">Show FPS</string>
     <string name="mostrar_fps_resumen">Corner counter: frames per second and milliseconds per frame.</string>
 
@@ -237,6 +239,13 @@
     <string name="servidor_eliminado" formatted="true">%1$s removed</string>
     <string name="deshacer">Undo</string>
     <string name="servidores_guardados">Saved servers</string>
+    <string name="servidor_buscar">Search the network</string>
+    <string name="servidor_buscando">Searching…</string>
+    <string name="servidores_encontrados">Found on your network</string>
+    <string name="servidor_encontrado_detalle" formatted="true">%1$s · %2$d in Xbox Live</string>
+    <string name="servidor_encontrado_guardado" formatted="true">%1$s · %2$d in Xbox Live · already saved</string>
+    <string name="servidor_encontrado_anadir" formatted="true">Add %1$s</string>
+    <string name="servidor_ninguno_encontrado">No server answered. It has to be on the same Wi-Fi (or this phone\'s hotspot) and up to date; otherwise add it by its IP.</string>
     <string name="seccion_tactil">Touch controls</string>
     <string name="editar_tactil">Edit touch controls</string>
     <string name="editar_tactil_resumen">Move the touch buttons and change their size and opacity.</string>
@@ -253,7 +262,7 @@
     <string name="giro_flechas">Arrows</string>
     <string name="giro_inclinar">Tilting the phone</string>
     <string name="menus_tactiles">Menus by touch</string>
-    <string name="menus_tactiles_resumen">In menus and in the pause menu there is no pad: swipe to move (in a list of options, sideways changes the value), tap an option to pick it, tap the arrows to change its value and tap the hints at the bottom, like “Ⓐ Accept” or “Ⓑ Back”, to press them. Two fingers, back. The PAD button at the top brings the pad back.</string>
+    <string name="menus_tactiles_resumen">In menus and in the pause menu there is no pad: swipe to move (in a list of options, sideways changes the value), tap an option to pick it, tap the arrows to change its value and tap the hints at the bottom, like “Ⓐ Accept” or “Ⓑ Back”, to press them. Two fingers, back. The PAD button at the top brings the pad back. In cutscenes, a tap skips them.</string>
     <string name="deslizar_invertido">Reverse swipe in menus</string>
     <string name="deslizar_invertido_resumen">Off: like turning pages, swiping left goes to the option on the right. On: swiping right goes to the one on the right.</string>
     <string name="sensibilidad_giro">Steering sensitivity</string>

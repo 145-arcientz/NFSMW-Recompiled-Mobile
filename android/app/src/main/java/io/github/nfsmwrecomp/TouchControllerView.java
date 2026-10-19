@@ -103,7 +103,9 @@ import java.util.List;
  * pulsaciones como de un mando (pulsar), asi que suena y se mueve como siempre.
  * El boton OCULTAR/TACTIL dice ahi MANDO: saca el mando en los menus (y DEDO lo
  * vuelve a quitar). Cada toque deja en files/logs/menus.txt lo que se leyo del
- * menu, para afinarlo.
+ * menu, para afinarlo. En las cinematicas del juego (CONTEXTO_CINEMATICA: la
+ * presentacion de cada carrera, las escenas de la historia) tampoco hay mando, y
+ * un toque pulsa A, que las salta.
  */
 public final class TouchControllerView extends View {
     private static final int DPAD_UP = 1 << 11;
@@ -366,8 +368,10 @@ public final class TouchControllerView extends View {
     private final boolean menusTactiles;
     private final boolean deslizarInvertido;
     // En un menu del juego o en la pausa (lo dice el contexto; con el motor de
-    // Xenos nunca, y los menus van con el mando).
+    // Xenos nunca, y los menus van con el mando). Tambien en una cinematica.
     private boolean enMenu;
+    // Una cinematica del juego (la presentacion de la carrera...): un toque la salta.
+    private boolean enCinematica;
     // En los menus, el mando en vez del dedo (el boton MANDO/DEDO). Se guarda.
     private boolean mandoEnMenus;
     // Donde se ve el juego en la vista: el 16:9 del centro, o toda si se estira.
@@ -476,7 +480,11 @@ public final class TouchControllerView extends View {
             // aceleracion, cuya disposicion no la tiene), pero sin girar
             // inclinando el movil: moveria las opciones.
             boolean pausa = contexto == TouchControllerBridge.CONTEXTO_PAUSA;
-            int ahora = contexto == TouchControllerBridge.CONTEXTO_ACELERACION ? ACELERACION
+            // En una cinematica, la disposicion de antes: es un momento, y al acabar
+            // la carrera empieza con la que tocaba.
+            boolean cinematica = contexto == TouchControllerBridge.CONTEXTO_CINEMATICA;
+            int ahora = cinematica ? dispJuego
+                    : contexto == TouchControllerBridge.CONTEXTO_ACELERACION ? ACELERACION
                     : contexto == TouchControllerBridge.CONTEXTO_CONDUCIENDO || pausa ? CONDUCIENDO
                     : NORMAL;
             if (pausa != enPausa) {
@@ -486,10 +494,12 @@ public final class TouchControllerView extends View {
             }
             // Los menus y la pausa, con el dedo. Al entrar y al salir, todo suelto
             // (un pedal que se pisaba, un deslizamiento a medias), y OCULTAR/TACTIL
-            // cambia de texto y de ancho.
-            boolean menu = contexto == TouchControllerBridge.CONTEXTO_MENUS || pausa;
-            if (menu != enMenu) {
+            // cambia de texto y de ancho. Las cinematicas, igual: sin mando, y un
+            // toque la salta.
+            boolean menu = contexto == TouchControllerBridge.CONTEXTO_MENUS || pausa || cinematica;
+            if (menu != enMenu || cinematica != enCinematica) {
                 enMenu = menu;
+                enCinematica = cinematica;
                 cancelarMenu();
                 rehacer();
             }
@@ -1237,6 +1247,7 @@ public final class TouchControllerView extends View {
      * moverse lo convierte en el toque de dos dedos, B.
      */
     private boolean tocarMenu(MotionEvent e) {
+        if (enCinematica) return tocarCinematica(e);
         int i = e.getActionIndex();
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
@@ -1335,6 +1346,21 @@ public final class TouchControllerView extends View {
             default:
                 return true;
         }
+    }
+
+    /**
+     * En una cinematica: al levantar el dedo, A, que es lo que la salta en el 360
+     * (HUDACTION_SKIPNIS en el mapa "hud" del mando). Sin deslizar ni dos dedos: no hay
+     * nada mas que hacer. Una sola A a la vez, para no dejar otras pendientes para lo
+     * que venga despues.
+     */
+    private boolean tocarCinematica(MotionEvent e) {
+        int accion = e.getActionMasked();
+        if ((accion == MotionEvent.ACTION_UP || accion == MotionEvent.ACTION_POINTER_UP)
+                && !pulsando && pulsos.isEmpty()) {
+            pulsar(A, TRAS_NADA);
+        }
+        return true;
     }
 
     /**

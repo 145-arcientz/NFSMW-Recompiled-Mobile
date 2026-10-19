@@ -41,12 +41,15 @@ versionan: los deja este script, y el APK se compila contra todo ello.
      tools/parche_gamertag.py, tools/parche_turnip.py (drivers propios),
      tools/parche_pausa.py (soltar la superficie al minimizar) y
      tools/android/parche_nativo.py (abrir la URI, la sonda y el audio).
+     Tambien clona SPIRV-Cross en su thirdparty, para el backend de OpenGL ES.
   4. Saca del juego lo que hace falta: default.xex y NFS/ (los videos no).
   5. Compila su generador de codigo (rexglue, un programa del PC) y traduce el
      juego: codegen, llamadas directas y copias literales, como su
      tools/codegen.sh.
   6. Genera la biblioteca de shaders, out/nfsmw_shaders.nfsp, con las
-     herramientas WASM que trae su app (hace falta Node.js).
+     herramientas WASM que trae su app (hace falta Node.js), y a su lado la
+     del backend de OpenGL ES, nfsmw_shaders_gles.nfsp
+     (nativo/tools/biblioteca_shaders_gles.mjs).
   7. Apunta la edicion del juego en out/edicion.json.
 
 
@@ -116,6 +119,11 @@ COMMIT = "6df1501"   # android: native renderer on Vulkan 1.1 and without shader
 # Resumen de "git ls-tree HEAD thirdparty/" (solo los submodulos, ordenados) del
 # ReXGlue v0.10.0 en que se basa ese arbol.
 SUBMODULOS = "13082df16a807b8e5d162b79c461b0f454a9bc47679928b281635cbb4941dbd9"
+# SPIRV-Cross, que pasa el SPIR-V de la biblioteca a GLSL ES en el movil (backend de OpenGL ES). No es de
+# su SDK: va aparte en sdk/thirdparty/spirv-cross.
+SPIRV_CROSS_REPO = "https://github.com/KhronosGroup/SPIRV-Cross.git"
+SPIRV_CROSS_ETIQUETA = "vulkan-sdk-1.4.309.0"
+SPIRV_CROSS_COMMIT = "2c32b6bf86f3c4a5539aa1f0bacbd59fe61759cf"
 
 sys.path.insert(0, str(RAIZ / "tools" / "ediciones"))
 import ediciones  # noqa: E402
@@ -214,6 +222,25 @@ def adrenotools(arbol, sdk_local):
     correr("git", "checkout", "-q", preparar_sdk.ADRENOTOOLS_COMMIT, cwd=destino, que="git checkout libadrenotools")
     correr("git", "submodule", "update", "--init", "--recursive", cwd=destino, que="submodulos de libadrenotools")
     print(f"[ok] libadrenotools en {preparar_sdk.ADRENOTOOLS_COMMIT[:8]}")
+
+
+def spirv_cross(arbol):
+    """SPIRV-Cross para el backend de OpenGL ES (nfsmw_gles_shaders.cpp)."""
+    destino = arbol / "sdk" / "thirdparty" / "spirv-cross"
+    if (destino / "spirv_glsl.cpp").is_file():
+        commit = git("rev-parse", "HEAD", cwd=destino).stdout.strip()
+        if commit and commit != SPIRV_CROSS_COMMIT:
+            fallar(f"{destino} esta en {commit[:8]} y tiene que estar en {SPIRV_CROSS_COMMIT[:8]} "
+                   f"({SPIRV_CROSS_ETIQUETA}): borra la carpeta y vuelve a preparar.")
+        print("[ok] SPIRV-Cross ya esta")
+        return
+    correr("git", "clone", "-q", "--depth", "1", "--branch", SPIRV_CROSS_ETIQUETA, SPIRV_CROSS_REPO, destino,
+           que="git clone SPIRV-Cross")
+    commit = git("rev-parse", "HEAD", cwd=destino).stdout.strip()
+    if commit != SPIRV_CROSS_COMMIT:
+        fallar(f"La etiqueta {SPIRV_CROSS_ETIQUETA} de SPIRV-Cross apunta a {commit[:8]}, no a "
+               f"{SPIRV_CROSS_COMMIT[:8]}.")
+    print(f"[ok] SPIRV-Cross en {SPIRV_CROSS_ETIQUETA}")
 
 
 def parches(arbol):
@@ -575,6 +602,10 @@ def shaders(arbol, carpeta_juego, salida):
     salida.parent.mkdir(parents=True, exist_ok=True)
     correr("node", "tools/biblioteca_shaders.mjs", instalador, carpeta_juego, salida,
            cwd=arbol, que="biblioteca_shaders.mjs")
+    # La del backend de OpenGL ES: los mismos shaders con una textura fija por registro.
+    print("== Biblioteca de shaders de OpenGL ES")
+    correr("node", "tools/biblioteca_shaders_gles.mjs", instalador, carpeta_juego,
+           salida.with_name("nfsmw_shaders_gles.nfsp"), cwd=arbol, que="biblioteca_shaders_gles.mjs")
 
 
 # ---------------------------------------------------------------------------
@@ -594,6 +625,7 @@ def main():
     comprobar_arbol(arbol)
     terceros(arbol, pathlib.Path(args.sdk).resolve())
     adrenotools(arbol, pathlib.Path(args.sdk).resolve())
+    spirv_cross(arbol)
     parches(arbol)
     carpeta_juego, ficha = juego(arbol, args.iso, args.juego)
     referencia = es_referencia(ficha)

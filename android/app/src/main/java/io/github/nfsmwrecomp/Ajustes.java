@@ -417,6 +417,19 @@ final class Ajustes {
     void estirar(boolean v) { p.edit().putBoolean("estirar", v).apply(); }
 
     /**
+     * Pantalla ancha (prototipo, solo el motor nativo): el juego dibuja a la
+     * proporcion de la pantalla (1600x720 en un 20:9) y la camara ve mas por
+     * los lados, sin deformar. GameActivity pasa la proporcion
+     * (nfsmw_proporcion_pantalla) y llena la pantalla. El HUD y los menus,
+     * de momento, se estiran.
+     */
+    boolean panoramico() { return p.getBoolean("panoramico", false); }
+    void panoramico(boolean v) { p.edit().putBoolean("panoramico", v).apply(); }
+
+    /** Si la partida va panoramica: la opcion, con el motor nativo y su renderizador. */
+    boolean panoramicoEfectivo() { return MotorNativo.ACTIVO && !compatibilidad() && panoramico(); }
+
+    /**
      * render_target_path_vulkan=fsi: emular la EDRAM dentro del shader de
      * pixel (fragment shader interlock) en vez de con objetivos de render del
      * anfitrion. Se salta las transferencias de propiedad entre objetivos.

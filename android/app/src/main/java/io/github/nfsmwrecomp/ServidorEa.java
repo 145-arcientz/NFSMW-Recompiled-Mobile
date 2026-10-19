@@ -14,6 +14,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -44,6 +46,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * El servidor de salas de EA de la LAN dentro de la app: lo mismo que
@@ -61,6 +64,8 @@ import java.util.concurrent.TimeUnit;
  *    en una Wi-Fi y dando punto de acceso.
  *  - Estadisticas (stats.json, races.jsonl) y registro en la carpeta que se le
  *    pase, con el mismo formato.
+ *  - Contesta a la busqueda de servidores de la app (BuscadorServidores, UDP
+ *    10902) con el nombre que se le pase, como Discovery en Python.
  * Lo arranca y lo para ServidorLanService.
  */
 final class ServidorEa {
@@ -80,7 +85,9 @@ final class ServidorEa {
     private final File datos;
     private final Writer registro;
     private final Runnable alCambiar;
+    private final Supplier<String> nombre;
     private final List<ServerSocket> escuchas = new ArrayList<>();
+    private DatagramSocket busqueda;
     private final ScheduledExecutorService latido = Executors.newSingleThreadScheduledExecutor();
     private volatile boolean parado;
 
@@ -95,10 +102,12 @@ final class ServidorEa {
     /**
      * datos: donde van stats.json y races.jsonl. logs: la carpeta del registro.
      * alCambiar: se llama (desde cualquier hilo) cuando entra o sale un jugador.
+     * nombre: el que ve quien busca servidores; se pide en cada busqueda.
      */
-    ServidorEa(File datos, File logs, Runnable alCambiar) throws IOException {
+    ServidorEa(File datos, File logs, Runnable alCambiar, Supplier<String> nombre) throws IOException {
         this.datos = datos;
         this.alCambiar = alCambiar;
+        this.nombre = nombre;
         //noinspection ResultOfMethodCallIgnored
         datos.mkdirs();
         //noinspection ResultOfMethodCallIgnored
@@ -110,7 +119,7 @@ final class ServidorEa {
         estadisticas = new Estadisticas(datos);
     }
 
-    /** Abre los tres puertos (falla si alguno esta cogido) y empieza a atender. */
+    /** Abre los cuatro puertos (falla si alguno esta cogido) y empieza a atender. */
     void arrancar() throws IOException {
         log("============================================================");
         try {
@@ -125,6 +134,13 @@ final class ServidorEa {
                 t.setDaemon(true);
                 t.start();
             }
+            DatagramSocket d = new DatagramSocket(null);
+            d.setReuseAddress(true);
+            d.bind(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), BuscadorServidores.PUERTO));
+            busqueda = d;
+            Thread t = new Thread(() -> contestarBusquedas(d), "servidor-ea-busqueda");
+            t.setDaemon(true);
+            t.start();
         } catch (IOException e) {
             parar();
             throw e;
@@ -133,7 +149,7 @@ final class ServidorEa {
         // conexion por muerta a los 60 s y vuelve al menu.
         latido.scheduleWithFixedDelay(this::latir, 20, 20, TimeUnit.SECONDS);
         log("EA server: directory " + PUERTO_DIRECTORIO + ", lobby " + PUERTO_SALAS
-                + ", gamertag check " + PUERTO_GAMERTAG);
+                + ", gamertag check " + PUERTO_GAMERTAG + ", LAN search " + BuscadorServidores.PUERTO + "/udp");
     }
 
     void parar() {
@@ -144,6 +160,9 @@ final class ServidorEa {
         latido.shutdownNow();
         for (ServerSocket s : escuchas) {
             cerrar(s);
+        }
+        if (busqueda != null) {
+            busqueda.close();
         }
         List<Sesion> todas;
         synchronized (this) {
@@ -189,13 +208,7 @@ final class ServidorEa {
                 if (!ni.isUp() || ni.isLoopback()) {
                     continue;
                 }
-                String n = ni.getName().toLowerCase(Locale.ROOT);
-                int puntos = n.startsWith("wlan") ? 3
-                        : n.startsWith("swlan") || n.startsWith("ap") || n.startsWith("softap") ? 2
-                        : n.startsWith("eth") ? 1
-                        : n.startsWith("rmnet") || n.startsWith("ccmni") || n.startsWith("v4-")
-                                || n.startsWith("tun") || n.startsWith("dummy") ? -1
-                        : 0;
+                int puntos = puntosInterfaz(ni.getName());
                 if (puntos < 0) {
                     continue;
                 }
@@ -212,8 +225,60 @@ final class ServidorEa {
         return mejor;
     }
 
+    /**
+     * Cuanto vale una interfaz como red local, por su nombre: la Wi-Fi 3, el punto
+     * de acceso 2, cable 1, otras 0; -1 = no es la LAN (datos moviles, VPN).
+     */
+    static int puntosInterfaz(String nombre) {
+        String n = nombre.toLowerCase(Locale.ROOT);
+        return n.startsWith("wlan") ? 3
+                : n.startsWith("swlan") || n.startsWith("ap") || n.startsWith("softap") ? 2
+                : n.startsWith("eth") ? 1
+                : n.startsWith("rmnet") || n.startsWith("ccmni") || n.startsWith("v4-")
+                        || n.startsWith("tun") || n.startsWith("dummy") ? -1
+                : 0;
+    }
+
     // ---------------------------------------------------------------------
     // Conexiones
+
+    /** La busqueda de servidores (BuscadorServidores): a cada pregunta, nombre y jugadores. */
+    private void contestarBusquedas(DatagramSocket d) {
+        byte[] buf = new byte[512];
+        // Cada busqueda llega varias veces (broadcast y directa, tres rondas): al
+        // registro, una vez por IP cada 10 s.
+        Map<InetAddress, Long> anotadas = new LinkedHashMap<>();
+        while (!parado) {
+            DatagramPacket p = new DatagramPacket(buf, buf.length);
+            try {
+                d.receive(p);
+            } catch (IOException e) {
+                if (!parado) {
+                    log("[" + BuscadorServidores.PUERTO + "/udp] " + e);
+                }
+                return;
+            }
+            if (!BuscadorServidores.esPregunta(p)) {
+                continue;
+            }
+            String n = nombre.get();
+            int j = jugadores();
+            byte[] r = BuscadorServidores.respuesta(n, j);
+            try {
+                d.send(new DatagramPacket(r, r.length, p.getSocketAddress()));
+            } catch (IOException e) {
+                continue;
+            }
+            long ahora = System.nanoTime();
+            Long antes = anotadas.get(p.getAddress());
+            if (antes != null && ahora - antes < TimeUnit.SECONDS.toNanos(10)) {
+                continue;
+            }
+            anotadas.put(p.getAddress(), ahora);
+            log("[" + BuscadorServidores.PUERTO + "/udp] search from " + p.getAddress().getHostAddress()
+                    + ": answered '" + n + "', " + j + " players");
+        }
+    }
 
     private void aceptar(ServerSocket escucha, int puerto) {
         while (!parado) {

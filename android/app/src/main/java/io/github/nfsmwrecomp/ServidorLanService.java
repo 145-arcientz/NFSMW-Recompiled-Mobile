@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -34,6 +35,9 @@ public class ServidorLanService extends Service {
     private final Handler hiloPrincipal = new Handler(Looper.getMainLooper());
     private ServidorEa servidor;
     private boolean enMarcha;
+    // Sin el, algunas Wi-Fi tiran los broadcast antes de llegar a la app: la
+    // busqueda de servidores de los demas (BuscadorServidores) no veria este.
+    private WifiManager.MulticastLock broadcasts;
 
     static void arrancar(Context ctx) {
         ctx.startForegroundService(new Intent(ctx, ServidorLanService.class));
@@ -74,6 +78,12 @@ public class ServidorLanService extends Service {
         }
         if (!enMarcha) {
             enMarcha = true;
+            WifiManager wifi = getApplicationContext().getSystemService(WifiManager.class);
+            if (wifi != null) {
+                broadcasts = wifi.createMulticastLock("servidor_lan");
+                broadcasts.setReferenceCounted(false);
+                broadcasts.acquire();
+            }
             // Abrir los puertos es red: fuera del hilo principal.
             new Thread(this::abrir, "servidor-ea").start();
         }
@@ -83,7 +93,7 @@ public class ServidorLanService extends Service {
     private void abrir() {
         try {
             ServidorEa s = new ServidorEa(new File(getFilesDir(), "servidor_lan"), Ajustes.carpetaLogs(this),
-                    () -> hiloPrincipal.post(this::actualizar));
+                    () -> hiloPrincipal.post(this::actualizar), this::nombreServidor);
             s.arrancar();
             hiloPrincipal.post(() -> {
                 if (enMarcha) {
@@ -102,6 +112,12 @@ public class ServidorLanService extends Service {
                 stopSelf();
             });
         }
+    }
+
+    /** Lo que ven los demas al buscar servidores: el gamertag de este movil, o su modelo. */
+    private String nombreServidor() {
+        String g = new Ajustes(this).gamertag().trim();
+        return g.isEmpty() ? Build.MODEL : g;
     }
 
     private void actualizar() {
@@ -137,6 +153,10 @@ public class ServidorLanService extends Service {
     @Override
     public void onDestroy() {
         enMarcha = false;
+        if (broadcasts != null) {
+            broadcasts.release();
+            broadcasts = null;
+        }
         hiloPrincipal.removeCallbacksAndMessages(null);
         if (servidor != null) {
             ServidorEa s = servidor;

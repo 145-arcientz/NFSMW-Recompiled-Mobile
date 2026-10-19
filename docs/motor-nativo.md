@@ -11,6 +11,9 @@ El APK de Android se puede compilar con dos motores:
 opciones portadas después (Turnip, sonda, afinidad, gráficos) están sin probar una a una:
 ver "Qué falta".
 
+Hay en obras un segundo backend sobre OpenGL ES, para los móviles sin Vulkan o con el
+driver roto: [motor-nativo-gles.md](motor-nativo-gles.md).
+
 ## Por qué
 
 Con el camino de Xenos la carrera de demostración va a 36–45 fps en un Snapdragon 8 Elite,
@@ -206,7 +209,7 @@ python tools/android/apk_ediciones.py              (todas las preparadas)
 python tools/android/apk_ediciones.py --ediciones usa
 ```
 
-Sale `out/apk/nfsmw-ediciones-<versión>-release.apk` (la `versionName` de la app), que juega la ISO de cualquiera de
+Sale `out/apk/nfsmw-all-<versión>-release.apk` (la `versionName` de la app), que juega la ISO de cualquiera de
 ellas. Entran todas las preparadas, no solo la USA y la japonesa: cada una añade unos
 16 MB al APK (40 MB instalada). Lo que cambia entre ediciones es solo el código traducido, `libmain.so`: las apps
 de cada una (`app`, `app_usa`, `app_jpn`) solo difieren en direcciones y comentarios,
