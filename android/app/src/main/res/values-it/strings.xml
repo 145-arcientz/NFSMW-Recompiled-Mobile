@@ -61,6 +61,9 @@
     <string name="filtro_color_apagado">Disattivato</string>
     <string name="desenfoque">Sfocatura della velocità</string>
     <string name="desenfoque_resumen">La sfocatura radiale quando acceleri e con il NOS. Costa 1,5–2 ms per fotogramma.</string>
+    <string name="api_grafica">API grafica</string>
+    <string name="api_grafica_resumen">OpenGL ES è per i telefoni senza Vulkan o con un driver Vulkan difettoso. Sperimentale: per ora il gioco funziona, ma si vede solo un colore di prova.</string>
+    <string name="api_gles">OpenGL ES (sperimentale)</string>
     <string name="filtro_imagen">Filtro immagine</string>
     <string name="filtro_imagen_resumen">Uno stile in più sopra quello del gioco.</string>
     <string name="filtro_imagen_no">Nessuno</string>

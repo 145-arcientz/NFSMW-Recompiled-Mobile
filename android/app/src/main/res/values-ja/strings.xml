@@ -61,6 +61,9 @@
     <string name="filtro_color_apagado">オフ</string>
     <string name="desenfoque">スピードブラー</string>
     <string name="desenfoque_resumen">加速時と NOS 使用時の放射状ブラーです。1 フレームあたり 1.5～2 ms かかります。</string>
+    <string name="api_grafica">グラフィックス API</string>
+    <string name="api_grafica_resumen">OpenGL ES は Vulkan 非対応、または Vulkan ドライバーに問題がある端末向けです。実験的：現在、ゲームは動作しますが、テスト用の色しか表示されません。</string>
+    <string name="api_gles">OpenGL ES（実験的）</string>
     <string name="filtro_imagen">画像フィルター</string>
     <string name="filtro_imagen_resumen">ゲームの見た目にさらに重ねるスタイルです。</string>
     <string name="filtro_imagen_no">なし</string>

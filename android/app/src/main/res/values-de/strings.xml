@@ -61,6 +61,9 @@
     <string name="filtro_color_apagado">Aus</string>
     <string name="desenfoque">Geschwindigkeitsunschärfe</string>
     <string name="desenfoque_resumen">Die radiale Unschärfe beim Beschleunigen und mit NOS. Kostet 1,5–2 ms pro Bild.</string>
+    <string name="api_grafica">Grafik-API</string>
+    <string name="api_grafica_resumen">OpenGL ES ist für Handys ohne Vulkan oder mit fehlerhaftem Vulkan-Treiber. Experimentell: Das Spiel läuft, aber vorerst ist nur eine Testfarbe zu sehen.</string>
+    <string name="api_gles">OpenGL ES (experimentell)</string>
     <string name="filtro_imagen">Bildfilter</string>
     <string name="filtro_imagen_resumen">Ein zusätzlicher Look über dem des Spiels.</string>
     <string name="filtro_imagen_no">Keiner</string>

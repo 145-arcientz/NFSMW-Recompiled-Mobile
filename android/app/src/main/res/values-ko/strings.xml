@@ -61,6 +61,9 @@
     <string name="filtro_color_apagado">끔</string>
     <string name="desenfoque">속도 블러</string>
     <string name="desenfoque_resumen">가속할 때와 NOS 사용 시의 방사형 블러입니다. 프레임당 1.5~2ms가 듭니다.</string>
+    <string name="api_grafica">그래픽 API</string>
+    <string name="api_grafica_resumen">OpenGL ES는 Vulkan이 없거나 Vulkan 드라이버에 문제가 있는 휴대폰용입니다. 실험: 지금은 게임이 실행되지만 테스트 색상만 표시됩니다.</string>
+    <string name="api_gles">OpenGL ES (실험)</string>
     <string name="filtro_imagen">이미지 필터</string>
     <string name="filtro_imagen_resumen">게임의 느낌 위에 더하는 추가 스타일입니다.</string>
     <string name="filtro_imagen_no">없음</string>

@@ -206,6 +206,11 @@ final class MotorNativo {
         a.add("--present_effect=" + ajustes.escalado());
 
         // Graficos y sonido
+        // Solo si no es la de siempre: las libmain de las otras ediciones (app_<edicion>) no
+        // conocen esta cvar hasta que se regeneran desde la app PAL.
+        if (Ajustes.API_GLES.equals(ajustes.apiGrafica())) {
+            a.add("--nfsmw_nativo_api=" + Ajustes.API_GLES);
+        }
         a.add("--nfsmw_resolucion_interna=" + ajustes.resolucionInterna());
         a.add("--nfsmw_limite_fps=" + (ajustes.limiteFps() == Ajustes.FPS_SIN_LIMITE
                 ? "sin_limite" : String.valueOf(ajustes.limiteFps())));

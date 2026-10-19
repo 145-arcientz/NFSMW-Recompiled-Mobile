@@ -61,6 +61,9 @@
     <string name="filtro_color_apagado">關閉</string>
     <string name="desenfoque">速度模糊</string>
     <string name="desenfoque_resumen">加速和使用 NOS 時的放射狀模糊。每個影格需要 1.5–2 毫秒。</string>
+    <string name="api_grafica">圖形 API</string>
+    <string name="api_grafica_resumen">OpenGL ES 適用於沒有 Vulkan 或 Vulkan 驅動程式有問題的手機。實驗性：目前遊戲可以執行，但只會顯示測試色彩。</string>
+    <string name="api_gles">OpenGL ES（實驗性）</string>
     <string name="filtro_imagen">影像濾鏡</string>
     <string name="filtro_imagen_resumen">疊加在遊戲畫面風格上的額外風格。</string>
     <string name="filtro_imagen_no">無</string>

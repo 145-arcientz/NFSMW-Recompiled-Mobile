@@ -64,6 +64,10 @@
     <string name="filtro_color_apagado">Off</string>
     <string name="desenfoque">Speed blur</string>
     <string name="desenfoque_resumen">The radial blur when accelerating and with NOS. Costs 1.5–2 ms per frame.</string>
+    <string name="api_grafica">Graphics API</string>
+    <string name="api_grafica_resumen">OpenGL ES is for phones without Vulkan or with a broken Vulkan driver. Experimental: for now the game runs but only a test color is shown.</string>
+    <string name="api_vulkan" translatable="false">Vulkan</string>
+    <string name="api_gles">OpenGL ES (experimental)</string>
     <string name="filtro_imagen">Image filter</string>
     <string name="filtro_imagen_resumen">An extra look on top of the one of the game.</string>
     <string name="filtro_imagen_no">None</string>

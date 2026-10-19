@@ -537,6 +537,15 @@ final class Ajustes {
     void resplandorCielo(String v) { p.edit().putString("resplandor_cielo", v).apply(); }
 
     /**
+     * nfsmw_nativo_api: vulkan, o gles (OpenGL ES, en obras: de momento el
+     * juego corre y se ve un color de prueba; docs/motor-nativo-gles.md).
+     */
+    static final String API_VULKAN = "vulkan";
+    static final String API_GLES = "gles";
+    String apiGrafica() { return p.getString("api_grafica", API_VULKAN); }
+    void apiGrafica(String v) { p.edit().putString("api_grafica", v).apply(); }
+
+    /**
      * Motor nativo: el sonido por nuestro driver AAudio (nfsmw_audio_aaudio),
      * el que arreglo los cortes con el motor de Xenos, o por el de SDL de su SDK.
      */

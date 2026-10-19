@@ -566,6 +566,10 @@ public class SetupActivity extends AppCompatActivity {
     private View tarjetaGraficos() {
         return tarjeta(
             seccion(R.string.seccion_graficos),
+            soloNativo(selector(R.string.api_grafica, R.string.api_grafica_resumen,
+                    Arrays.asList(getString(R.string.api_vulkan), getString(R.string.api_gles)),
+                    Arrays.asList(Ajustes.API_VULKAN, Ajustes.API_GLES), ajustes.apiGrafica(), true,
+                    ajustes::apiGrafica)),
             soloNativo(selector(R.string.resolucion_interna, R.string.resolucion_interna_resumen,
                     Arrays.asList(getString(R.string.res_interna_576), getString(R.string.res_interna_720),
                             getString(R.string.res_interna_1080)),

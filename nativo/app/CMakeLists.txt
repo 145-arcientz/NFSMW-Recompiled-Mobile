@@ -133,6 +133,8 @@ if(ANDROID)
     # SDLActivity resolves SDL_main from libmain.so.
     add_library(nfsmw SHARED ${NFSMW_SOURCES})
     set_target_properties(nfsmw PROPERTIES OUTPUT_NAME main)
+    # The OpenGL ES backend (nfsmw_nativo_api = gles) calls GL and EGL from here too, not only the SDK.
+    target_link_libraries(nfsmw PRIVATE EGL GLESv3)
 elseif(WIN32)
     add_executable(nfsmw WIN32 ${NFSMW_SOURCES})
     # PC build: masks again the floating-point exceptions that

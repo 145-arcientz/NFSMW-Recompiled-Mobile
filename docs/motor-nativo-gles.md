@@ -1,8 +1,9 @@
 # El motor nativo sobre OpenGL ES
 
 Un segundo backend del [motor nativo](motor-nativo.md) para los móviles que no tienen Vulkan, o
-cuyo driver de Vulkan falla. **Estado: en obras.** Hecha la fase 1 (los shaders); el renderizador
-todavía no existe.
+cuyo driver de Vulkan falla. **Estado: en obras.** Hechas la fase 1 (los shaders) y la 2 (el
+presentador); el renderizador todavía no dibuja. Con «API gráfica: OpenGL ES (experimental)» en
+el lanzador, el juego corre y la pantalla muestra el color de prueba.
 
 ## Decisiones
 
@@ -22,9 +23,7 @@ todavía no existe.
 ## Fases
 
 1. **Shaders.** Hecha (ver abajo).
-2. **Presentador.** Una subclase de `rex::ui::Presenter` con EGL sobre el `ANativeWindow` y un
-   contexto compartido con el hilo del anillo. Los overlays de imgui pueden quedarse fuera al
-   principio.
+2. **Presentador.** Hecha (ver abajo).
 3. **C2.** Render targets como texturas con FBO, resolves con `glCopyImageSubData` o
    `glBlitFramebuffer`, el intercambio de imágenes al resolver, los borrados con tijera, y tres
    ranuras con `glFenceSync`.
@@ -111,3 +110,38 @@ compilación está en la cabecera de la prueba; con `glslangValidator` (de `sdk/
 
 Un PS lee como mucho 11 interpoladores. El conversor también compila con el NDK para arm64.
 Todavía no se ha probado ningún shader en un driver de verdad: eso llega con la fase 4.
+
+## Fase 2: el presentador
+
+En el SDK del motor nativo, solo para Android:
+
+- **[`GlesProvider`](../nativo/sdk/include/rex/ui/gles/provider.h)** abre EGL, elige una
+  configuración RGBA8 sin profundidad y crea un contexto raíz de OpenGL ES 3.2 (o 3.1) que nunca
+  se hace actual. Todos los demás comparten objetos con él: el del presentador y uno por cada hilo
+  que dibuja (`CrearContextoHilo`, con `EGL_KHR_surfaceless_context` o un pbuffer de 1×1). Las
+  texturas, búferes, programas y objetos de sincronización se comparten; los framebuffers y los
+  VAO, no. Al arrancar escribe en el log el driver y lo que tiene (clip_control, timer_query,
+  buffer_storage, S3TC/RGTC, límites).
+- **[`GlesPresenter`](../nativo/sdk/include/rex/ui/gles/presenter.h)** implementa la interfaz
+  del presentador del SDK. La salida del juego es un buzón de tres texturas `GL_RGB10_A2`, como
+  las imágenes `A2B10G10R10` del de Vulkan. El hilo que la refresca (el del anillo) dibuja en ella
+  desde su contexto, y la sincronización entre contextos va por la GPU con `glWaitSync`: el
+  refresco deja un sync al terminar de escribir, que el pintado espera antes de muestrear, y el
+  pintado deja otro, que el siguiente refresco de esa textura espera antes de escribir. El
+  contexto de pintado se hace actual con la superficie de la ventana en cada pintado y se suelta
+  al acabar, porque el pintado puede cambiar de hilo (el hilo propio del presentador o el de la
+  UI). La superficie se crea sobre el `ANativeWindow` que da SDL, que no crea la suya porque la
+  ventana no lleva `SDL_WINDOW_OPENGL`. Con `eglSwapInterval(1)`, la sincronía vertical es
+  implícita.
+- Todavía no: los overlays de ImGui (`CreateImmediateDrawer` devuelve nulo, y entonces la app no
+  los monta), la captura de la salida y los efectos de FidelityFX (solo bilineal).
+
+En la app: la cvar `nfsmw_nativo_api` (`vulkan` o `gles`, que el lanzador pone con «API
+gráfica») elige el proveedor. Con GLES, el hilo del anillo crea y hace actual su propio contexto
+al empezar y lo destruye al acabar, y como no hay destinos (`AsegurarDestinos` devuelve falso),
+cada Swap pinta el color de prueba (`LimpiarSalidaGles`): el verde sube y baja con cada Swap, y
+una franja blanca cubre la octava parte de arriba de la imagen. **Si la franja sale abajo, la
+orientación está mal.**
+
+Compila con el NDK. **Sin probar en el móvil.** Solo va en la app de PAL España: los árboles de
+las demás ediciones (`app_<edición>`) se regeneran desde `app/` con `preparar_nativo.py`.

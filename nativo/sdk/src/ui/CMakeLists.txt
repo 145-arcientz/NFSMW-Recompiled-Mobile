@@ -84,6 +84,9 @@ elseif(WIN32)
 elseif(ANDROID)
     set(REXUI_PLATFORM_SOURCES
         surface_android.cpp
+        # PARCHE LOCAL - OpenGL ES backend of the native renderer (EGL).
+        gles/gles_presenter.cpp
+        gles/gles_provider.cpp
     )
 elseif(APPLE)
     set(REXUI_PLATFORM_SOURCES
@@ -182,6 +185,8 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
     )
 elseif(ANDROID)
     target_link_libraries(rexui PRIVATE android)
+    # PARCHE LOCAL - OpenGL ES backend: EGL and GLES 3 are public because the native renderer calls GL too.
+    target_link_libraries(rexui PUBLIC EGL GLESv3)
     # PARCHE LOCAL - Turnip: drivers Vulkan propios via libadrenotools, si
     # thirdparty/CMakeLists.txt lo ha compilado.
     if(TARGET adrenotools)

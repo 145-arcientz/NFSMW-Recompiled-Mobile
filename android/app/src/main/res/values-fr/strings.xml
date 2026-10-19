@@ -61,6 +61,9 @@
     <string name="filtro_color_apagado">Désactivé</string>
     <string name="desenfoque">Flou de vitesse</string>
     <string name="desenfoque_resumen">Le flou radial en accélérant et avec le NOS. Coûte 1,5–2 ms par image.</string>
+    <string name="api_grafica">API graphique</string>
+    <string name="api_grafica_resumen">OpenGL ES est destiné aux téléphones sans Vulkan ou dont le pilote Vulkan est défaillant. Expérimental : pour l\'instant, le jeu tourne mais seule une couleur de test s\'affiche.</string>
+    <string name="api_gles">OpenGL ES (expérimental)</string>
     <string name="filtro_imagen">Filtre d\'image</string>
     <string name="filtro_imagen_resumen">Un style supplémentaire par-dessus celui du jeu.</string>
     <string name="filtro_imagen_no">Aucun</string>

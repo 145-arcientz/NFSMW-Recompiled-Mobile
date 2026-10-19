@@ -56,6 +56,9 @@
     <string name="filtro_color_apagado">Apagado</string>
     <string name="desenfoque">Desenfoque de velocidad</string>
     <string name="desenfoque_resumen">El desenfoque radial al acelerar y con el NOS. Cuesta 1,5–2 ms por fotograma.</string>
+    <string name="api_grafica">API gráfica</string>
+    <string name="api_grafica_resumen">OpenGL ES es para móviles sin Vulkan o con el driver de Vulkan roto. Experimental: por ahora el juego corre, pero solo se ve un color de prueba.</string>
+    <string name="api_gles">OpenGL ES (experimental)</string>
     <string name="filtro_imagen">Filtro de imagen</string>
     <string name="filtro_imagen_resumen">Un aspecto encima del del juego.</string>
     <string name="filtro_imagen_no">Ninguno</string>

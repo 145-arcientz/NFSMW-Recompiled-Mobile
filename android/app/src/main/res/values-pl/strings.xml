@@ -61,6 +61,9 @@
     <string name="filtro_color_apagado">Wyłączony</string>
     <string name="desenfoque">Rozmycie prędkości</string>
     <string name="desenfoque_resumen">Rozmycie promieniowe przy przyspieszaniu i z NOS. Kosztuje 1,5–2 ms na klatkę.</string>
+    <string name="api_grafica">Interfejs graficzny</string>
+    <string name="api_grafica_resumen">OpenGL ES jest dla telefonów bez Vulkana lub z wadliwym sterownikiem Vulkan. Eksperymentalne: na razie gra działa, ale widać tylko kolor testowy.</string>
+    <string name="api_gles">OpenGL ES (eksperymentalne)</string>
     <string name="filtro_imagen">Filtr obrazu</string>
     <string name="filtro_imagen_resumen">Dodatkowy styl nałożony na styl gry.</string>
     <string name="filtro_imagen_no">Brak</string>
