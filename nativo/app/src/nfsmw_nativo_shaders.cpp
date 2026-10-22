@@ -5,7 +5,9 @@
 #include "nfsmw_nativo_shaders.h"
 
 #include "nfsmw_shader_library.h"
+#include "nfsmw_spirv_precision.h"
 
+#include <rex/cvar.h>
 #include <rex/logging.h>
 
 #include <algorithm>
@@ -29,6 +31,13 @@
 #define XXH_FORCE_MEMORY_ACCESS 0
 #define XXH_INLINE_ALL
 #include <xxhash.h>
+
+REXCVAR_DEFINE_BOOL(nfsmw_nativo_media_precision, false, "NFSMW",
+                    "Renderizador nativo (Vulkan y OpenGL ES, prueba): el color de los pixel shaders a 16 bits "
+                    "(RelaxedPrecision; mediump en GLES). Mali y Adreno hacen el doble de cuentas por ciclo; las "
+                    "coordenadas de textura, la profundidad y lo que no sale de una textura siguen a 32 bits. Puede "
+                    "dar bandas en algun efecto: apagado hasta probarlo en el movil")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 namespace nfsmw::nativo {
 namespace {
@@ -261,6 +270,21 @@ bool ShadersNativos::Cargar(const std::filesystem::path& archivo) {
     REXLOG_WARN("[nativo] C5a: biblioteca de shaders no disponible ({}): {}", archivo.string(),
                 e.what());
     return false;
+  }
+  // nfsmw_nativo_media_precision: the pixel shaders' color math at 16 bits, for both renderers (see
+  // nfsmw_spirv_precision.h). Before anything reads the SPIR-V.
+  if (REXCVAR_GET(nfsmw_nativo_media_precision)) {
+    uint32_t shaders_tocados = 0;
+    uint64_t resultados = 0;
+    for (native::Shader& s : d.biblioteca.shaders_para_ajustar()) {
+      if (!s.vertices) {
+        const uint32_t marcados = RelajarPrecision(s.spirv);
+        shaders_tocados += marcados ? 1 : 0;
+        resultados += marcados;
+      }
+    }
+    REXLOG_INFO("[nativo] C5a: media precision en {} pixel shaders ({} resultados a 16 bits)", shaders_tocados,
+                resultados);
   }
   const auto& shaders = d.biblioteca.shaders();
   uint32_t con_kill = 0, sin_kill = 0;

@@ -10,6 +10,7 @@
 //     $S/spirv-cross/spirv_glsl.cpp -o gles_shaders_test
 //   gles_shaders_test <nfsmw_shaders_gles.nfsp> <output folder> [310|320] [clip_control]
 #include "nfsmw_gles_shaders.h"
+#include "nfsmw_spirv_precision.h"
 #include "nfsmw_shader_library.h"
 
 #include <algorithm>
@@ -42,7 +43,7 @@ int main(int argc, char** argv) {
     return 2;
   }
   nfsmw::gles::OpcionesGlsl opciones;
-  if (argc > 3) opciones.version = uint32_t(std::atoi(argv[3]));
+  if (argc > 3 && std::atoi(argv[3]) > 0) opciones.version = uint32_t(std::atoi(argv[3]));
   opciones.clip_control = argc > 4 && std::strcmp(argv[4], "clip_control") == 0;
 
   nfsmw::native::BibliotecaShaders biblioteca;
@@ -51,6 +52,16 @@ int main(int argc, char** argv) {
   } catch (const std::exception& e) {
     std::fprintf(stderr, "biblioteca: %s\n", e.what());
     return 1;
+  }
+  // "relajado": the pixel shaders with nfsmw_nativo_media_precision (RelaxedPrecision, mediump in GLSL ES).
+  uint64_t relajados = 0;
+  for (int i = 3; i < argc; ++i) {
+    if (std::strcmp(argv[i], "relajado") == 0) {
+      for (auto& shader : biblioteca.shaders_para_ajustar()) {
+        if (!shader.vertices) relajados += nfsmw::nativo::RelajarPrecision(shader.spirv);
+      }
+      std::printf("media precision: %llu resultados marcados\n", (unsigned long long)relajados);
+    }
   }
   std::filesystem::create_directories(argv[2]);
   const auto escribir = [&](uint32_t n, bool vertices, const std::string& fuente) {

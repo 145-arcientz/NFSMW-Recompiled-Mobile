@@ -24,6 +24,8 @@ class BibliotecaShaders {
   void Cargar(const std::filesystem::path& archivo);
   const Shader* Buscar(std::span<const uint8_t> original) const;
   const std::vector<Shader>& shaders() const { return shaders_; }
+  // To adjust the SPIR-V right after Cargar (nfsmw_nativo_media_precision), before any pointer is handed out.
+  std::vector<Shader>& shaders_para_ajustar() { return shaders_; }
 
  private:
   std::vector<Shader> shaders_;

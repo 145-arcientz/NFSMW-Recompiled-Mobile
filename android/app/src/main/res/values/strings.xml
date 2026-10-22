@@ -36,10 +36,6 @@
     <string name="sombras_alta">High</string>
     <string name="sombras_muy_alta">Very high</string>
     <string name="sombras_ultra">Ultra</string>
-    <string name="sombras">Shadows</string>
-    <string name="sombras_resumen">How often the shadow maps are redrawn. Every 2 frames is cheaper and barely shows.</string>
-    <string name="sombras_siempre">Every frame</string>
-    <string name="sombras_cada_2">Every 2 frames</string>
     <string name="sombras_distancia">Shadow distance</string>
     <string name="sombras_distancia_resumen">How far away objects still cast shadows. Most of the shadow cost is there.</string>
     <string name="sombras_lejos">Far (like the game)</string>
@@ -65,9 +61,10 @@
     <string name="desenfoque">Speed blur</string>
     <string name="desenfoque_resumen">The radial blur when accelerating and with NOS. Costs 1.5–2 ms per frame.</string>
     <string name="api_grafica">Graphics API</string>
-    <string name="api_grafica_resumen">OpenGL ES is for phones without Vulkan or with a broken Vulkan driver. Experimental: for now the game runs but only a test color is shown.</string>
+    <string name="api_grafica_resumen">OpenGL ES is for phones without Vulkan or with a broken Vulkan driver. Experimental: slower than Vulkan, and some effects are missing.</string>
     <string name="api_vulkan" translatable="false">Vulkan</string>
     <string name="api_gles">OpenGL ES (experimental)</string>
+    <string name="gles_no_disponible">This edition has no OpenGL ES yet: it plays with Vulkan.</string>
     <string name="filtro_imagen">Image filter</string>
     <string name="filtro_imagen_resumen">An extra look on top of the one of the game.</string>
     <string name="filtro_imagen_no">None</string>
@@ -281,4 +278,13 @@
     <string name="editor_disposicion_normal">CONTROLS: NORMAL</string>
     <string name="editor_disposicion_aceleracion">CONTROLS: DRAG</string>
     <string name="editor_disposicion_conduciendo">CONTROLS: DRIVING</string>
+    <string name="preajustes">Presets</string>
+    <string name="preajustes_resumen">Change all the settings below at once.</string>
+    <string name="preajuste_ahorro">Battery saver</string>
+    <string name="preajuste_fabrica">Factory settings</string>
+    <string name="preajuste_ahorro_detalle">30 fps, 1024×576 scaled with FSR, no anti-aliasing, fast shadows close by, and a single car reflection. Uses less battery and runs cooler.</string>
+    <string name="preajuste_fabrica_detalle">Puts the graphics settings back as they were on a new install on this phone.</string>
+    <string name="preajuste_mios">My settings</string>
+    <string name="preajuste_mios_detalle">Goes back to the graphics settings you had before applying the last preset.</string>
+    <string name="preajuste_aplicar">Apply</string>
 </resources>

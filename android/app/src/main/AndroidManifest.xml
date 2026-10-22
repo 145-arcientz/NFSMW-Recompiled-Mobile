@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- La emulacion de la GPU Xenos va sobre Vulkan 1.1 como minimo. -->
+    <!-- La emulacion de la GPU Xenos va sobre Vulkan 1.1 como minimo. El motor
+         nativo no lo exige: sin Vulkan juega con OpenGL ES (vulkanRequerido sale
+         de build.gradle.kts). -->
     <uses-feature
         android:name="android.hardware.vulkan.version"
         android:version="0x401000"
-        android:required="true" />
+        android:required="${vulkanRequerido}" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />

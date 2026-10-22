@@ -29,6 +29,10 @@ class GlesProvider final : public GraphicsProvider {
     bool copy_image = false;            // core in 3.2, GL_EXT_copy_image in 3.1
     bool texture_compression_s3tc = false;  // GL_EXT_texture_compression_s3tc (BC1-3)
     bool texture_compression_rgtc = false;  // GL_EXT_texture_compression_rgtc (BC4-5)
+    bool texture_norm16 = false;            // GL_EXT_texture_norm16 (R16, RG16, RGBA16 unorm)
+    bool float_linear = false;              // GL_OES_texture_float_linear (filtering of 32-bit floats)
+    bool mirror_clamp = false;              // GL_EXT_texture_mirror_clamp_to_edge
+    float anisotropia_max = 0.0f;           // GL_EXT_texture_filter_anisotropic; 0 = without it
     int32_t max_texture_size = 0;
     int32_t max_combined_texture_units = 0;
     int32_t max_vertex_output_components = 0;
@@ -66,7 +70,7 @@ class GlesProvider final : public GraphicsProvider {
       Presenter::HostGpuLossCallback host_gpu_loss_callback =
           Presenter::FatalErrorHostGpuLossCallback) override;
   // Not yet: without an immediate drawer the app does not set up the ImGui overlays.
-  std::unique_ptr<ImmediateDrawer> CreateImmediateDrawer() override { return nullptr; }
+  std::unique_ptr<ImmediateDrawer> CreateImmediateDrawer() override;
 
   std::unique_ptr<ContextoHilo> CrearContextoHilo() const;
   // A new context shared with the root one (the presenter's), current on no thread. EGL_NO_CONTEXT on failure.

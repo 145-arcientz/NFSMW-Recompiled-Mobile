@@ -33,10 +33,6 @@
     <string name="sombras_alta">Wysoka</string>
     <string name="sombras_muy_alta">Bardzo wysoka</string>
     <string name="sombras_ultra">Ultra</string>
-    <string name="sombras">Cienie</string>
-    <string name="sombras_resumen">Jak często mapy cieni są przerysowywane. Co 2 klatki jest taniej i prawie tego nie widać.</string>
-    <string name="sombras_siempre">Co klatkę</string>
-    <string name="sombras_cada_2">Co 2 klatki</string>
     <string name="sombras_distancia">Zasięg cieni</string>
     <string name="sombras_distancia_resumen">Do jakiej odległości obiekty rzucają cienie. Tu jest większość kosztu cieni.</string>
     <string name="sombras_lejos">Daleko (jak w grze)</string>
@@ -62,8 +58,9 @@
     <string name="desenfoque">Rozmycie prędkości</string>
     <string name="desenfoque_resumen">Rozmycie promieniowe przy przyspieszaniu i z NOS. Kosztuje 1,5–2 ms na klatkę.</string>
     <string name="api_grafica">Interfejs graficzny</string>
-    <string name="api_grafica_resumen">OpenGL ES jest dla telefonów bez Vulkana lub z wadliwym sterownikiem Vulkan. Eksperymentalne: na razie gra działa, ale widać tylko kolor testowy.</string>
+    <string name="api_grafica_resumen">OpenGL ES jest dla telefonów bez Vulkana lub z wadliwym sterownikiem Vulkan. Eksperymentalne: wolniejsze niż Vulkan i brakuje niektórych efektów.</string>
     <string name="api_gles">OpenGL ES (eksperymentalne)</string>
+    <string name="gles_no_disponible">Ta edycja nie ma jeszcze OpenGL ES: gra używa Vulkana.</string>
     <string name="filtro_imagen">Filtr obrazu</string>
     <string name="filtro_imagen_resumen">Dodatkowy styl nałożony na styl gry.</string>
     <string name="filtro_imagen_no">Brak</string>
@@ -257,4 +254,13 @@
     <string name="editor_disposicion_normal">STEROWANIE: NORMALNE</string>
     <string name="editor_disposicion_aceleracion">STEROWANIE: DRAG</string>
     <string name="editor_disposicion_conduciendo">STEROWANIE: JAZDA</string>
+    <string name="preajustes">Ustawienia wstępne</string>
+    <string name="preajustes_resumen">Zmieniają naraz wszystkie ustawienia poniżej.</string>
+    <string name="preajuste_ahorro">Oszczędzanie baterii</string>
+    <string name="preajuste_fabrica">Ustawienia fabryczne</string>
+    <string name="preajuste_ahorro_detalle">30 fps, 1024×576 skalowane przez FSR, bez wygładzania, szybkie cienie tylko z bliska oraz jedno odbicie samochodu. Zużywa mniej baterii i mniej się nagrzewa.</string>
+    <string name="preajuste_fabrica_detalle">Przywraca ustawienia grafiki takie jak po nowej instalacji na tym telefonie.</string>
+    <string name="preajuste_mios">Moje ustawienia</string>
+    <string name="preajuste_mios_detalle">Przywraca ustawienia grafiki sprzed zastosowania ostatniego profilu.</string>
+    <string name="preajuste_aplicar">Zastosuj</string>
 </resources>

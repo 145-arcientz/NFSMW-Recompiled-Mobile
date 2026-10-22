@@ -126,12 +126,13 @@ def carpeta_nativa(app_nativa):
     return max(candidatas, key=lambda o: (o / "libmain.so").stat().st_mtime)
 
 
-def salida():
+def salida(sufijo=""):
     """out/apk/nfsmw-all-<versionName>-release.apk, como los de una edicion
-    (nfsmw-pal_es-0.4.1-release.apk)."""
+    (nfsmw-pal_es-0.4.1-release.apk). Con sufijo (los de depurar), otro nombre
+    para no pisar el de publicar."""
     texto = (APP / "build.gradle.kts").read_text(encoding="utf-8")
     version = re.search(r'versionName\s*=\s*"([^"]+)"', texto).group(1)
-    return RAIZ / "out" / "apk" / f"nfsmw-all-{version}-release.apk"
+    return RAIZ / "out" / "apk" / f"nfsmw-all-{version}{sufijo}-release.apk"
 
 
 def ndk():
@@ -168,6 +169,8 @@ def main():
                          "todas las preparadas: out/<id>/edicion.json)")
     ap.add_argument("--registro", action="store_true", help="con el log del juego (-Pnfsmw.registro=true)")
     ap.add_argument("--depurable", action="store_true", help="depurable con run-as (-Pnfsmw.depurable=true)")
+    ap.add_argument("--capas-vulkan", metavar="CARPETA",
+                    help="mete la capa de validacion de Vulkan (CARPETA/arm64-v8a/libVkLayer_khronos_validation.so)")
     args = ap.parse_args()
     arbol = pathlib.Path(args.arbol).resolve()
 
@@ -209,6 +212,12 @@ def main():
         destino = CARPETA / "assets" / "nativo" / e
         destino.mkdir(parents=True)
         shutil.copy2(shaders, destino / "nfsmw_shaders.nfsp")
+        # La del backend de OpenGL ES, si preparar_nativo.py la genero (MotorNativo la instala si esta).
+        gles = shaders.with_name("nfsmw_shaders_gles.nfsp")
+        if gles.is_file():
+            shutil.copy2(gles, destino / "nfsmw_shaders_gles.nfsp")
+        else:
+            print(f"[aviso] {e}: sin biblioteca de OpenGL ES ({gles}); esa edicion jugara solo con Vulkan")
     with open(CARPETA / "ediciones.json", "w", encoding="utf-8", newline="\n") as fh:
         json.dump([d for d, _ in fichas.values()], fh, ensure_ascii=False, indent=2)
         fh.write("\n")
@@ -219,9 +228,11 @@ def main():
         extra.append("-Pnfsmw.registro=true")
     if args.depurable:
         extra.append("-Pnfsmw.depurable=true")
+    if args.capas_vulkan:
+        extra.append(f"-Pnfsmw.capas_vulkan={pathlib.Path(args.capas_vulkan).resolve()}")
     gradle(":app:assembleRelease", *extra)
     apk = APP / "build" / "outputs" / "apk" / "release" / "app-release.apk"
-    destino = salida()
+    destino = salida("-depuracion" if args.registro or args.depurable or args.capas_vulkan else "")
     destino.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(apk, destino)
     print(f"\n[ok] {destino} ({destino.stat().st_size / 1e6:.1f} MB): "

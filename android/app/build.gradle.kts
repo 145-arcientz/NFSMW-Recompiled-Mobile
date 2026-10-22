@@ -80,6 +80,9 @@ val assetsNativo = layout.buildDirectory.dir("generated/nfsmw-nativo-assets")
 val copiarAssetsNativo = tasks.register<Copy>("copiarAssetsNativo") {
     from(File(nativo, "android/app/src/main/assets/nfsmw.toml"))
     from(File(outNativo, "nfsmw_shaders.nfsp"))
+    // La del backend de OpenGL ES (nfsmw_nativo_api = gles), si se ha generado
+    // (preparar_nativo.py o nativo/tools/biblioteca_shaders_gles.mjs).
+    from(File(outNativo, "nfsmw_shaders_gles.nfsp"))
     into(assetsNativo.map { it.dir("nativo") })
     doFirst {
         require(File(outNativo, "nfsmw_shaders.nfsp").isFile) {
@@ -97,12 +100,14 @@ android {
         applicationId = "io.github.nfsmwrecomp"
         // 29: memfd para adrenotools y un cargador de librerias con los espacios
         // de nombres que necesita. Por debajo no hay Snapdragon que merezca la pena.
-        minSdk = 29
+        minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.5.2"
+        versionCode = 13
+        versionName = "0.5.4"
 
         buildConfigField("boolean", "CON_JUEGO", conJuego.toString())
+        // El motor de Xenos necesita Vulkan 1.1; el nativo tiene OpenGL ES de respaldo.
+        manifestPlaceholders["vulkanRequerido"] = (!esNativo).toString()
         buildConfigField("String", "MOTOR", "\"$motor\"")
         // Las ediciones cuyo codigo lleva el APK (una, o varias con
         // -Pnfsmw.ediciones): su nombre, el SHA-256 de su default.xex (para
@@ -191,6 +196,14 @@ android {
             )
             if (esNativo) {
                 assets.directories.add(assetsNativo.get().asFile.absolutePath)
+            }
+            // Solo para depurar: la capa de validacion de Vulkan dentro del APK
+            // (una carpeta con arm64-v8a/libVkLayer_khronos_validation.so, la de
+            // las releases de KhronosGroup/Vulkan-ValidationLayers). Se enciende
+            // con --vulkan_validation_enabled=true --vulkan_log_debug_messages=true.
+            //     gradlew assembleRelease -Pnfsmw.capas_vulkan=<carpeta>
+            (findProperty("nfsmw.capas_vulkan") as String?)?.let {
+                jniLibs.directories.add(File(it).absolutePath)
             }
             if (carpetaEdiciones != null) {
                 jniLibs.directories.add(File(carpetaEdiciones, "jniLibs").absolutePath)

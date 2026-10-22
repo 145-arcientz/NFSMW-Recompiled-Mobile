@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Build;
 
+import androidx.annotation.RequiresApi;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -48,6 +50,7 @@ final class Cierres {
         }, "cierres").start();
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)  // getHistoricalProcessExitReasons; guardar ya lo comprueba
     private static void guardarYa(Context ctx) {
         ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
         if (am == null) return;
@@ -70,6 +73,7 @@ final class Cierres {
         if (nuevo != visto) p.edit().putLong(PREF, nuevo).apply();
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private static void escribir(File carpeta, ApplicationExitInfo i) {
         String hora = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT).format(new Date(i.getTimestamp()));
         StringBuilder t = new StringBuilder();
@@ -119,6 +123,7 @@ final class Cierres {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private static byte[] leerTraza(ApplicationExitInfo i) {
         try (InputStream in = i.getTraceInputStream()) {
             if (in == null) return null;

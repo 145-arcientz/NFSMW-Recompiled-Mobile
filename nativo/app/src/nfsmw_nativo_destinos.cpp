@@ -26,6 +26,7 @@
 // Everything is used only by the native system's PM4 ring thread: no locks.
 
 #include "nfsmw_nativo_destinos.h"
+#include "nfsmw_nativo_copias_comun.h"  // rectangle, tiling and write-back (shared with GLES)
 #include "nfsmw_esperas_tiron.h"
 #include "nfsmw_nativo_shaders.h"  // Samplers of the PS (nfsmw_nativo_diag_lectores_s)
 #include "nfsmw_nativo_sincronizacion.h"
@@ -67,6 +68,11 @@ REXCVAR_DEFINE_STRING(nfsmw_consultas_oclusion, "auto", "NFSMW",
 REXCVAR_DEFINE_BOOL(nfsmw_nativo_sincronizacion_gpu, true, "NFSMW",
                     "Sincroniza subidas, reflejos y lecturas de imagenes entre pases Vulkan")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+
+REXCVAR_DEFINE_BOOL(nfsmw_nativo_barreras_transferencia, true, "NFSMW",
+                    "Barrera entre dos transferencias seguidas (copia, borrado, blit, lectura a bufer). Sin ella "
+                    "Mali puede solaparlas (la capa de validacion lo vio en el A22). false = como antes, para "
+                    "comparar");
 
 REXCVAR_DEFINE_INT32(nfsmw_nativo_resolver_sin_copia_alternar_s, 0, "NFSMW",
                      "Renderizador nativo (prueba, build 154): con N > 0 alterna copiar e intercambiar cada N "
@@ -667,44 +673,7 @@ using FnBorrarProfundidad = void(VKAPI_PTR*)(VkCommandBuffer, VkImage, VkImageLa
 using FnBlit = void(VKAPI_PTR*)(VkCommandBuffer, VkImage, VkImageLayout, VkImage, VkImageLayout,
                                 uint32_t, const VkImageBlit*, VkFilter);
 
-// Direct3D 11 16.8 fixed point with rounding, like ui::FloatToD3D11Fixed16p8.
-int32_t Fijo16p8(float valor) {
-  if (!(std::abs(valor) >= 1.0f / 512.0f)) {
-    return 0;
-  }
-  const double escalado = std::clamp(double(valor) * 256.0, -2147483392.0, 2147483392.0);
-  return int32_t(std::lround(escalado));
-}
-
-// Address of a texel in a 32x32-tiled texture (pipeline/texture/util.cpp:424-436).
-int32_t DesplazamientoMosaico2D(int32_t x, int32_t y, uint32_t pitch, uint32_t log2_bytes) {
-  pitch = (pitch + 31) & ~uint32_t(31);
-  const int32_t macro = ((x >> 5) + (y >> 5) * int32_t(pitch >> 5)) << (log2_bytes + 7);
-  const int32_t micro = ((x & 7) + ((y & 0xE) << 2)) << log2_bytes;
-  const int32_t offset = macro + ((micro & ~0xF) << 1) + (micro & 0xF) + ((y & 1) << 4);
-  return ((offset & ~0x1FF) << 3) + ((y & 16) << 7) + ((offset & 0x1C0) << 2) +
-         (((((y & 8) >> 2) + (x >> 3)) & 3) << 6) + (offset & 0x3F);
-}
-
-// With 4-byte texels, DesplazamientoMosaico2D(x, y, pitch, 2) is
-// (((x >> 5) + (y >> 5) * (pitch aligned to 32 >> 5)) << 12) + table[(y & 31) * 32 + (x & 31)]:
-// the part inside the 32x32 tile does not depend on the pitch (EscribirLecturas).
-const std::array<uint16_t, 1024>& TablaMosaico2DTexel4() {
-  static const std::array<uint16_t, 1024> tabla = [] {
-    std::array<uint16_t, 1024> t{};
-    for (int32_t y = 0; y < 32; ++y) {
-      for (int32_t x = 0; x < 32; ++x) {
-        t[size_t(y) * 32 + size_t(x)] = uint16_t(DesplazamientoMosaico2D(x, y, 32, 2));
-      }
-    }
-    return t;
-  }();
-  return tabla;
-}
-
-int32_t ExtenderSigno15(uint32_t valor) {
-  return int32_t(valor << 17) >> 17;
-}
+// Fijo16p8, DesplazamientoMosaico2D, TablaMosaico2DTexel4 and ExtenderSigno15 are in nfsmw_nativo_copias_comun.h.
 
 // Fixed color per render target with nfsmw_nativo_diag_borrado: the
 // capture shows which render target reached the screen.
@@ -1546,6 +1515,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
         reduccion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         reduccion.dstOffsets[0] = {int32_t(dx), int32_t(dy), 0};
         reduccion.dstOffsets[1] = {int32_t(dx + cabe_ancho), int32_t(dy + cabe_alto), 1};
+        AntesDeTransferir();
         blit_(comandos_trabajo_, destino_render->imagen, VK_IMAGE_LAYOUT_GENERAL,
               resuelta->imagen.imagen, VK_IMAGE_LAYOUT_GENERAL, 1, &reduccion, VK_FILTER_LINEAR);
         ++copias_;
@@ -1597,6 +1567,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
         if (!AplazarCopiaFrontal(base_resuelta, *destino_render, *resuelta, copia) &&
             !AplazarCompuesta(base_resuelta, *destino_render, *resuelta, copia,
                               (info_color & 0xFFF) | (pitch << 12))) {
+          AntesDeTransferir();
           copiar_imagen_(comandos_trabajo_, destino_render->imagen, VK_IMAGE_LAYOUT_GENERAL,
                          resuelta->imagen.imagen, VK_IMAGE_LAYOUT_GENERAL, 1, &copia);
           ++copias_;
@@ -1644,6 +1615,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
         }
         // nfsmw_nativo_borrar_area_util. Only the rows in use; the bottom band, if needed.
         if (!BorrarColorAreaUtil(*destino_render, color)) {
+          AntesDeTransferir();
           dfn_.vkCmdClearColorImage(comandos_trabajo_, destino_render->imagen,
                                     VK_IMAGE_LAYOUT_GENERAL, &color, 1, &kRangoColor);
           QuitarBanda(*destino_render);
@@ -1699,6 +1671,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       }
       return;
     }
+    AntesDeTransferir();
     borrar_profundidad_(comandos_trabajo_, profundidad->imagen, VK_IMAGE_LAYOUT_GENERAL, &valor, 1,
                         &kRangoProfundidad);
   }
@@ -1815,6 +1788,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       copia.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
       copia.dstOffset = {aX(int32_t(dx)), aY(int32_t(dy)), 0};
       copia.extent = {ancho_img, alto_img, 1};
+      AntesDeTransferir();
       copiar_imagen_(comandos_trabajo_, profundidad->imagen, VK_IMAGE_LAYOUT_GENERAL,
                      resuelta->imagen.imagen, VK_IMAGE_LAYOUT_GENERAL, 1, &copia);
       ++copias_;
@@ -1868,6 +1842,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     if (AplazarCopiaProfundidad(base & 0x1FFFFFFF, *profundidad, *resuelta, copia)) {
       return;
     }
+    AntesDeTransferir();
     copiar_imagen_(comandos_trabajo_, profundidad->imagen, VK_IMAGE_LAYOUT_GENERAL,
                    resuelta->imagen.imagen, VK_IMAGE_LAYOUT_GENERAL, 1, &copia);
     ++copias_;
@@ -2265,6 +2240,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       dibujos_->TerminarPase();  // it can arrive from a draw: the copy goes outside the pass
     }
     MarcarGpu(kGpuCopias);
+    AntesDeTransferir();
     copiar_imagen_(comandos_trabajo_, p.origen_vk, VK_IMAGE_LAYOUT_GENERAL, p.textura_vk, VK_IMAGE_LAYOUT_GENERAL, 1,
                    &p.copia);
     ++copias_;
@@ -3301,6 +3277,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       dibujos_->TerminarPase();  // it can arrive from a draw (TexturaResuelta): the copy goes outside the pass
     }
     MarcarGpu(kGpuCopias);
+    AntesDeTransferir();
     copiar_imagen_(comandos_trabajo_, pendiente.origen_vk, VK_IMAGE_LAYOUT_GENERAL, pendiente.destino_vk,
                    VK_IMAGE_LAYOUT_GENERAL, 1, &pendiente.copia);
     ++copias_;
@@ -3426,6 +3403,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       dibujos_->TerminarPase();  // may come from a draw (TexturaResuelta): the copy goes outside the pass
     }
     MarcarGpu(kGpuCopias);
+    AntesDeTransferir();
     copiar_imagen_(comandos_trabajo_, pendiente.origen_vk, VK_IMAGE_LAYOUT_GENERAL, pendiente.textura_vk,
                    VK_IMAGE_LAYOUT_GENERAL, 1, &pendiente.copia);
     ++copias_;
@@ -3838,67 +3816,12 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     return false;
   }
 
-  // Rectangle covered by the copy, as in GetResolveInfo (draw.cpp:787-889).
+  // Rectangle covered by the copy, as in GetResolveInfo (draw.cpp:787-889): RectanguloCopia.
   bool Rectangulo(const RegistrosCopia& reg, uint32_t pitch, int32_t& x0, int32_t& y0,
                   int32_t& x1, int32_t& y1) {
-    const uint32_t tipo = reg.fetch_vertices[0] & 0x3;
-    const uint32_t direccion = reg.fetch_vertices[0] >> 2;
-    const auto orden = static_cast<xenos::Endian>(reg.fetch_vertices[1] & 0x3);
-    const uint32_t tamano = (reg.fetch_vertices[1] >> 2) & 0xFFFFFF;
-    if (tipo != uint32_t(xenos::FetchConstantType::kVertex) || tamano != 3 * 2) {
-      return Rechazar(5, "vertices de la copia en un formato no soportado");
-    }
-    const uint8_t* vertices = memoria_->TranslatePhysical(direccion * 4);
-    const float medio_pixel =
-        (reg.pa_su_vtx_cntl & 0x1) == uint32_t(xenos::PixelCenter::kD3DZero) ? 0.5f : 0.0f;
-    int32_t fijo[6];
-    for (int i = 0; i < 6; ++i) {
-      float valor;
-      std::memcpy(&valor, vertices + i * 4, sizeof(valor));
-      fijo[i] = Fijo16p8(xenos::GpuSwap(valor, orden) + medio_pixel);
-    }
-    x0 = (std::min({fijo[0], fijo[2], fijo[4]}) + 127) >> 8;
-    y0 = (std::min({fijo[1], fijo[3], fijo[5]}) + 127) >> 8;
-    x1 = (std::max({fijo[0], fijo[2], fijo[4]}) + 127) >> 8;
-    y1 = (std::max({fijo[1], fijo[3], fijo[5]}) + 127) >> 8;
-
-    const int32_t desplazamiento_x = ExtenderSigno15(reg.pa_sc_window_offset & 0x7FFF);
-    const int32_t desplazamiento_y = ExtenderSigno15((reg.pa_sc_window_offset >> 16) & 0x7FFF);
-    if ((reg.pa_su_sc_mode_cntl >> 16) & 0x1) {  // vtx_window_offset_enable
-      x0 += desplazamiento_x;
-      y0 += desplazamiento_y;
-      x1 += desplazamiento_x;
-      y1 += desplazamiento_y;
-    }
-    // Window scissor (GetScissor without clamping to the pitch).
-    int32_t izquierda = int32_t(reg.pa_sc_window_scissor_tl & 0x3FFF);
-    int32_t arriba = int32_t((reg.pa_sc_window_scissor_tl >> 16) & 0x3FFF);
-    int32_t derecha = int32_t(reg.pa_sc_window_scissor_br & 0x3FFF);
-    int32_t abajo = int32_t((reg.pa_sc_window_scissor_br >> 16) & 0x3FFF);
-    if (!((reg.pa_sc_window_scissor_tl >> 31) & 0x1)) {  // window_offset_disable
-      izquierda += desplazamiento_x;
-      arriba += desplazamiento_y;
-      derecha += desplazamiento_x;
-      abajo += desplazamiento_y;
-    }
-    izquierda = std::max(izquierda, 0);
-    arriba = std::max(arriba, 0);
-    derecha = std::max(derecha, izquierda);
-    abajo = std::max(abajo, arriba);
-    x0 = std::clamp(x0, izquierda, derecha);
-    y0 = std::clamp(y0, arriba, abajo);
-    x1 = std::clamp(x1, izquierda, derecha);
-    y1 = std::clamp(y1, arriba, abajo);
-    // D3D9 alinea a 8 (kResolveAlignmentPixels).
-    x0 &= ~int32_t(7);
-    y0 &= ~int32_t(7);
-    x1 = (x1 + 7) & ~int32_t(7);
-    y1 = (y1 + 7) & ~int32_t(7);
-    const int32_t pitch_alineado = int32_t(pitch & ~uint32_t(7));
-    x0 = std::min(x0, pitch_alineado);
-    x1 = std::min(x1, pitch_alineado);
-    if (x0 >= x1 || y0 >= y1) {
-      return Rechazar(6, "rectangulo de copia vacio");
+    uint32_t causa = 0;
+    if (!RectanguloCopia(reg, pitch, memoria_, x0, y0, x1, y1, causa)) {
+      return Rechazar(causa, causa == 5 ? "vertices de la copia en un formato no soportado" : "rectangulo de copia vacio");
     }
     return true;
   }
@@ -4326,6 +4249,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     copia.extent = {destino.ancho, alto, 1};
     AnotarUsoBorrado(destino, destino.ancho, alto);  // nfsmw_nativo_diag_borrados
     MarcarGpu(kGpuCopias);
+    AntesDeTransferir();
     copiar_imagen_(comandos_trabajo_, it->second.imagen.imagen, VK_IMAGE_LAYOUT_GENERAL,
                    destino.imagen, VK_IMAGE_LAYOUT_GENERAL, 1, &copia);
     ++restauraciones_;
@@ -4366,6 +4290,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     copia.extent = {destino.ancho, destino.alto, 1};
     AnotarUsoBorrado(destino, destino.ancho, destino.alto);  // nfsmw_nativo_diag_borrados, like the restore
     MarcarGpu(kGpuCopias);
+    AntesDeTransferir();
     copiar_imagen_(comandos_trabajo_, origen.imagen, VK_IMAGE_LAYOUT_GENERAL, destino.imagen, VK_IMAGE_LAYOUT_GENERAL,
                    1, &copia);
     // And the copied data made visible to what follows: the current resolve (copy or swap), the draws that
@@ -4535,6 +4460,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     Preparar(destino);
     MarcarGpu(kGpuBorrados);
     const VkClearDepthStencilValue valor{1.0f, 0};
+    AntesDeTransferir();
     borrar_profundidad_(comandos_trabajo_, destino.imagen, VK_IMAGE_LAYOUT_GENERAL, &valor, 1, &kRangoProfundidad);
     AnotarUsoBorrado(destino, destino.ancho, destino.alto);  // nfsmw_nativo_diag_borrados: like the restore
     OlvidarBorrado(destino);  // not a game clear: the game's next clear cannot be skipped
@@ -4808,10 +4734,23 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       dfn_.vkCmdClearColorImage(comandos, imagen.imagen, VK_IMAGE_LAYOUT_GENERAL, &cero,
                                 1, &kRangoColor);
     }
+    // nfsmw_nativo_barreras_transferencia. Whatever the upload buffer writes to this image next (the
+    // rear-view mirror cubemap copies its faces there) must come after this clear.
+    BarreraTransferencias(dfn_, comandos);
     imagen.preparada = true;
     if (dibujos_) {
       dibujos_->InvalidarTexturas();  // TexturaResuelta only returns prepared ones
     }
+  }
+
+  // nfsmw_nativo_barreras_transferencia: before each transfer in the work buffer, a barrier if another
+  // transfer may come before it. The first one of the buffer needs it too: the previous submission's
+  // buffer can end with a clear of the image this one copies first (the validation layer saw it on the A22).
+  void AntesDeTransferir() {
+    if (transferencia_grabada_) {
+      BarreraTransferencias(dfn_, comandos_trabajo_);
+    }
+    transferencia_grabada_ = true;
   }
 
   bool Grabar() {
@@ -4840,6 +4779,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
         std::chrono::steady_clock::now() - antes_pools).count());
     comandos_trabajo_ = ranura.trabajo;
     comandos_subida_ = ranura.subida;
+    transferencia_grabada_ = true;
     grabando_subida_ = false;
     VkCommandBufferBeginInfo inicio{};
     inicio.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -5259,6 +5199,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     }
     Preparar(mosaico_);
     const VkClearColorValue fondo{{0.12f, 0.0f, 0.12f, 1.0f}};
+    AntesDeTransferir();
     dfn_.vkCmdClearColorImage(comandos_trabajo_, mosaico_.imagen, VK_IMAGE_LAYOUT_GENERAL, &fondo,
                               1, &kRangoColor);
     std::string lista;
@@ -5277,6 +5218,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       copia.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
       copia.dstOffsets[0] = {x + 2, y + 2, 0};
       copia.dstOffsets[1] = {x + 318, y + 178, 1};
+      AntesDeTransferir();
       blit_(comandos_trabajo_, imagen.imagen, VK_IMAGE_LAYOUT_GENERAL, mosaico_.imagen,
             VK_IMAGE_LAYOUT_GENERAL, 1, &copia, VK_FILTER_LINEAR);
       lista += fmt::format(" {}{}:{:08X} {}x{}", i, bases[i] == base_swap ? "*" : "", bases[i],
@@ -5511,6 +5453,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     copia.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copia.imageOffset = {int32_t(dx), int32_t(dy), 0};
     copia.imageExtent = {ancho, alto, 1};
+    AntesDeTransferir();
     dfn_.vkCmdCopyImageToBuffer(comandos_trabajo_, resuelta.imagen.imagen, VK_IMAGE_LAYOUT_GENERAL,
                                 lectura.bufer, 1, &copia);
     lecturas_pendientes_.push_back({&lectura, reg.rb_copy_dest_base, x0, y0, ancho, alto,
@@ -5561,46 +5504,8 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
         rango.size = VK_WHOLE_SIZE;
         dfn_.vkInvalidateMappedMemoryRanges(device_, 1, &rango);
       }
-      const bool intercambio = (p.info >> 24) & 0x1;
-      const uint32_t orden_copia = p.info & 0x7;  // Endian128: 0-3 as xenos::Endian
-      const auto orden =
-          orden_copia <= 3 ? static_cast<xenos::Endian>(orden_copia) : xenos::Endian::k8in32;
-      // Each texel is a permutation of its 4 bytes (R/B swap plus GpuSwap): it is computed once with
-      // marked bytes. Addresses come from the tile and the tiling table, and the guest's physical memory
-      // is contiguous.
-      const uint32_t permutacion =
-          xenos::GpuSwap(intercambio ? uint32_t(0x03000102) : uint32_t(0x03020100), orden);
-      const uint8_t b0 = uint8_t(permutacion), b1 = uint8_t(permutacion >> 8),
-                    b2 = uint8_t(permutacion >> 16), b3 = uint8_t(permutacion >> 24);
-      uint8_t* const fisica = memoria_->TranslatePhysical(0);
-      const uint64_t base = uint64_t(p.base & 0x1FFFFFFF);
-      const auto& tabla = TablaMosaico2DTexel4();
-      const uint64_t baldosas_por_fila = ((p.pitch + 31) & ~uint32_t(31)) >> 5;
-      for (uint32_t j = 0; j < p.alto; ++j) {
-        const uint32_t ty = uint32_t(p.y0) + j;
-        if (p.alto_destino && ty >= p.alto_destino) {
-          break;
-        }
-        const uint64_t fila = base + ((uint64_t(ty >> 5) * baldosas_por_fila) << 12);
-        const uint16_t* const local = tabla.data() + size_t(ty & 31) * 32;
-        const uint8_t* s = lectura.datos + size_t(j) * p.ancho * 4;
-        for (uint32_t i = 0; i < p.ancho; ++i, s += 4) {
-          const uint32_t tx = uint32_t(p.x0) + i;
-          if (tx >= p.pitch) {
-            break;
-          }
-          const uint64_t direccion = fila + (uint64_t(tx >> 5) << 12) + local[tx & 31];
-          if (direccion + 4 > 0x20000000) {
-            continue;
-          }
-          const uint8_t t0 = s[b0], t1 = s[b1], t2 = s[b2], t3 = s[b3];
-          uint8_t* const d = fisica + direccion;
-          d[0] = t0;
-          d[1] = t1;
-          d[2] = t2;
-          d[3] = t3;
-        }
-      }
+      EscribirTexelsEnGuest(memoria_->TranslatePhysical(0), lectura.datos, p.base, p.x0, p.y0, p.ancho, p.alto,
+                            p.pitch, p.alto_destino, p.info);
     }
     lecturas.clear();
     ns_escribir_lecturas_ += uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -5805,6 +5710,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
 
   const VulkanDevice* dispositivo_;
   const VulkanDevice::Functions& dfn_;
+  bool transferencia_grabada_ = false;  // nfsmw_nativo_barreras_transferencia
   VkDevice device_;
   rex::memory::Memory* memoria_;
   uint32_t familia_;

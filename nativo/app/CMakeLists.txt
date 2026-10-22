@@ -109,6 +109,8 @@ set(NFSMW_SOURCES
     # in the NFSSPV library (nfsmw_shaders.nfsp next to the executable).
     src/nfsmw_nativo_shaders.cpp
     src/nfsmw_shader_library.cpp
+    # nfsmw_nativo_media_precision: RelaxedPrecision in the pixel shaders' SPIR-V.
+    src/nfsmw_spirv_precision.cpp
     # Native renderer, part C5b: VS and PS of each draw from the game
     # thread (shader constructors and the D3D Draw* functions).
     src/nfsmw_nativo_ganchos.cpp
@@ -135,6 +137,23 @@ if(ANDROID)
     set_target_properties(nfsmw PROPERTIES OUTPUT_NAME main)
     # The OpenGL ES backend (nfsmw_nativo_api = gles) calls GL and EGL from here too, not only the SDK.
     target_link_libraries(nfsmw PRIVATE EGL GLESv3)
+    target_sources(nfsmw PRIVATE
+        src/nfsmw_nativo_destinos_gles.cpp
+        src/nfsmw_nativo_dibujos_gles.cpp
+        src/nfsmw_gles_shaders.cpp)
+    # SPIRV-Cross converts the GLES library's SPIR-V to GLSL ES on the phone (preparar_nativo.py clones it into
+    # sdk/thirdparty/spirv-cross). Only the GLSL backend is needed.
+    set(NFSMW_SPIRV_CROSS "${REXSDK_DIR}/thirdparty/spirv-cross")
+    if(NOT EXISTS "${NFSMW_SPIRV_CROSS}/spirv_glsl.cpp")
+        message(FATAL_ERROR "Falta SPIRV-Cross en ${NFSMW_SPIRV_CROSS}: ejecuta tools/android/preparar_nativo.py")
+    endif()
+    target_sources(nfsmw PRIVATE
+        "${NFSMW_SPIRV_CROSS}/spirv_cross.cpp"
+        "${NFSMW_SPIRV_CROSS}/spirv_parser.cpp"
+        "${NFSMW_SPIRV_CROSS}/spirv_cross_parsed_ir.cpp"
+        "${NFSMW_SPIRV_CROSS}/spirv_cfg.cpp"
+        "${NFSMW_SPIRV_CROSS}/spirv_glsl.cpp")
+    target_include_directories(nfsmw PRIVATE "${NFSMW_SPIRV_CROSS}")
 elseif(WIN32)
     add_executable(nfsmw WIN32 ${NFSMW_SOURCES})
     # PC build: masks again the floating-point exceptions that

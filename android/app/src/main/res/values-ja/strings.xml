@@ -33,10 +33,6 @@
     <string name="sombras_alta">高</string>
     <string name="sombras_muy_alta">最高</string>
     <string name="sombras_ultra">ウルトラ</string>
-    <string name="sombras">影</string>
-    <string name="sombras_resumen">シャドウマップを描き直す頻度です。2 フレームごとは負荷が軽く、ほとんど違いがわかりません。</string>
-    <string name="sombras_siempre">毎フレーム</string>
-    <string name="sombras_cada_2">2 フレームごと</string>
     <string name="sombras_distancia">影の描画距離</string>
     <string name="sombras_distancia_resumen">どこまで離れた物体が影を落とすかです。影の負荷の大部分はここにあります。</string>
     <string name="sombras_lejos">遠く（ゲームと同じ）</string>
@@ -62,8 +58,9 @@
     <string name="desenfoque">スピードブラー</string>
     <string name="desenfoque_resumen">加速時と NOS 使用時の放射状ブラーです。1 フレームあたり 1.5～2 ms かかります。</string>
     <string name="api_grafica">グラフィックス API</string>
-    <string name="api_grafica_resumen">OpenGL ES は Vulkan 非対応、または Vulkan ドライバーに問題がある端末向けです。実験的：現在、ゲームは動作しますが、テスト用の色しか表示されません。</string>
+    <string name="api_grafica_resumen">OpenGL ES は Vulkan 非対応、または Vulkan ドライバーに問題がある端末向けです。実験的：Vulkan より遅く、一部のエフェクトがありません。</string>
     <string name="api_gles">OpenGL ES（実験的）</string>
+    <string name="gles_no_disponible">このエディションはまだ OpenGL ES に対応していません。Vulkan でプレイします。</string>
     <string name="filtro_imagen">画像フィルター</string>
     <string name="filtro_imagen_resumen">ゲームの見た目にさらに重ねるスタイルです。</string>
     <string name="filtro_imagen_no">なし</string>
@@ -257,4 +254,13 @@
     <string name="editor_disposicion_normal">操作：ノーマル</string>
     <string name="editor_disposicion_aceleracion">操作：ドラッグ</string>
     <string name="editor_disposicion_conduciendo">操作：走行中</string>
+    <string name="preajustes">プリセット</string>
+    <string name="preajustes_resumen">下の設定をまとめて変更します。</string>
+    <string name="preajuste_ahorro">バッテリー節約</string>
+    <string name="preajuste_fabrica">初期設定</string>
+    <string name="preajuste_ahorro_detalle">30 fps、1024×576 を FSR で拡大、アンチエイリアスなし、高速な影を近くだけ、車の反射は1つ。バッテリー消費と発熱が減ります。</string>
+    <string name="preajuste_fabrica_detalle">グラフィック設定をこの端末への新規インストール時の状態に戻します。</string>
+    <string name="preajuste_mios">自分の設定</string>
+    <string name="preajuste_mios_detalle">最後のプリセットを適用する前のグラフィック設定に戻します。</string>
+    <string name="preajuste_aplicar">適用</string>
 </resources>

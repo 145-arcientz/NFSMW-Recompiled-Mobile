@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 
 REXCVAR_DECLARE(bool, nfsmw_nativo_sincronizacion_gpu);
+REXCVAR_DECLARE(bool, nfsmw_nativo_barreras_transferencia);
 
 namespace nfsmw::nativo {
 
@@ -27,6 +28,23 @@ inline void DependenciasImagenes(VkSubpassDependency (&dependencias)[2]) {
                      kAccesosImagenes, kAccesosPase, 0};
   dependencias[1] = {0, VK_SUBPASS_EXTERNAL, kEtapasPase, kEtapasImagenes,
                      kAccesosPase, kAccesosImagenes, 0};
+}
+
+// Two transfer commands in a row (copy -> clear, copy -> copy, copy -> read to a buffer) are not ordered
+// by Vulkan without a barrier between them. Adreno runs them in order anyway; Mali can overlap them, and
+// the validation layer saw it on the A22: a render target cleared before its resolve had read it, a
+// cubemap written before its own preparatory clear. The render passes already carry their dependencies
+// (DependenciasImagenes); this is only for transfer after transfer.
+template <typename Funciones>
+inline void BarreraTransferencias(const Funciones& dfn, VkCommandBuffer comandos) {
+  if (!REXCVAR_GET(nfsmw_nativo_barreras_transferencia)) {
+    return;
+  }
+  VkMemoryBarrier barrera{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  barrera.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  barrera.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+  dfn.vkCmdPipelineBarrier(comandos, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1,
+                           &barrera, 0, nullptr, 0, nullptr);
 }
 
 }  // namespace nfsmw::nativo

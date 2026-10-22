@@ -85,6 +85,7 @@ elseif(ANDROID)
     set(REXUI_PLATFORM_SOURCES
         surface_android.cpp
         # PARCHE LOCAL - OpenGL ES backend of the native renderer (EGL).
+        gles/gles_immediate_drawer.cpp
         gles/gles_presenter.cpp
         gles/gles_provider.cpp
     )

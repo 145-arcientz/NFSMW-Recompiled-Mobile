@@ -68,6 +68,7 @@ extern "C" void NfsmwAndroidPausaEnSwap() __attribute__((weak));
 #include <GLES3/gl32.h>
 #include <rex/ui/gles/presenter.h>
 #include <rex/ui/gles/provider.h>
+#include "nfsmw_nativo_destinos_gles.h"
 #define NFSMW_CON_GLES 1
 #else
 #define NFSMW_CON_GLES 0
@@ -810,11 +811,18 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
     // data, so it is not distributed). Without it the game still runs, without identification.
     // Next to the executable (the app folder on Android) or, failing that, with the game files, where it
     // is easier to copy on a phone.
-    std::filesystem::path biblioteca = rex::filesystem::GetExecutableFolder() / "nfsmw_shaders.nfsp";
+    // With OpenGL ES, its own library: the same shaders with one fixed texture per register
+    // (tools/biblioteca_shaders_gles.mjs).
+#if NFSMW_CON_GLES
+    const char* const nombre_biblioteca = provider_gles_ ? "nfsmw_shaders_gles.nfsp" : "nfsmw_shaders.nfsp";
+#else
+    const char* const nombre_biblioteca = "nfsmw_shaders.nfsp";
+#endif
+    std::filesystem::path biblioteca = rex::filesystem::GetExecutableFolder() / nombre_biblioteca;
     if (std::error_code ec; !std::filesystem::is_regular_file(biblioteca, ec)) {
       const std::string juego = rex::cvar::GetFlagByName("game_data_root");
-      if (!juego.empty() && std::filesystem::is_regular_file(std::filesystem::path(juego) / "nfsmw_shaders.nfsp", ec)) {
-        biblioteca = std::filesystem::path(juego) / "nfsmw_shaders.nfsp";
+      if (!juego.empty() && std::filesystem::is_regular_file(std::filesystem::path(juego) / nombre_biblioteca, ec)) {
+        biblioteca = std::filesystem::path(juego) / nombre_biblioteca;
       }
     }
     if (shaders_.Cargar(biblioteca)) {
@@ -1838,6 +1846,7 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
     // The context is current on this thread: its objects are deleted here, and it is released before the
     // thread ends.
     if (contexto_anillo_) {
+      destinos_.reset();  // its GL objects belong to this context
       for (FramebufferGles& f : fbos_salida_gles_) {
         if (f.fbo) {
           glDeleteFramebuffers(1, &f.fbo);
@@ -2311,12 +2320,16 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
   bool AsegurarDestinos() {
 #if NFSMW_CON_GLES
     if (provider_gles_) {
-      // No GLES render targets or draws yet (phases 3 and 4): every copy and draw is dropped.
-      if (!destinos_fallidos_) {
-        destinos_fallidos_ = true;
-        REXLOG_INFO("[nativo] OpenGL ES: todavia sin destinos ni dibujos; se ve el color de prueba");
+      // Render targets, copies and presentation on GLES (phase 3); no draws yet (phase 4). Created on this
+      // thread, which is the one with the context.
+      if (!destinos_ && !destinos_fallidos_) {
+        destinos_ = contexto_anillo_ ? CrearDestinosGles(provider_gles_.get(), memory_) : nullptr;
+        if (!destinos_) {
+          destinos_fallidos_ = true;
+          REXLOG_ERROR("[nativo] No se pudieron crear los destinos nativos de OpenGL ES (C2)");
+        }
       }
-      return false;
+      return destinos_ != nullptr;
     }
 #endif
     if (!destinos_ && !destinos_fallidos_) {

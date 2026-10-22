@@ -9,6 +9,8 @@
 #include <rex/ui/gles/provider.h>
 #include <rex/ui/surface_android.h>
 
+#include "gles_presenter_efectos.h"
+
 namespace rex::ui::gles {
 
 namespace {
@@ -31,6 +33,15 @@ in vec2 uv;
 out vec4 color;
 void main() {
   color = vec4(texture(salida, uv).rgb, 1.0);
+}
+)";
+
+// The effects' vertex stage: a triangle covering the viewport, which is the effect's output rectangle. The pixel
+// shaders work out their pixel from gl_FragCoord.
+constexpr const char* kVerticesEfecto = R"(#version 310 es
+void main() {
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }
 )";
 
@@ -259,22 +270,184 @@ bool GlesPresenter::PrepararPintado() {
   return true;
 }
 
+GLuint GlesPresenter::ProgramaEfecto(size_t efecto, bool final) {
+  ProgramaEfectoGles& p = programas_efecto_[efecto][final ? 1 : 0];
+  if (p.programa || p.fallido) {
+    return p.programa;
+  }
+  p.fallido = true;
+  static_assert(std::size(efectos::kEfectos) == size_t(GuestOutputPaintEffect::kCount),
+                "gles_presenter_efectos.h does not have every GuestOutputPaintEffect");
+  const efectos::Efecto& e = efectos::kEfectos[efecto];
+  if (!vertices_efecto_) {
+    vertices_efecto_ = Compilar(GL_VERTEX_SHADER, kVerticesEfecto);
+    if (!vertices_efecto_) {
+      return 0;
+    }
+  }
+  const GLuint ps = Compilar(GL_FRAGMENT_SHADER, final ? e.final : e.intermedio);
+  if (!ps) {
+    REXLOG_ERROR("GlesPresenter: el efecto {} no compila", e.nombre);
+    return 0;
+  }
+  GLuint programa = glCreateProgram();
+  glAttachShader(programa, vertices_efecto_);
+  glAttachShader(programa, ps);
+  glLinkProgram(programa);
+  glDetachShader(programa, vertices_efecto_);
+  glDeleteShader(ps);
+  GLint ok = GL_FALSE;
+  glGetProgramiv(programa, GL_LINK_STATUS, &ok);
+  if (ok != GL_TRUE) {
+    char registro[1024] = {};
+    glGetProgramInfoLog(programa, sizeof(registro) - 1, nullptr, registro);
+    REXLOG_ERROR("GlesPresenter: el efecto {} no enlaza: {}", e.nombre, registro);
+    glDeleteProgram(programa);
+    return 0;
+  }
+  static constexpr const char* kMiembros[3] = {"constantes.m0", "constantes.m1", "constantes.m2"};
+  for (uint32_t i = 0; i < e.miembros && i < 3; ++i) {
+    p.constantes[i] = glGetUniformLocation(programa, kMiembros[i]);
+  }
+  p.alto = glGetUniformLocation(programa, "nfsmw_alto");
+  glUseProgram(programa);
+  glUniform1i(glGetUniformLocation(programa, "origen"), 0);
+  glUseProgram(0);
+  p.programa = programa;
+  p.fallido = false;
+  REXLOG_INFO("GlesPresenter: efecto {} ({}) listo", e.nombre, final ? "a la ventana" : "a una textura");
+  return programa;
+}
+
+bool GlesPresenter::PintarEfectos(const GuestOutputPaintFlow& flujo, const GuestOutputPaintConfig& configuracion,
+                                  GLuint textura, EGLint ancho_ventana, EGLint alto_ventana) {
+  (void)ancho_ventana;
+  // All the programs first: if one is missing nothing is drawn and the caller falls back to bilinear.
+  for (size_t i = 0; i < flujo.effect_count; ++i) {
+    if (!ProgramaEfecto(size_t(flujo.effects[i]), i + 1 == flujo.effect_count)) {
+      return false;
+    }
+  }
+  glBindVertexArray(vao_);
+  glActiveTexture(GL_TEXTURE0);
+  glBindSampler(0, sampler_);
+  GLuint entrada = textura;
+  for (size_t i = 0; i < flujo.effect_count; ++i) {
+    const bool final = i + 1 == flujo.effect_count;
+    const auto efecto = flujo.effects[i];
+    const auto [ancho, alto] = flujo.effect_output_sizes[i];
+    if (final) {
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      // The flow measures from the top-left corner; GL's viewport from the bottom-left one.
+      glViewport(flujo.output_x, alto_ventana - flujo.output_y - GLint(alto), GLsizei(ancho), GLsizei(alto));
+    } else {
+      Intermedia& m = intermedias_[i];
+      if (m.textura && (m.ancho != ancho || m.alto != alto)) {
+        glDeleteFramebuffers(1, &m.fbo);
+        glDeleteTextures(1, &m.textura);
+        m = Intermedia{};
+      }
+      if (!m.textura) {
+        glGenTextures(1, &m.textura);
+        glBindTexture(GL_TEXTURE_2D, m.textura);
+        glTexStorage2D(GL_TEXTURE_2D, 1, kGuestOutputFormat, GLsizei(ancho), GLsizei(alto));
+        glGenFramebuffers(1, &m.fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, m.fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m.textura, 0);
+        m.ancho = ancho;
+        m.alto = alto;
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+          REXLOG_ERROR("GlesPresenter: la textura intermedia {}x{} del efecto {} no se puede dibujar", ancho, alto, i);
+          glBindFramebuffer(GL_FRAMEBUFFER, 0);
+          return false;
+        }
+      }
+      glBindFramebuffer(GL_FRAMEBUFFER, m.fbo);
+      glViewport(0, 0, GLsizei(ancho), GLsizei(alto));
+    }
+    const ProgramaEfectoGles& p = programas_efecto_[size_t(efecto)][final ? 1 : 0];
+    glUseProgram(p.programa);
+    switch (efecto) {
+      case GuestOutputPaintEffect::kBilinear:
+      case GuestOutputPaintEffect::kBilinearDither: {
+        BilinearConstants c;
+        c.Initialize(flujo, i);
+        glUniform2i(p.constantes[0], c.output_offset[0], c.output_offset[1]);
+        glUniform2f(p.constantes[1], c.output_size_inv[0], c.output_size_inv[1]);
+      } break;
+#if defined(REX_HAS_FIDELITYFX_SDK)
+      case GuestOutputPaintEffect::kCasSharpen:
+      case GuestOutputPaintEffect::kCasSharpenDither: {
+        CasSharpenConstants c;
+        c.Initialize(flujo, i, configuracion);
+        glUniform2i(p.constantes[0], c.output_offset[0], c.output_offset[1]);
+        glUniform1f(p.constantes[1], c.sharpness_post_setup);
+      } break;
+      case GuestOutputPaintEffect::kCasResample:
+      case GuestOutputPaintEffect::kCasResampleDither: {
+        CasResampleConstants c;
+        c.Initialize(flujo, i, configuracion);
+        glUniform2i(p.constantes[0], c.output_offset[0], c.output_offset[1]);
+        glUniform2f(p.constantes[1], c.input_output_size_ratio[0], c.input_output_size_ratio[1]);
+        glUniform1f(p.constantes[2], c.sharpness_post_setup);
+      } break;
+      case GuestOutputPaintEffect::kFsrEasu: {
+        FsrEasuConstants c;
+        c.Initialize(flujo, i);
+        glUniform2f(p.constantes[0], c.input_output_size_ratio[0], c.input_output_size_ratio[1]);
+        glUniform2f(p.constantes[1], c.input_size_inv[0], c.input_size_inv[1]);
+      } break;
+      case GuestOutputPaintEffect::kFsrRcas:
+      case GuestOutputPaintEffect::kFsrRcasDither: {
+        FsrRcasConstants c;
+        c.Initialize(flujo, i, configuracion);
+        glUniform2i(p.constantes[0], c.output_offset[0], c.output_offset[1]);
+        glUniform1f(p.constantes[1], c.sharpness_post_setup);
+      } break;
+#endif
+      default:
+        break;
+    }
+    if (final) {
+      glUniform1f(p.alto, float(alto_ventana));
+    }
+    glBindTexture(GL_TEXTURE_2D, entrada);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    if (!final) {
+      entrada = intermedias_[i].textura;
+    }
+  }
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindSampler(0, 0);
+  glBindVertexArray(0);
+  glUseProgram(0);
+  return true;
+}
+
 Presenter::PaintResult GlesPresenter::PaintAndPresentImpl(bool execute_ui_drawers) {
-  (void)execute_ui_drawers;  // no UI drawers yet (CreateImmediateDrawer returns nullptr)
   if (superficie_ == EGL_NO_SURFACE) {
     return PaintResult::kNotPresentedConnectionOutdated;
   }
   const EGLDisplay display = provider_->display();
+  /*
+   * In the "paint right away from the game thread" mode the paint happens on the thread that refreshes the
+   * guest output, which has its own context current (the native renderer's ring thread). That context is
+   * restored on every exit, instead of leaving the thread with none: the first version released it, and
+   * from the second frame on the ring thread had no context and the screen stayed on the first image.
+   * With no previous context, the paint context is released: the next paint may happen on another thread.
+   */
+  struct Restaurar {
+    EGLDisplay display;
+    EGLContext contexto = eglGetCurrentContext();
+    EGLSurface dibujo = eglGetCurrentSurface(EGL_DRAW);
+    EGLSurface lectura = eglGetCurrentSurface(EGL_READ);
+    ~Restaurar() { eglMakeCurrent(display, dibujo, lectura, contexto); }
+  } restaurar{display};
   if (eglMakeCurrent(display, superficie_, superficie_, contexto_pintar_) != EGL_TRUE) {
     const EGLint error = eglGetError();
     REXLOG_ERROR("GlesPresenter: eglMakeCurrent para pintar fallo ({:#x})", error);
     return ResultadoDeError(error);
   }
-  // Released on every exit: the next paint may happen on another thread.
-  struct Soltar {
-    EGLDisplay display;
-    ~Soltar() { eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT); }
-  } soltar{display};
 
   if (!intervalo_puesto_) {
     eglSwapInterval(display, 1);
@@ -316,12 +489,36 @@ Presenter::PaintResult GlesPresenter::PaintAndPresentImpl(bool execute_ui_drawer
     }
   }
   if (textura) {
-    // Only bilinear for now: the FidelityFX effects are not implemented in GLES.
-    configuracion.SetEffect(GuestOutputPaintConfig::Effect::kBilinear);
+    if (efectos_fallidos_) {
+      configuracion.SetEffect(GuestOutputPaintConfig::Effect::kBilinear);
+    }
     const auto maximo = uint32_t(provider_->capacidades().max_texture_size);
-    const GuestOutputPaintFlow flujo =
+    GuestOutputPaintFlow flujo =
         GetGuestOutputPaintFlow(propiedades, uint32_t(ancho), uint32_t(alto), maximo, maximo, configuracion);
-    if (flujo.effect_count) {
+    // A single bilinear pass (with or without dithering) keeps the presenter's own simple path; anything else
+    // (FSR, CAS) goes through the chain of effects. If that fails once, bilinear for the rest of the session.
+    bool pintado = false;
+    const bool solo_bilineal = flujo.effect_count == 1 && (flujo.effects[0] == GuestOutputPaintEffect::kBilinear ||
+                                                           flujo.effects[0] == GuestOutputPaintEffect::kBilinearDither);
+    if (flujo.effect_count && !solo_bilineal && !efectos_fallidos_) {
+      pintado = PintarEfectos(flujo, configuracion, textura, ancho, alto);
+      if (!pintado) {
+        efectos_fallidos_ = true;
+        REXLOG_WARN("GlesPresenter: los efectos de escalado no estan disponibles: se pinta con bilineal");
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, ancho, alto);
+        configuracion.SetEffect(GuestOutputPaintConfig::Effect::kBilinear);
+        flujo = GetGuestOutputPaintFlow(propiedades, uint32_t(ancho), uint32_t(alto), maximo, maximo, configuracion);
+      }
+    }
+    if (pintado) {
+      GLsync leida = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+      std::lock_guard<std::mutex> cerrojo(sincronizacion_);
+      if (salidas_[indice].leida) {
+        glDeleteSync(salidas_[indice].leida);
+      }
+      salidas_[indice].leida = leida;
+    } else if (flujo.effect_count) {
       const auto [salida_ancho, salida_alto] = flujo.effect_output_sizes[flujo.effect_count - 1];
       // The flow measures from the top-left corner; GL's viewport from the bottom-left one.
       glViewport(flujo.output_x, alto - flujo.output_y - GLint(salida_alto), GLsizei(salida_ancho),
@@ -343,6 +540,13 @@ Presenter::PaintResult GlesPresenter::PaintAndPresentImpl(bool execute_ui_drawer
       }
       salidas_[indice].leida = leida;
     }
+  }
+
+  if (execute_ui_drawers) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, ancho, alto);
+    GlesUIDrawContext contexto_ui(*this, uint32_t(ancho), uint32_t(alto));
+    ExecuteUIDrawersFromUIThread(contexto_ui);
   }
 
   if (eglSwapBuffers(display, superficie_) != EGL_TRUE) {

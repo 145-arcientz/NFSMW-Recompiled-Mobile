@@ -33,10 +33,6 @@
     <string name="sombras_alta">Hoch</string>
     <string name="sombras_muy_alta">Sehr hoch</string>
     <string name="sombras_ultra">Ultra</string>
-    <string name="sombras">Schatten</string>
-    <string name="sombras_resumen">Wie oft die Schattenkarten neu gezeichnet werden. Jedes 2. Bild ist günstiger und fällt kaum auf.</string>
-    <string name="sombras_siempre">Jedes Bild</string>
-    <string name="sombras_cada_2">Jedes 2. Bild</string>
     <string name="sombras_distancia">Schattenentfernung</string>
     <string name="sombras_distancia_resumen">Bis zu welcher Entfernung Objekte noch Schatten werfen. Hier liegt der Großteil der Schattenkosten.</string>
     <string name="sombras_lejos">Weit (wie im Spiel)</string>
@@ -62,8 +58,9 @@
     <string name="desenfoque">Geschwindigkeitsunschärfe</string>
     <string name="desenfoque_resumen">Die radiale Unschärfe beim Beschleunigen und mit NOS. Kostet 1,5–2 ms pro Bild.</string>
     <string name="api_grafica">Grafik-API</string>
-    <string name="api_grafica_resumen">OpenGL ES ist für Handys ohne Vulkan oder mit fehlerhaftem Vulkan-Treiber. Experimentell: Das Spiel läuft, aber vorerst ist nur eine Testfarbe zu sehen.</string>
+    <string name="api_grafica_resumen">OpenGL ES ist für Handys ohne Vulkan oder mit fehlerhaftem Vulkan-Treiber. Experimentell: langsamer als Vulkan, und einige Effekte fehlen.</string>
     <string name="api_gles">OpenGL ES (experimentell)</string>
+    <string name="gles_no_disponible">Diese Edition hat noch kein OpenGL ES: Es wird mit Vulkan gespielt.</string>
     <string name="filtro_imagen">Bildfilter</string>
     <string name="filtro_imagen_resumen">Ein zusätzlicher Look über dem des Spiels.</string>
     <string name="filtro_imagen_no">Keiner</string>
@@ -257,4 +254,13 @@
     <string name="editor_disposicion_normal">STEUERUNG: NORMAL</string>
     <string name="editor_disposicion_aceleracion">STEUERUNG: DRAG</string>
     <string name="editor_disposicion_conduciendo">STEUERUNG: FAHREN</string>
+    <string name="preajustes">Voreinstellungen</string>
+    <string name="preajustes_resumen">Ändern alle Einstellungen darunter auf einmal.</string>
+    <string name="preajuste_ahorro">Akku sparen</string>
+    <string name="preajuste_fabrica">Werkseinstellungen</string>
+    <string name="preajuste_ahorro_detalle">30 fps, 1024×576 mit FSR skaliert, keine Kantenglättung, schnelle Schatten nur in der Nähe, und nur eine Autospiegelung. Verbraucht weniger Akku und wird weniger warm.</string>
+    <string name="preajuste_fabrica_detalle">Setzt die Grafikeinstellungen auf den Stand einer Neuinstallation auf diesem Handy zurück.</string>
+    <string name="preajuste_mios">Meine Einstellungen</string>
+    <string name="preajuste_mios_detalle">Stellt die Grafikeinstellungen wieder her, die du vor dem letzten Preset hattest.</string>
+    <string name="preajuste_aplicar">Anwenden</string>
 </resources>

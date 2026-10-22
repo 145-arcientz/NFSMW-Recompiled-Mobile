@@ -33,10 +33,6 @@
     <string name="sombras_alta">Alta</string>
     <string name="sombras_muy_alta">Molto alta</string>
     <string name="sombras_ultra">Ultra</string>
-    <string name="sombras">Ombre</string>
-    <string name="sombras_resumen">Ogni quanto si ridisegnano le mappe delle ombre. Ogni 2 fotogrammi costa meno e quasi non si nota.</string>
-    <string name="sombras_siempre">Ogni fotogramma</string>
-    <string name="sombras_cada_2">Ogni 2 fotogrammi</string>
     <string name="sombras_distancia">Distanza delle ombre</string>
     <string name="sombras_distancia_resumen">Fino a che distanza gli oggetti proiettano ombre. Gran parte del costo delle ombre sta qui.</string>
     <string name="sombras_lejos">Lontano (come il gioco)</string>
@@ -62,8 +58,9 @@
     <string name="desenfoque">Sfocatura della velocità</string>
     <string name="desenfoque_resumen">La sfocatura radiale quando acceleri e con il NOS. Costa 1,5–2 ms per fotogramma.</string>
     <string name="api_grafica">API grafica</string>
-    <string name="api_grafica_resumen">OpenGL ES è per i telefoni senza Vulkan o con un driver Vulkan difettoso. Sperimentale: per ora il gioco funziona, ma si vede solo un colore di prova.</string>
+    <string name="api_grafica_resumen">OpenGL ES è per i telefoni senza Vulkan o con un driver Vulkan difettoso. Sperimentale: più lento di Vulkan e mancano alcuni effetti.</string>
     <string name="api_gles">OpenGL ES (sperimentale)</string>
+    <string name="gles_no_disponible">Questa edizione non ha ancora OpenGL ES: si gioca con Vulkan.</string>
     <string name="filtro_imagen">Filtro immagine</string>
     <string name="filtro_imagen_resumen">Uno stile in più sopra quello del gioco.</string>
     <string name="filtro_imagen_no">Nessuno</string>
@@ -257,4 +254,13 @@
     <string name="editor_disposicion_normal">COMANDI: NORMALE</string>
     <string name="editor_disposicion_aceleracion">COMANDI: ACCELERAZIONE</string>
     <string name="editor_disposicion_conduciendo">COMANDI: GUIDA</string>
+    <string name="preajustes">Preimpostazioni</string>
+    <string name="preajustes_resumen">Cambiano in un colpo tutte le impostazioni qui sotto.</string>
+    <string name="preajuste_ahorro">Risparmio batteria</string>
+    <string name="preajuste_fabrica">Valori di fabbrica</string>
+    <string name="preajuste_ahorro_detalle">30 fps, 1024×576 scalato con FSR, senza antialiasing, ombre rapide e da vicino, e un solo riflesso dell\'auto. Consuma meno batteria e scalda meno.</string>
+    <string name="preajuste_fabrica_detalle">Rimette le impostazioni grafiche come in una nuova installazione su questo telefono.</string>
+    <string name="preajuste_mios">Le mie impostazioni</string>
+    <string name="preajuste_mios_detalle">Torna alle impostazioni grafiche che avevi prima di applicare l\'ultimo preset.</string>
+    <string name="preajuste_aplicar">Applica</string>
 </resources>

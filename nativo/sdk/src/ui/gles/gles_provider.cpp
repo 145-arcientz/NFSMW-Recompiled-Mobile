@@ -8,6 +8,7 @@
 #include <GLES3/gl32.h>
 
 #include <rex/logging.h>
+#include <rex/ui/gles/immediate_drawer.h>
 #include <rex/ui/gles/presenter.h>
 #include <rex/ui/gles/provider.h>
 
@@ -172,6 +173,12 @@ bool GlesProvider::Inicializar() {
   c.copy_image = c.version >= 32 || TieneExtensionGl("GL_EXT_copy_image");
   c.texture_compression_s3tc = TieneExtensionGl("GL_EXT_texture_compression_s3tc");
   c.texture_compression_rgtc = TieneExtensionGl("GL_EXT_texture_compression_rgtc");
+  c.texture_norm16 = TieneExtensionGl("GL_EXT_texture_norm16");
+  c.float_linear = TieneExtensionGl("GL_OES_texture_float_linear");
+  c.mirror_clamp = TieneExtensionGl("GL_EXT_texture_mirror_clamp_to_edge");
+  if (TieneExtensionGl("GL_EXT_texture_filter_anisotropic")) {
+    glGetFloatv(0x84FF /* GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT */, &c.anisotropia_max);
+  }
   glGetIntegerv(GL_MAX_TEXTURE_SIZE, &c.max_texture_size);
   glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &c.max_combined_texture_units);
   glGetIntegerv(GL_MAX_VERTEX_OUTPUT_COMPONENTS, &c.max_vertex_output_components);
@@ -185,9 +192,11 @@ bool GlesProvider::Inicializar() {
   REXLOG_INFO("GlesProvider: EGL {}.{}, {} ({}), {}", mayor, menor, c.renderer, c.vendor, c.version_texto);
   REXLOG_INFO(
       "GlesProvider: GLES {}.{}; clip_control {}, timer_query {}, buffer_storage {}, copy_image {}, s3tc {}, "
-      "rgtc {}; textura max {}, unidades {}, salidas VS {}, UBO max {} (alineacion {}); sin superficie {}",
+      "rgtc {}, norm16 {}, float_linear {}, mirror_clamp {}, anisotropia {}; textura max {}, unidades {}, salidas VS "
+      "{}, UBO max {} (alineacion {}); sin superficie {}",
       c.version / 10, c.version % 10, c.clip_control, c.timer_query, c.buffer_storage, c.copy_image,
-      c.texture_compression_s3tc, c.texture_compression_rgtc, c.max_texture_size, c.max_combined_texture_units,
+      c.texture_compression_s3tc, c.texture_compression_rgtc, c.texture_norm16, c.float_linear, c.mirror_clamp,
+      c.anisotropia_max, c.max_texture_size, c.max_combined_texture_units,
       c.max_vertex_output_components, c.max_uniform_block_size, c.uniform_buffer_offset_alignment,
       sin_superficie_);
   if (c.version < 31) {
@@ -222,6 +231,10 @@ std::unique_ptr<GlesProvider::ContextoHilo> GlesProvider::CrearContextoHilo() co
     }
   }
   return std::unique_ptr<ContextoHilo>(new ContextoHilo(display_, contexto, superficie));
+}
+
+std::unique_ptr<ImmediateDrawer> GlesProvider::CreateImmediateDrawer() {
+  return GlesImmediateDrawer::Create(*this);
 }
 
 std::unique_ptr<Presenter> GlesProvider::CreatePresenter(Presenter::HostGpuLossCallback host_gpu_loss_callback) {

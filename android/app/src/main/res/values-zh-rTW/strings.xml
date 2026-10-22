@@ -33,10 +33,6 @@
     <string name="sombras_alta">高</string>
     <string name="sombras_muy_alta">非常高</string>
     <string name="sombras_ultra">極致</string>
-    <string name="sombras">陰影</string>
-    <string name="sombras_resumen">陰影貼圖重新繪製的頻率。每 2 個影格比較省，幾乎看不出差別。</string>
-    <string name="sombras_siempre">每個影格</string>
-    <string name="sombras_cada_2">每 2 個影格</string>
     <string name="sombras_distancia">陰影距離</string>
     <string name="sombras_distancia_resumen">多遠的物體仍會投下陰影。陰影的大部分成本都在這裡。</string>
     <string name="sombras_lejos">遠（與遊戲相同）</string>
@@ -62,8 +58,9 @@
     <string name="desenfoque">速度模糊</string>
     <string name="desenfoque_resumen">加速和使用 NOS 時的放射狀模糊。每個影格需要 1.5–2 毫秒。</string>
     <string name="api_grafica">圖形 API</string>
-    <string name="api_grafica_resumen">OpenGL ES 適用於沒有 Vulkan 或 Vulkan 驅動程式有問題的手機。實驗性：目前遊戲可以執行，但只會顯示測試色彩。</string>
+    <string name="api_grafica_resumen">OpenGL ES 適用於沒有 Vulkan 或 Vulkan 驅動程式有問題的手機。實驗性：比 Vulkan 慢，且缺少部分效果。</string>
     <string name="api_gles">OpenGL ES（實驗性）</string>
+    <string name="gles_no_disponible">此版本尚未支援 OpenGL ES，將以 Vulkan 執行。</string>
     <string name="filtro_imagen">影像濾鏡</string>
     <string name="filtro_imagen_resumen">疊加在遊戲畫面風格上的額外風格。</string>
     <string name="filtro_imagen_no">無</string>
@@ -257,4 +254,13 @@
     <string name="editor_disposicion_normal">操作：一般</string>
     <string name="editor_disposicion_aceleracion">操作：直線加速</string>
     <string name="editor_disposicion_conduciendo">操作：駕駛中</string>
+    <string name="preajustes">預設組合</string>
+    <string name="preajustes_resumen">一次變更下方所有設定。</string>
+    <string name="preajuste_ahorro">省電</string>
+    <string name="preajuste_fabrica">原廠設定</string>
+    <string name="preajuste_ahorro_detalle">30 fps、以 FSR 放大的 1024×576、無反鋸齒、只在近處的快速陰影，以及單一車身反射。更省電、發熱更少。</string>
+    <string name="preajuste_fabrica_detalle">將圖形設定恢復為在這支手機上全新安裝時的狀態。</string>
+    <string name="preajuste_mios">我的設定</string>
+    <string name="preajuste_mios_detalle">回到套用上一個預設之前的圖形設定。</string>
+    <string name="preajuste_aplicar">套用</string>
 </resources>

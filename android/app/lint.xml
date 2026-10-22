@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- SDL3 (submodulo del SDK, no se toca): SDLActivity solo crea
+         SDLGenericMotionListener_API29 con Build.VERSION.SDK_INT >= 29, pero lint
+         no lo ve desde la clase. -->
+    <issue id="NewApi">
+        <ignore path="**/thirdparty/sdl3/**" />
+    </issue>
+</lint>

@@ -25,6 +25,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.libsdl.app.SDLActivity;
 
@@ -115,6 +116,11 @@ public class GameActivity extends SDLActivity {
         // super.onCreate cargue las librerias.
         if (MotorNativo.ACTIVO) {
             MotorNativo.preparar(this, edicion);
+            // OpenGL ES pedido para una edicion que no lo trae: con Vulkan.
+            if (lista.contains("--nfsmw_nativo_api=gles") && !MotorNativo.glesDisponible(this)) {
+                lista.remove("--nfsmw_nativo_api=gles");
+                Toast.makeText(this, R.string.gles_no_disponible, Toast.LENGTH_LONG).show();
+            }
         }
 
         // Pantalla ancha: la pantalla entera, tambien la franja de la camara, y su

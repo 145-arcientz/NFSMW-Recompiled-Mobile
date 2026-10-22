@@ -28,9 +28,13 @@ final class Ajustes {
     static final String PREFS = "ajustes";
 
     private final SharedPreferences p;
+    /** El movil declara Vulkan 1.1 por hardware (lo que pedia el manifiesto). */
+    private final boolean conVulkan;
 
     Ajustes(Context ctx) {
         p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        conVulkan = ctx.getPackageManager().hasSystemFeature(
+                android.content.pm.PackageManager.FEATURE_VULKAN_HARDWARE_VERSION, 0x401000);
     }
 
     /** Mando tactil: el movil vibra cuando el juego hace vibrar el mando. */
@@ -516,10 +520,6 @@ final class Ajustes {
     int sombrasEscala() { return p.getInt("sombras_escala", 100); }
     void sombrasEscala(int v) { p.edit().putInt("sombras_escala", v).apply(); }
 
-    /** nfsmw_sombras_cada: los mapas de sombras, 1 de cada N fotogramas. */
-    int sombrasCada() { return p.getInt("sombras_cada", 1); }
-    void sombrasCada(int v) { p.edit().putInt("sombras_cada", v).apply(); }
-
     /** nfsmw_sombras_corte: 100 = como el juego; mas = menos distancia, y mas barato. */
     int sombrasCorte() { return p.getInt("sombras_corte", 150); }
     void sombrasCorte(int v) { p.edit().putInt("sombras_corte", v).apply(); }
@@ -542,7 +542,9 @@ final class Ajustes {
      */
     static final String API_VULKAN = "vulkan";
     static final String API_GLES = "gles";
-    String apiGrafica() { return p.getString("api_grafica", API_VULKAN); }
+    // Por defecto Vulkan, salvo en los moviles sin Vulkan 1.1: ahi OpenGL ES.
+    String apiGrafica() { return p.getString("api_grafica", conVulkan ? API_VULKAN : API_GLES); }
+    boolean conVulkan() { return conVulkan; }
     void apiGrafica(String v) { p.edit().putString("api_grafica", v).apply(); }
 
     /**
@@ -575,8 +577,7 @@ final class Ajustes {
     /**
      * La primera vez, en una GPU debil (Gpu.debil), unos ajustes que la hagan
      * jugable: 1024x576, 30 fps (a ritmo fijo se siente mas fluido que
-     * saltando entre 20 y 30), sin suavizado, sombras cada 2 fotogramas y de
-     * cerca, un solo reflejo del coche y sin el del asfalto, y el bufer de la
+     * saltando entre 20 y 30), sin suavizado, sombras de cerca, un solo reflejo del coche y sin el del asfalto, y el bufer de la
      * pantalla a 720p. Solo toca lo que el usuario no haya elegido nunca, y
      * lo hace una vez: despues manda lo que ponga en la pantalla de inicio.
      */
@@ -591,12 +592,116 @@ final class Ajustes {
             if (!p.contains("antialiasing")) e.putString("antialiasing", AA_NO);
             if (!p.contains("resolucion")) e.putString("resolucion", RES_720P);
             if (!p.contains("anisotropico")) e.putInt("anisotropico", 2);
-            if (!p.contains("sombras_cada")) e.putInt("sombras_cada", 2);
             if (!p.contains("sombras_corte")) e.putInt("sombras_corte", 200);
             if (!p.contains("reflejos_coche")) e.putInt("reflejos_coche", 1);
             if (!p.contains("reflejo_asfalto")) e.putBoolean("reflejo_asfalto", false);
         }
         e.putBoolean("perfil_gpu_debil", true).apply();
+    }
+
+    /**
+     * Preajuste "Ahorro de bateria" (motor nativo): lo que mas trabajo quita sin
+     * romper la imagen. 30 fps a ritmo fijo, 1024x576 escalado con FSR, sin
+     * suavizado ni anisotropico, sombras rapidas y de cerca,
+     * y un solo reflejo del coche. El reflejo del asfalto se queda: el juego ya
+     * solo lo dibuja cuando se ve agua.
+     */
+    void aplicarAhorro() {
+        guardarMisAjustes();
+        p.edit()
+                .putInt("limite_fps", 30)
+                .putString("resolucion_interna", "1024x576")
+                .putString("escalado", "fsr")
+                .putString("antialiasing", AA_NO)
+                .putInt("anisotropico", 0)
+                .putString("calidad_sombras", SOMBRAS_RAPIDA)
+                .putInt("sombras_escala", 100)
+                .putInt("sombras_corte", 200)
+                .putInt("reflejos_coche", 1)
+                .commit();
+        p.edit().putString("huella_preajuste", fotoGraficos().toString()).apply();
+    }
+
+    /**
+     * Los ajustes graficos de fabrica: los de una instalacion nueva en este
+     * movil, con el perfil de GPU debil si le toca (aplicarPerfilGpuDebil).
+     */
+    void aplicarFabrica(Context ctx) {
+        guardarMisAjustes();
+        p.edit()
+                .remove("limite_fps").remove("resolucion_interna").remove("escalado")
+                .remove("antialiasing").remove("sin_msaa").remove("anisotropico")
+                .remove("calidad_sombras").remove("sombras_escala").remove("sombras_cada")
+                .remove("sombras_corte").remove("reflejos_coche").remove("reflejo_asfalto")
+                .remove("perfil_gpu_debil")
+                .commit();
+        aplicarPerfilGpuDebil(ctx);
+        p.edit().putString("huella_preajuste", fotoGraficos().toString()).apply();
+    }
+
+    /** Los ajustes graficos que cambian los preajustes (y "sombras_cada", que ya no se usa). */
+    private static final String[] CLAVES_GRAFICOS = {
+            "limite_fps", "resolucion_interna", "escalado", "antialiasing", "sin_msaa", "anisotropico",
+            "calidad_sombras", "sombras_escala", "sombras_cada", "sombras_corte", "reflejos_coche",
+            "reflejo_asfalto", "perfil_gpu_debil"};
+
+    /** Los valores guardados de CLAVES_GRAFICOS, con su tipo (las que no estan, no salen). */
+    private JSONObject fotoGraficos() {
+        JSONObject foto = new JSONObject();
+        java.util.Map<String, ?> todo = p.getAll();
+        try {
+            for (String clave : CLAVES_GRAFICOS) {
+                Object v = todo.get(clave);
+                if (v instanceof Boolean) foto.put(clave, new JSONArray().put("b").put(v));
+                else if (v instanceof Integer) foto.put(clave, new JSONArray().put("i").put(v));
+                else if (v instanceof String) foto.put(clave, new JSONArray().put("s").put(v));
+            }
+        } catch (JSONException ignorada) {
+            // put solo falla con numeros no finitos
+        }
+        return foto;
+    }
+
+    /**
+     * Preajuste "Mis ajustes": antes de aplicar otro preajuste se guardan los
+     * ajustes graficos del usuario, para poder volver a ellos. Si no los ha
+     * tocado desde el ultimo preajuste (siguen siendo los de ese preajuste),
+     * no se guardan: asi "Ahorro" y luego "Fabrica" no pisan los suyos.
+     */
+    private void guardarMisAjustes() {
+        String ahora = fotoGraficos().toString();
+        if (!ahora.equals(p.getString("huella_preajuste", null))) {
+            p.edit().putString("mis_ajustes", ahora).commit();
+        }
+    }
+
+    boolean hayMisAjustes() { return p.contains("mis_ajustes"); }
+
+    /** Vuelve a los ajustes graficos guardados por guardarMisAjustes. */
+    void aplicarMisAjustes() {
+        String texto = p.getString("mis_ajustes", null);
+        if (texto == null) {
+            return;
+        }
+        try {
+            JSONObject foto = new JSONObject(texto);
+            SharedPreferences.Editor e = p.edit();
+            for (String clave : CLAVES_GRAFICOS) {
+                JSONArray v = foto.optJSONArray(clave);
+                if (v == null) {
+                    e.remove(clave);
+                } else if ("b".equals(v.getString(0))) {
+                    e.putBoolean(clave, v.getBoolean(1));
+                } else if ("i".equals(v.getString(0))) {
+                    e.putInt(clave, v.getInt(1));
+                } else {
+                    e.putString(clave, v.getString(1));
+                }
+            }
+            e.commit();
+        } catch (JSONException ignorada) {
+            // una foto rota no cambia nada
+        }
     }
 
     static File carpetaDatos(Context ctx) {

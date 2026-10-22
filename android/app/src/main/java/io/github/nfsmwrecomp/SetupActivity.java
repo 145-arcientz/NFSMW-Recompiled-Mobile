@@ -95,18 +95,19 @@ public class SetupActivity extends AppCompatActivity {
 
     // Las secciones del menu lateral, en su orden.
     private static final int S_JUEGO = 0;
-    private static final int S_GRAFICOS = 1;
-    private static final int S_MULTIJUGADOR = 2;
-    private static final int S_CONTROLES = 3;
-    private static final int S_IDIOMA = 4;
-    private static final int S_OTRAS = 5;
-    private static final int S_AVANZADO = 6;
-    private static final int[] SECCIONES = {R.string.seccion_juego, R.string.seccion_graficos,
-            R.string.seccion_multijugador, R.string.seccion_controles, R.string.seccion_idioma,
-            R.string.seccion_otras, R.string.seccion_avanzado};
-    private static final int[] ICONOS = {R.drawable.ic_juego, R.drawable.ic_graficos,
-            R.drawable.ic_multijugador, R.drawable.ic_controles, R.drawable.ic_idioma,
-            R.drawable.ic_ajustes, R.drawable.ic_avanzado};
+    private static final int S_PANTALLA = 1;
+    private static final int S_GRAFICOS = 2;
+    private static final int S_MULTIJUGADOR = 3;
+    private static final int S_CONTROLES = 4;
+    private static final int S_IDIOMA = 5;
+    private static final int S_OTRAS = 6;
+    private static final int S_AVANZADO = 7;
+    private static final int[] SECCIONES = {R.string.seccion_juego, R.string.seccion_pantalla,
+            R.string.seccion_graficos, R.string.seccion_multijugador, R.string.seccion_controles,
+            R.string.seccion_idioma, R.string.seccion_otras, R.string.seccion_avanzado};
+    private static final int[] ICONOS = {R.drawable.ic_juego, R.drawable.ic_pantalla,
+            R.drawable.ic_graficos, R.drawable.ic_multijugador, R.drawable.ic_controles,
+            R.drawable.ic_idioma, R.drawable.ic_ajustes, R.drawable.ic_avanzado};
     // La seccion abierta sobrevive a girar el movil y a cambiar de idioma.
     private static final String ESTADO_SECCION = "seccion";
     private int seccion = S_JUEGO;
@@ -372,7 +373,8 @@ public class SetupActivity extends AppCompatActivity {
         // refrescar() y la comprobacion del gamertag tienen siempre sus vistas.
         FrameLayout contenido = new FrameLayout(this);
         paneles[S_JUEGO] = panel(tarjetaJuego());
-        paneles[S_GRAFICOS] = panel(tarjetaPantalla(), tarjetaGraficos());
+        paneles[S_PANTALLA] = panel(tarjetaPantalla());
+        paneles[S_GRAFICOS] = panel(tarjetaGraficos());
         paneles[S_MULTIJUGADOR] = panel(tarjetaPerfil(),
                 MotorNativo.ACTIVO ? tarjetaServidorLan() : null);
         paneles[S_CONTROLES] = panel(tarjetaControles());
@@ -570,6 +572,7 @@ public class SetupActivity extends AppCompatActivity {
                     Arrays.asList(getString(R.string.api_vulkan), getString(R.string.api_gles)),
                     Arrays.asList(Ajustes.API_VULKAN, Ajustes.API_GLES), ajustes.apiGrafica(), true,
                     ajustes::apiGrafica)),
+            soloNativo(filaPreajustes()),
             soloNativo(selector(R.string.resolucion_interna, R.string.resolucion_interna_resumen,
                     Arrays.asList(getString(R.string.res_interna_576), getString(R.string.res_interna_720),
                             getString(R.string.res_interna_1080)),
@@ -602,9 +605,6 @@ public class SetupActivity extends AppCompatActivity {
                     Arrays.asList(getString(R.string.sombras_nativa), getString(R.string.sombras_alta),
                             getString(R.string.sombras_muy_alta), getString(R.string.sombras_ultra)),
                     Arrays.asList(100, 150, 200, 250), ajustes.sombrasEscala(), ajustes::sombrasEscala)),
-            soloNativo(selector(R.string.sombras, R.string.sombras_resumen,
-                    Arrays.asList(getString(R.string.sombras_siempre), getString(R.string.sombras_cada_2)),
-                    Arrays.asList(1, 2), ajustes.sombrasCada(), true, ajustes::sombrasCada)),
             soloNativo(selector(R.string.sombras_distancia, R.string.sombras_distancia_resumen,
                     Arrays.asList(getString(R.string.sombras_lejos), getString(R.string.sombras_media),
                             getString(R.string.sombras_cerca)),
@@ -635,6 +635,60 @@ public class SetupActivity extends AppCompatActivity {
                     Arrays.asList("apagado", "cine", "vivo", "calido", "frio", "sepia", "noir", "crt"),
                     ajustes.filtroImagen(), ajustes::filtroImagen))
         );
+    }
+
+    /** Preajustes del motor nativo: cambian de golpe los ajustes graficos de abajo. */
+    private View filaPreajustes() {
+        LinearLayout caja = new LinearLayout(this);
+        caja.setOrientation(LinearLayout.VERTICAL);
+        caja.setPadding(0, 0, 0, dp(6));
+        caja.addView(titulo(R.string.preajustes));
+        caja.addView(resumen(R.string.preajustes_resumen));
+        LinearLayout fila = new LinearLayout(this);
+        fila.setOrientation(LinearLayout.HORIZONTAL);
+        fila.setPadding(0, dp(6), 0, 0);
+        MaterialButton ahorro = new MaterialButton(this);
+        ahorro.setText(R.string.preajuste_ahorro);
+        estilarBotonSecundario(ahorro);
+        ahorro.setOnClickListener(v -> confirmarPreajuste(R.string.preajuste_ahorro,
+                R.string.preajuste_ahorro_detalle, ajustes::aplicarAhorro));
+        MaterialButton fabrica = new MaterialButton(this);
+        fabrica.setText(R.string.preajuste_fabrica);
+        estilarBotonSecundario(fabrica);
+        fabrica.setOnClickListener(v -> confirmarPreajuste(R.string.preajuste_fabrica,
+                R.string.preajuste_fabrica_detalle, () -> ajustes.aplicarFabrica(this)));
+        LinearLayout.LayoutParams izquierda =
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        izquierda.setMarginEnd(dp(8));
+        fila.addView(ahorro, izquierda);
+        fila.addView(fabrica, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        caja.addView(fila);
+        // Los del usuario, guardados al aplicar uno de los otros dos: solo si los hay.
+        if (ajustes.hayMisAjustes()) {
+            MaterialButton mios = new MaterialButton(this);
+            mios.setText(R.string.preajuste_mios);
+            estilarBotonSecundario(mios);
+            mios.setOnClickListener(v -> confirmarPreajuste(R.string.preajuste_mios,
+                    R.string.preajuste_mios_detalle, ajustes::aplicarMisAjustes));
+            LinearLayout.LayoutParams ancho = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            ancho.topMargin = dp(4);
+            caja.addView(mios, ancho);
+        }
+        return caja;
+    }
+
+    /** Pregunta antes de cambiar varios ajustes a la vez; al aplicar, la pantalla se rehace con ellos. */
+    private void confirmarPreajuste(int titulo, int detalle, Runnable aplicar) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(titulo)
+                .setMessage(detalle)
+                .setPositiveButton(R.string.preajuste_aplicar, (d, w) -> {
+                    aplicar.run();
+                    recreate();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private View tarjetaPerfil() {

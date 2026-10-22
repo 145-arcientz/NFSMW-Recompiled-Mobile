@@ -28,10 +28,6 @@
     <string name="sombras_alta">Alta</string>
     <string name="sombras_muy_alta">Muito alta</string>
     <string name="sombras_ultra">Ultra</string>
-    <string name="sombras">Sombras</string>
-    <string name="sombras_resumen">A cada quanto os mapas de sombras são redesenhados. A cada 2 quadros custa menos e quase não se nota.</string>
-    <string name="sombras_siempre">Todo quadro</string>
-    <string name="sombras_cada_2">A cada 2 quadros</string>
     <string name="sombras_distancia">Distância das sombras</string>
     <string name="sombras_distancia_resumen">Até onde os objetos projetam sombra. É aí que está quase todo o custo das sombras.</string>
     <string name="sombras_lejos">Longe (como o jogo)</string>
@@ -57,8 +53,9 @@
     <string name="desenfoque">Desfoque de velocidade</string>
     <string name="desenfoque_resumen">O desfoque radial ao acelerar e com o NOS. Custa 1,5–2 ms por quadro.</string>
     <string name="api_grafica">API gráfica</string>
-    <string name="api_grafica_resumen">O OpenGL ES é para celulares sem Vulkan ou com o driver Vulkan com defeito. Experimental: por enquanto o jogo roda, mas só aparece uma cor de teste.</string>
+    <string name="api_grafica_resumen">O OpenGL ES é para celulares sem Vulkan ou com o driver Vulkan com defeito. Experimental: mais lento que o Vulkan e faltam alguns efeitos.</string>
     <string name="api_gles">OpenGL ES (experimental)</string>
+    <string name="gles_no_disponible">Esta edição ainda não tem OpenGL ES: o jogo usa Vulkan.</string>
     <string name="filtro_imagen">Filtro de imagem</string>
     <string name="filtro_imagen_resumen">Um visual por cima do do jogo.</string>
     <string name="filtro_imagen_no">Nenhum</string>
@@ -252,4 +249,13 @@
     <string name="editor_disposicion_normal">CONTROLES: NORMAIS</string>
     <string name="editor_disposicion_aceleracion">CONTROLES: ARRANCADA</string>
     <string name="editor_disposicion_conduciendo">CONTROLES: DIRIGINDO</string>
+    <string name="preajustes">Predefinições</string>
+    <string name="preajustes_resumen">Mudam de uma vez todos os ajustes abaixo.</string>
+    <string name="preajuste_ahorro">Economia de bateria</string>
+    <string name="preajuste_fabrica">Valores de fábrica</string>
+    <string name="preajuste_ahorro_detalle">30 fps, 1024×576 escalado com FSR, sem suavização, sombras rápidas e de perto, e um só reflexo do carro. Gasta menos bateria e esquenta menos.</string>
+    <string name="preajuste_fabrica_detalle">Deixa os ajustes gráficos como numa instalação nova neste celular.</string>
+    <string name="preajuste_mios">Meus ajustes</string>
+    <string name="preajuste_mios_detalle">Volta aos ajustes gráficos que você tinha antes de aplicar a última predefinição.</string>
+    <string name="preajuste_aplicar">Aplicar</string>
 </resources>

@@ -10,6 +10,81 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Añadido
 
+- **OpenGL ES: escalado FSR 1.0 y CAS** (0.5.4): el presentador de GLES hace los mismos efectos que
+  el de Vulkan (bilineal, AMD CAS de nitidez o reescalado y FSR 1.0 con EASU y RCAS, con y sin
+  tramado), encadenados en texturas intermedias `GL_RGB10_A2`. Antes pintaba siempre en bilineal
+  aunque el launcher pidiera FSR o CAS. Los shaders son los de Vulkan
+  (`sdk/src/ui/shaders/vulkan_spirv`) pasados a GLSL ES 3.10 una vez en el PC con SPIRV-Cross
+  (`nativo/tools/gles_efectos_presentador.cpp`, que escribe `gles_presenter_efectos.h`), en dos
+  variantes: a una textura, tal cual, y a la ventana, con la y de `gl_FragCoord` volteada. Si uno
+  no compila, bilineal el resto de la sesión.
+- **OpenGL ES: programas guardados en disco** (0.5.4, `nfsmw_nativo_gles_cache_programas`): cada
+  programa enlazado se guarda con `glGetProgramBinary` en `cache/nfsmw_nativo_programas_gles.bin`
+  y en las partidas siguientes se carga con `glProgramBinary`, sin convertir, compilar ni enlazar:
+  los tirones de 20–110 ms de la primera vez que sale cada shader solo pasan en la primera
+  partida. La clave es el SPIR-V de los dos shaders, la especialización y las variantes; otro
+  driver empieza de cero.
+- **OpenGL ES: el destello del sol con fundido** (0.5.4): cada consulta de oclusión lleva un
+  contador atómico de muestras, y sus dibujos usan una variante del programa con la prueba de
+  profundidad antes del shader y un `atomicCounterIncrement` al final: sale la cuenta de la 360 y
+  no solo el sí o no de `GL_ANY_SAMPLES_PASSED`. Sin contadores atómicos en los pixel shaders, o si
+  el driver da 0 con la consulta visible, vuelve al sí o no.
+- **OpenGL ES: las optimizaciones de Vulkan que más CPU ahorran** (0.5.4), con sus mismas cvars:
+  vértices sin duplicar en el mismo fotograma (`nfsmw_nativo_dedupe_vertices`), sombras sin
+  vegetación (`nfsmw_sombras_sin_vegetacion`), dibujos invisibles saltados
+  (`nfsmw_nativo_saltar_invisibles`) y Z temprana (`nfsmw_nativo_z_temprana`); y otras propias:
+  cambio de orden de bytes de los vértices con NEON, índices de 16 bits con NEON directos al búfer
+  de subida y vértice base con `glDrawElementsBaseVertex` (`nfsmw_nativo_gles_base_vertice`), sin
+  volver a apuntar los atributos ni a enlazar los bloques uniformes si no cambian, y texturas por
+  registro reutilizadas dentro del fotograma (`nfsmw_nativo_gles_memo_texturas`). Falta el cielo
+  aplazado. Nada de la 0.5.4 se ha probado todavía en un móvil.
+- **OpenGL ES: el reflejo de la carretera bajo demanda** (0.5.4): `nfsmw_reflejo_bajo_demanda` y
+  `nfsmw_reflejo_visibilidad` necesitan que el renderizador avise de cuándo se resuelve el reflejo,
+  cuándo se lee y cuándo hay Swap, y con GLES no se avisaba: el guardián no veía copias, se apagaba
+  y el reflejo se dibujaba en todos los fotogramas (en Vulkan son ~210 dibujos por fotograma donde
+  no se ve agua). Ahora `DestinosGles` avisa, y los dibujos miden si el agua deja muestras con una
+  consulta `GL_ANY_SAMPLES_PASSED_CONSERVATIVE` propia, con el testigo de la composición final,
+  como Vulkan.
+- **OpenGL ES: el cielo aplazado** (0.5.4, `nfsmw_nativo_cielo_aplazado`): la cúpula del cielo se
+  dibuja después de los opacos de su pase, con el criterio y el guardián de Vulkan (3,4–4,3 ms de
+  GPU allí). Para poder aplazar un dibujo, el final de `Dibujar` se separó en el dibujo calculado
+  (`DibujoGles`) y `Emitir`; C2 cierra el pase (`TerminarPase`) antes de cada copia, Swap y
+  consulta del juego.
+- **OpenGL ES: informe de fases** (0.5.4, `nfsmw_nativo_gles_etapas`, apagado): el tiempo de cada
+  dibujo por fases y el de las copias y Swaps de C2, cada 600 fotogramas en el log.
+- **BC1 a 16 bits sin BC en la GPU** (0.5.4, `nfsmw_nativo_bc1_16_bits`): en Mali y PowerVR las BC1
+  convertidas en la CPU van a 5:6:5 (o 5:5:5:1 si usan su alfa de un bit) en vez de RGBA8, en GLES
+  y en Vulkan: la mitad de memoria y de ancho de banda en las texturas más comunes.
+- **Media precisión en los pixel shaders** (0.5.4, `nfsmw_nativo_media_precision`, apagado):
+  `RelaxedPrecision` en la matemática de color del SPIR-V (`nfsmw_spirv_precision.cpp`), para
+  Vulkan y GLES; coordenadas, profundidad y lo que no sale de una textura siguen a 32 bits.
+  Comprobado con `spirv-val` y glslang en el PC; sin probar en un móvil.
+- **Preajustes en el launcher** (0.5.4, motor nativo): «Ahorro de batería» (30 fps, 1024×576 con
+  FSR, sin suavizado ni anisotrópico, sombras rápidas cada 2 fotogramas y de cerca, un reflejo del
+  coche) y «Valores de fábrica» (los de una instalación nueva en ese móvil), con confirmación; los
+  textos en los 10 idiomas.
+- **OpenGL ES para el motor nativo** (0.5.3, experimental): ajuste nuevo **"API gráfica"**
+  (Vulkan u OpenGL ES 3.2) para móviles sin Vulkan o con el driver de Vulkan roto. Es un
+  segundo backend del renderizador nativo con las mismas interfaces que el de Vulkan, que no
+  cambia (detalle en [docs/motor-nativo-gles.md](docs/motor-nativo-gles.md)):
+  - shaders: una biblioteca aparte (`nfsmw_shaders_gles.nfsp`, una textura fija por registro en
+    vez de los montones de descriptores) que SPIRV-Cross pasa a GLSL ES en el móvil;
+  - presentador EGL con un buzón de tres texturas `GL_RGB10_A2` y sincronización con `glWaitSync`
+    entre el contexto del anillo y el de pintar;
+  - destinos, copias, resueltas y lecturas a la memoria del guest (C2), y los dibujos (C3–C6):
+    estado fijo, búfer de subida persistente de 64 MB, texturas con las BC descomprimidas en la
+    CPU, el desplazamiento de profundidad de las sombras y expulsión de texturas con un límite
+    según la RAM del móvil;
+  - oclusión con `GL_ANY_SAMPLES_PASSED` (el destello del sol se enciende y se apaga, sin
+    fundido), FXAA en la salida, tiempo de GPU con `EXT_disjoint_timer_query` y los overlays de
+    ImGui (el teclado del nombre del perfil, los mensajes de XAM, depuración, logros).
+  Por defecto sale OpenGL ES si el móvil no tiene Vulkan 1.1. Las seis ediciones llevan su
+  biblioteca GLES; si una no la trae, se juega con Vulkan y se avisa. Probado en un Galaxy A22
+  (Mali-G57): el vídeo, los menús a 30 fps y carreras a unos 22 fps. Faltan las optimizaciones
+  del de Vulkan (cielo aplazado, Z temprana, poda de dibujos, caché de programas en disco: la
+  primera vez que sale cada shader hay un tirón de 20–110 ms) y los efectos FidelityFX al
+  escalar (solo bilineal). El límite de texturas por RAM, la oclusión, el FXAA y los overlays,
+  sin probar en el móvil.
 - **Buscar servidores en la red** (0.5.2): botón **"Buscar en la red"** en Multijugador. La app
   pregunta por UDP 10902 (`NFSMW_DISCOVER`) por broadcast, tres veces, y a cada IP de la /24 de
   la Wi-Fi o del punto de acceso (hay routers que se comen los broadcast), y escucha 1,5 s
@@ -420,6 +495,12 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Cambiado
 
+- El APK del motor nativo ya no exige Vulkan en el manifiesto (0.5.3): se puede instalar en un
+  móvil sin Vulkan (el de Xenos lo sigue exigiendo).
+- Motor nativo (0.5.3): lo que los dibujos y las copias de Vulkan hacen sin tocar la API
+  (desenmosaicado, mips, orden de bytes, rectángulos de copia, escritura de texels al guest) va
+  ahora en cabeceras comunes con el backend de OpenGL ES
+  (`nfsmw_nativo_texturas_comun.h`, `nfsmw_nativo_copias_comun.h`), con los mismos cuerpos.
 - El launcher va por secciones con iconos (0.5.2): Multijugador, Controles y Otras opciones.
 - Los controles táctiles de fábrica en carrera (0.5.2): pedales al doble de tamaño; los
   botones con iconos (B el nitro, A el freno de mano, X el Speedbreaker) y sin Y, porque mirar

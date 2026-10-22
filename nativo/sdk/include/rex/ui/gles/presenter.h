@@ -9,11 +9,18 @@
  * after writing, which the paint waits for before sampling, and the paint leaves one after sampling,
  * which the next refresh of that texture waits for before writing.
  *
- * Painting happens on the presenter's own thread or on the UI thread, never on both at once (the base
- * class guarantees it): the paint context is made current with the window surface for each paint and
- * released afterwards, so it can change threads.
+ * Painting happens on the presenter's own thread, on the UI thread or right away on the refreshing thread,
+ * never on two at once (the base class guarantees it): the paint context is made current with the window
+ * surface for each paint, and afterwards the thread gets back whatever context it had (the ring thread's,
+ * when it paints itself) or none, so the paint context can change threads.
  *
- * Not yet: UI drawers (ImGui), guest output capture and the FidelityFX effects (only bilinear).
+ * The UI drawers (ImGui, GlesImmediateDrawer) draw over the output in the paint, with its context current.
+ *
+ * The effects (bilinear, AMD CAS and FSR 1.0) are VulkanPresenter's pixel shaders converted to GLSL ES
+ * (gles_presenter_efectos.h), chained through intermediate textures like in Vulkan. If one does not compile, the
+ * presenter goes back to plain bilinear for the rest of the session.
+ *
+ * Not yet: guest output capture.
  */
 
 #include <array>
@@ -60,6 +67,13 @@ class GlesPresenter final : public Presenter {
     uint64_t version_;
   };
 
+  // For GlesImmediateDrawer: the window surface is bound as the draw framebuffer, with the paint context current.
+  class GlesUIDrawContext final : public UIDrawContext {
+   public:
+    GlesUIDrawContext(Presenter& presenter, uint32_t render_target_width, uint32_t render_target_height)
+        : UIDrawContext(presenter, render_target_width, render_target_height) {}
+  };
+
   static std::unique_ptr<GlesPresenter> Create(HostGpuLossCallback host_gpu_loss_callback,
                                                const GlesProvider* provider);
   ~GlesPresenter() override;
@@ -95,6 +109,11 @@ class GlesPresenter final : public Presenter {
   static PaintResult ResultadoDeError(EGLint error);
   bool InicializarIndependienteDeSuperficie();
   bool PrepararPintado();  // with the paint context current
+  // The chain of effects of `flujo` from `textura` to the window. false if a program is missing: nothing drawn.
+  bool PintarEfectos(const GuestOutputPaintFlow& flujo, const GuestOutputPaintConfig& configuracion, GLuint textura,
+                     EGLint ancho_ventana, EGLint alto_ventana);
+  // Program of an effect (GuestOutputPaintEffect) into a texture or into the window; 0 if it does not compile.
+  GLuint ProgramaEfecto(size_t efecto, bool final);
   void DestruirObjetosDePintado();
 
   const GlesProvider* provider_;
@@ -109,6 +128,23 @@ class GlesPresenter final : public Presenter {
   GLuint programa_ = 0;
   GLuint vao_ = 0;
   GLuint sampler_ = 0;
+  // The effects: programs by effect and destination (0 texture, 1 window), compiled on first use.
+  struct ProgramaEfectoGles {
+    GLuint programa = 0;
+    bool fallido = false;
+    GLint constantes[3] = {-1, -1, -1};
+    GLint alto = -1;
+  };
+  std::array<std::array<ProgramaEfectoGles, 2>, size_t(GuestOutputPaintEffect::kCount)> programas_efecto_;
+  GLuint vertices_efecto_ = 0;
+  struct Intermedia {
+    GLuint textura = 0;
+    GLuint fbo = 0;
+    uint32_t ancho = 0;
+    uint32_t alto = 0;
+  };
+  std::array<Intermedia, kMaxGuestOutputPaintEffects> intermedias_;
+  bool efectos_fallidos_ = false;
 
   std::mutex sincronizacion_;
   std::array<ImagenSalida, kGuestOutputMailboxSize> salidas_;

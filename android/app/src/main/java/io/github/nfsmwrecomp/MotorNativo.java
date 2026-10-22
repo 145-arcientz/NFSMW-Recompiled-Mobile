@@ -157,21 +157,44 @@ final class MotorNativo {
                 && edicion.id.equals(p.getString("shaders_edicion", edicion.id))) {
             return;
         }
-        File temporal = new File(usuario, SHADERS + ".tmp");
-        try (InputStream in = ctx.getAssets().open(edicion.shaders);
+        if (!copiarAsset(ctx, edicion.shaders, usuario, SHADERS)) {
+            return;
+        }
+        // La del backend de OpenGL ES va al lado, si el APK la trae
+        // (nativo/<edicion>/nfsmw_shaders_gles.nfsp); si no, se quita una vieja.
+        String gles = edicion.shaders.replace(".nfsp", "_gles.nfsp");
+        String nombreGles = SHADERS.replace(".nfsp", "_gles.nfsp");
+        if (!copiarAsset(ctx, gles, usuario, nombreGles)) {
+            //noinspection ResultOfMethodCallIgnored
+            new File(usuario, nombreGles).delete();
+        }
+        // commit y no apply: el proceso del juego muere al salir, y lo
+        // pendiente de apply podria no llegar a escribirse.
+        p.edit().putLong("shaders_apk", apk).putString("shaders_edicion", edicion.id).commit();
+    }
+
+    /**
+     * La edicion que se va a jugar trae biblioteca de OpenGL ES (instalada por
+     * preparar). Las ediciones preparadas antes del backend de GLES no la
+     * traen, y su libmain tampoco conoce nfsmw_nativo_api.
+     */
+    static boolean glesDisponible(Context ctx) {
+        return new File(carpetaUsuario(ctx), SHADERS.replace(".nfsp", "_gles.nfsp")).isFile();
+    }
+
+    /** Copia un asset a la carpeta con ese nombre, por un temporal. */
+    private static boolean copiarAsset(Context ctx, String asset, File carpeta, String nombre) {
+        File temporal = new File(carpeta, nombre + ".tmp");
+        try (InputStream in = ctx.getAssets().open(asset);
              OutputStream out = new FileOutputStream(temporal)) {
             volcar(in, out);
         } catch (IOException e) {
-            Log.w(TAG, "No se pudo instalar " + SHADERS, e);
+            Log.w(TAG, "No se pudo instalar " + nombre, e);
             //noinspection ResultOfMethodCallIgnored
             temporal.delete();
-            return;
+            return false;
         }
-        if (temporal.renameTo(destino)) {
-            // commit y no apply: el proceso del juego muere al salir, y lo
-            // pendiente de apply podria no llegar a escribirse.
-            p.edit().putLong("shaders_apk", apk).putString("shaders_edicion", edicion.id).commit();
-        }
+        return temporal.renameTo(new File(carpeta, nombre));
     }
 
     /**
@@ -225,7 +248,9 @@ final class MotorNativo {
         a.add("--nfsmw_nativo_pcf_barato=" + Ajustes.SOMBRAS_RAPIDA.equals(sombras));
         a.add("--nfsmw_sombras_sin_vegetacion=" + !Ajustes.SOMBRAS_XBOX.equals(sombras));
         a.add("--nfsmw_nativo_sombras_escala=" + ajustes.sombrasEscala());
-        a.add("--nfsmw_sombras_cada=" + ajustes.sombrasCada());
+        // Siempre cada fotograma: cada 2 deja el mapa un fotograma por detras del
+        // coche y las sombras tiemblan (ya no hay opcion en el lanzador).
+        a.add("--nfsmw_sombras_cada=1");
         a.add("--nfsmw_sombras_corte=" + ajustes.sombrasCorte());
         a.add("--nfsmw_cubemap_caras_max=" + ajustes.reflejosCoche());
         a.add("--nfsmw_reflejo_carretera=" + ajustes.reflejoAsfalto());

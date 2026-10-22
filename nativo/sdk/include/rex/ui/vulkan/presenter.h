@@ -468,6 +468,12 @@ class VulkanPresenter final : public Presenter {
     bool swapchain_is_fifo = false;
     std::vector<VkImage> swapchain_images;
     std::vector<SwapchainFramebuffer> swapchain_framebuffers;
+    // PARCHE LOCAL (NFSMW Recompiled). One "rendering finished" semaphore per swapchain image, not per
+    // submission: vkQueuePresentKHR gives no signal of when it has finished waiting, so a per-submission
+    // one could be signaled again while the presentation of an earlier image still held it
+    // (VUID-vkQueueSubmit-pSignalSemaphores-00067, seen by the validation layer on the A22 Mali). They
+    // are reused when the swapchain is recreated and destroyed only with the presenter.
+    std::vector<VkSemaphore> semaforos_presentar;
   };
 
   explicit VulkanPresenter(HostGpuLossCallback host_gpu_loss_callback,
