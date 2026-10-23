@@ -10,4 +10,6 @@
     <string name="ios_editar_tactil_resumen">W grze zębatka obok przycisku UKRYJ otwiera edytor: przesuwaj przyciski dotykowe i zmieniaj ich rozmiar oraz przezroczystość.</string>
     <string name="ios_vibracion_probada">Tak wibruje telefon, gdy gra włącza wibracje sterowania dotykowego. Fizyczny kontroler wibruje sam.</string>
     <string name="ios_sin_biblioteca">Brakuje biblioteki shaderów (nfsmw_shaders.nfsp), której potrzebuje natywny renderer. Skopiuj ją do folderu aplikacji, obok ISO, albo zbuduj aplikację z nią.</string>
+    <string name="ios_audio">Dźwięk o niskim opóźnieniu (AVAudioEngine)</string>
+    <string name="ios_audio_resumen">Wyjście iOS tej aplikacji o niskim opóźnieniu, jak AAudio na Androidzie. Wyłączone: wyjście SDL natywnego silnika.</string>
 </resources>

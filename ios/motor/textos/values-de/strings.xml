@@ -10,4 +10,6 @@
     <string name="ios_editar_tactil_resumen">Im Spiel öffnet das Zahnrad neben der Taste AUSBL. den Editor: Verschiebe die Touch-Tasten und ändere ihre Größe und Deckkraft.</string>
     <string name="ios_vibracion_probada">So vibriert das Handy, wenn das Spiel die Touch-Steuerung vibrieren lässt. Ein physischer Controller vibriert selbst.</string>
     <string name="ios_sin_biblioteca">Die Shader-Bibliothek (nfsmw_shaders.nfsp), die der native Renderer braucht, fehlt. Kopiere sie in den Ordner der App, neben die ISO, oder baue die App mit ihr.</string>
+    <string name="ios_audio">Ton mit niedriger Latenz (AVAudioEngine)</string>
+    <string name="ios_audio_resumen">Die iOS-Ausgabe dieser App mit niedriger Latenz, wie AAudio unter Android. Aus: die SDL-Ausgabe der nativen Engine.</string>
 </resources>

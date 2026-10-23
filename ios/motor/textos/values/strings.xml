@@ -14,4 +14,6 @@
     <string name="ios_editar_tactil_resumen">In the game, the gear next to the HIDE button opens the editor: move the touch buttons and change their size and opacity.</string>
     <string name="ios_vibracion_probada">The phone vibrates like this when the game rumbles the touch controls. A physical controller vibrates by itself.</string>
     <string name="ios_sin_biblioteca">The shader library (nfsmw_shaders.nfsp), which the native renderer needs, is missing. Copy it to the app\'s folder, next to the ISO, or build the app with it.</string>
+    <string name="ios_audio">Low-latency sound (AVAudioEngine)</string>
+    <string name="ios_audio_resumen">The iOS low-latency output of this app, like AAudio on Android. Off: the SDL output of the native engine.</string>
 </resources>

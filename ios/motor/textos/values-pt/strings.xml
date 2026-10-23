@@ -10,4 +10,6 @@
     <string name="ios_editar_tactil_resumen">No jogo, a engrenagem ao lado do botão OCULTAR abre o editor: mova os botões de toque e mude o tamanho e a opacidade.</string>
     <string name="ios_vibracion_probada">O celular vibra assim quando o jogo faz vibrar os controles de toque. Um controle físico vibra sozinho.</string>
     <string name="ios_sin_biblioteca">Falta a biblioteca de shaders (nfsmw_shaders.nfsp), de que o renderizador nativo precisa. Copie-a para a pasta do app, junto da ISO, ou compile o app com ela.</string>
+    <string name="ios_audio">Som de baixa latência (AVAudioEngine)</string>
+    <string name="ios_audio_resumen">A saída de baixa latência do iOS deste app, como o AAudio no Android. Desligado: a saída SDL do motor nativo.</string>
 </resources>

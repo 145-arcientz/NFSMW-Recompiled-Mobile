@@ -9,8 +9,8 @@
 //     ISO en la carpeta de la app (Documents, que ven Archivos y el Finder) o el juego extraido en
 //     Documents/game_root. La ISO no se mapea entera: ver disc_image_device.cpp del SDK.
 //   - No estan las opciones que en iOS no existen: la resolucion de la pantalla, la API grafica
-//     (solo Vulkan, por MoltenVK), el sonido por AAudio, los hilos fijados, el driver de la GPU, la
-//     sonda de Vulkan y el modo de compatibilidad (sin Xenos en iOS).
+//     (solo Vulkan, por MoltenVK), los hilos fijados, el driver de la GPU, la sonda de Vulkan y el
+//     modo de compatibilidad (sin Xenos en iOS). El sonido por AAudio es aqui por AVAudioEngine.
 //   - Multijugador: la red va en red_lan.cpp y el servidor del anfitrion en servidor_ea.cpp. Buscar
 //     servidores por broadcast no sale sin un permiso de Apple que no tiene una Apple ID gratuita:
 //     se pregunta a cada IP de la red. El anfitrion sirve mientras la app esta delante.
@@ -640,6 +640,8 @@ std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, cons
   poner(@"--audio_ganancia_pct=100");
   // La vibracion del juego, a los mandos fisicos y, con el mando tactil, al movil.
   poner([@"--input_vibracion=" stringByAppendingString:bandera(LeerBool(@"vibracion", true))]);
+  // La salida de audio: AVAudioEngine (audio_ios.mm) o la de SDL de su SDK.
+  poner([@"--nfsmw_audio_ios=" stringByAppendingString:bandera(LeerBool(@"audio_avaudio", true))]);
   poner(@"--nfsmw_renderizador=nativo");
 
   // El idioma y el pais de la consola, los de la edicion de esta app.
@@ -933,13 +935,13 @@ UIScrollView* Panel(NSArray<UIView*>* tarjetas) {
 NSString* T(NSString* clave) { return NfsmwTexto(clave); }
 
 // Las secciones del menu lateral, en su orden.
-enum { S_JUEGO, S_PANTALLA, S_GRAFICOS, S_MULTIJUGADOR, S_CONTROLES, S_IDIOMA, S_AVANZADO, SECCIONES };
-NSString* const NOMBRES_SECCION[] = {@"seccion_juego",     @"seccion_pantalla",  @"seccion_graficos",
+enum { S_JUEGO, S_PANTALLA, S_GRAFICOS, S_MULTIJUGADOR, S_CONTROLES, S_IDIOMA, S_OTRAS, S_AVANZADO, SECCIONES };
+NSString* const NOMBRES_SECCION[] = {@"seccion_juego",        @"seccion_pantalla",  @"seccion_graficos",
                                      @"seccion_multijugador", @"seccion_controles", @"seccion_idioma",
-                                     @"seccion_avanzado"};
+                                     @"seccion_otras",        @"seccion_avanzado"};
 NSString* const ICONOS_SECCION[] = {@"gamecontroller.fill", @"rectangle.inset.filled", @"paintpalette.fill",
                                     @"person.2.fill",       @"hand.tap.fill",          @"globe",
-                                    @"wrench.and.screwdriver.fill"};
+                                    @"gearshape.fill",      @"wrench.and.screwdriver.fill"};
 
 }  // namespace
 
@@ -1133,7 +1135,7 @@ NSString* NfsmwTexto(NSString* clave) {
   paneles_ = [NSMutableArray arrayWithArray:@[
     Panel(@[[self tarjetaJuego]]), Panel(@[[self tarjetaPantalla]]), Panel(@[[self tarjetaGraficos]]),
     Panel(@[[self tarjetaPerfil], [self tarjetaServidorLan]]), Panel(@[[self tarjetaControles]]),
-    Panel(@[[self tarjetaIdioma]]),
+    Panel(@[[self tarjetaIdioma]]), Panel(@[[self tarjetaSonido]]),
     Panel(@[[self tarjetaAvanzado]])
   ]];
   for (UIView* p in paneles_) {
@@ -2053,6 +2055,16 @@ NSString* NfsmwTexto(NSString* clave) {
         [yo construir];
       });
     })
+  ]);
+}
+
+// ---- Otras opciones: el sonido (por donde sale el audio)
+
+- (UIView*)tarjetaSonido {
+  return Tarjeta(@[
+    Seccion(T(@"seccion_sonido")),
+    Interruptor(T(@"ios_audio"), T(@"ios_audio_resumen"), LeerBool(@"audio_avaudio", true),
+                ^(bool v) { Poner(@"audio_avaudio", @(v)); })
   ]);
 }
 

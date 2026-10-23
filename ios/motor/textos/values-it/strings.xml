@@ -10,4 +10,6 @@
     <string name="ios_editar_tactil_resumen">Nel gioco, l\'ingranaggio accanto al pulsante NASCONDI apre l\'editor: sposta i pulsanti touch e cambia dimensione e opacità.</string>
     <string name="ios_vibracion_probada">Il telefono vibra così quando il gioco fa vibrare i comandi touch. Un controller fisico vibra da solo.</string>
     <string name="ios_sin_biblioteca">Manca la libreria degli shader (nfsmw_shaders.nfsp), che serve al renderer nativo. Copiala nella cartella dell\'app, accanto alla ISO, oppure compila l\'app con essa.</string>
+    <string name="ios_audio">Audio a bassa latenza (AVAudioEngine)</string>
+    <string name="ios_audio_resumen">L\'uscita iOS a bassa latenza di questa app, come AAudio su Android. Disattivato: l\'uscita SDL del motore nativo.</string>
 </resources>

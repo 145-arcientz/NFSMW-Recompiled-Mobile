@@ -10,4 +10,6 @@
     <string name="ios_editar_tactil_resumen">게임 중 숨기기 버튼 옆의 톱니바퀴를 누르면 편집기가 열립니다. 터치 버튼을 옮기고 크기와 불투명도를 바꿀 수 있습니다.</string>
     <string name="ios_vibracion_probada">게임이 터치 조작을 진동시키면 휴대폰이 이렇게 진동합니다. 실물 컨트롤러는 스스로 진동합니다.</string>
     <string name="ios_sin_biblioteca">네이티브 렌더러에 필요한 셰이더 라이브러리(nfsmw_shaders.nfsp)가 없습니다. ISO 옆, 앱 폴더에 복사하거나 라이브러리를 넣어 앱을 빌드하세요.</string>
+    <string name="ios_audio">저지연 사운드(AVAudioEngine)</string>
+    <string name="ios_audio_resumen">이 앱의 iOS 저지연 출력입니다(Android의 AAudio와 같음). 끄면 네이티브 엔진의 SDL 출력을 씁니다.</string>
 </resources>

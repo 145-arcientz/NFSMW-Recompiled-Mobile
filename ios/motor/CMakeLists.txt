@@ -51,7 +51,10 @@ target_link_libraries(nfsmw PRIVATE
 # nativo_android.cpp, compiled without JNI. Objective-C++ with ARC.
 # The LAN multiplayer of the launcher (red_lan.cpp) and the host's EA server (servidor_ea.cpp, the Android app's
 # ServidorEa), which runs in the game's process while the app is in front.
+# The sound: AVAudioEngine, low latency, instead of the SDK's SDL driver (audio_ios.mm, the Android app's AAudio
+# driver on iOS).
 target_sources(nfsmw PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/audio_ios.mm"
     "${CMAKE_CURRENT_LIST_DIR}/lanzador.mm"
     "${CMAKE_CURRENT_LIST_DIR}/red_lan.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/servidor_ea.cpp"
@@ -64,6 +67,8 @@ target_link_libraries(nfsmw PRIVATE
     "-framework GameController"
     "-framework CoreMotion"
     "-framework CoreHaptics"
+    "-framework AVFoundation"
+    "-framework AudioToolbox"
     "-framework UniformTypeIdentifiers")
 
 # Compiler runtime for iOS (__isPlatformVersionAtLeast, behind the @available checks in SDL's

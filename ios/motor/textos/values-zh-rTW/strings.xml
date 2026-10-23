@@ -10,4 +10,6 @@
     <string name="ios_editar_tactil_resumen">遊戲中，「隱藏」按鈕旁的齒輪會開啟編輯器：移動觸控按鈕，並調整大小與不透明度。</string>
     <string name="ios_vibracion_probada">遊戲讓觸控操作震動時，手機會這樣震動。實體控制器會自己震動。</string>
     <string name="ios_sin_biblioteca">缺少原生渲染器所需的著色器庫（nfsmw_shaders.nfsp）。請把它複製到 App 的資料夾、ISO 旁邊，或建置含有它的 App。</string>
+    <string name="ios_audio">低延遲音效（AVAudioEngine）</string>
+    <string name="ios_audio_resumen">這個 App 的 iOS 低延遲輸出，如同 Android 上的 AAudio。關閉：使用原生引擎的 SDL 輸出。</string>
 </resources>

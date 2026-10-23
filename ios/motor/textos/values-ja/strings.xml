@@ -10,4 +10,6 @@
     <string name="ios_editar_tactil_resumen">ゲーム中、「隠す」ボタンの横の歯車でエディタが開きます。タッチボタンを移動し、サイズと不透明度を変更できます。</string>
     <string name="ios_vibracion_probada">ゲームがタッチ操作を振動させると、スマートフォンはこのように振動します。物理コントローラーはそれ自体が振動します。</string>
     <string name="ios_sin_biblioteca">ネイティブレンダラーに必要なシェーダーライブラリ（nfsmw_shaders.nfsp）がありません。ISO と同じアプリのフォルダにコピーするか、ライブラリ入りでアプリをビルドしてください。</string>
+    <string name="ios_audio">低遅延サウンド（AVAudioEngine）</string>
+    <string name="ios_audio_resumen">このアプリの iOS 低遅延出力です（Android の AAudio と同様）。オフ：ネイティブエンジンの SDL 出力。</string>
 </resources>
