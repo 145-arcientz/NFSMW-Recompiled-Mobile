@@ -10,8 +10,10 @@
 //     Documents/game_root. La ISO no se mapea entera: ver disc_image_device.cpp del SDK.
 //   - No estan las opciones que en iOS no existen: la resolucion de la pantalla, la API grafica
 //     (solo Vulkan, por MoltenVK), el sonido por AAudio, los hilos fijados, el driver de la GPU, la
-//     sonda de Vulkan y el modo de compatibilidad (sin Xenos en iOS). El servidor LAN, de momento,
-//     tampoco.
+//     sonda de Vulkan y el modo de compatibilidad (sin Xenos en iOS).
+//   - Multijugador: la red va en red_lan.cpp y el servidor del anfitrion en servidor_ea.cpp. Buscar
+//     servidores por broadcast no sale sin un permiso de Apple que no tiene una Apple ID gratuita:
+//     se pregunta a cada IP de la red. El anfitrion sirve mientras la app esta delante.
 //   - El editor del mando tactil es el de la partida (el engranaje junto a OCULTAR).
 //   - Volver aqui es cerrar la app y abrirla: iOS no deja que una app se cierre sola.
 //
@@ -21,6 +23,7 @@
 #import <CommonCrypto/CommonDigest.h>
 #import <UIKit/UIKit.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import <objc/runtime.h>
 #include <os/log.h>
 
 #include <fcntl.h>
@@ -30,6 +33,8 @@
 #include <algorithm>
 #include <cerrno>
 #include <cmath>
+#include <csignal>
+#include <optional>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -37,8 +42,30 @@
 #include <vector>
 
 #include "ios_app.h"
+#include "red_lan.h"
+#include "servidor_ea.h"
+
+// Un toque en una vista que no es un boton (las filas de los servidores), con un bloque.
+@interface NfsmwAccion : NSObject
+@property(nonatomic, copy) void (^hacer)(void);
+- (void)ejecutar;
+@end
+
+@implementation NfsmwAccion
+- (void)ejecutar {
+  if (self.hacer) self.hacer();
+}
+@end
 
 namespace {
+
+void AlTocar(UIView* v, void (^hacer)(void)) {
+  NfsmwAccion* a = [NfsmwAccion new];
+  a.hacer = hacer;
+  [v addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:a action:@selector(ejecutar)]];
+  // El reconocedor no retiene a su destino: lo retiene la vista.
+  objc_setAssociatedObject(v, (__bridge const void*)a, a, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
 
 // ---------------------------------------------------------------------------------------------
 //  Textos (Idioma.java): textos.json, que compilar.sh mete en la app
@@ -155,6 +182,66 @@ constexpr int FPS_SIN_LIMITE = 0;
 bool GamertagValido(NSString* g) {
   return g.length == 0 ||
          [[NSPredicate predicateWithFormat:@"SELF MATCHES %@", @"[A-Za-z][A-Za-z0-9 ]{0,14}"] evaluateWithObject:g];
+}
+
+// --- Multijugador (Ajustes.servidores, servidorLan, anfitrionLan)
+
+std::string S(NSString* t) { return t ? std::string(t.UTF8String) : std::string(); }
+NSString* N(const std::string& t) { return [NSString stringWithUTF8String:t.c_str()] ?: @""; }
+bool DireccionValida(NSString* d) { return nfsmw::red::DireccionValida(S(d)); }
+
+// Un servidor LAN guardado: su direccion y, si se le puso, un nombre ("Casa", "PC de Juan").
+struct Servidor {
+  NSString* nombre = @"";
+  NSString* direccion = @"";
+};
+
+// Donde esta esa direccion en la lista (sin mirar mayusculas), o -1.
+NSInteger IndiceServidor(const std::vector<Servidor>& l, NSString* direccion) {
+  for (size_t i = 0; i < l.size(); ++i) {
+    if ([l[i].direccion caseInsensitiveCompare:direccion] == NSOrderedSame) return NSInteger(i);
+  }
+  return -1;
+}
+
+// Los guardados, en el orden en que se guardaron: [{"nombre": "...", "direccion": "..."}]. La elegida
+// (servidor_lan) siempre esta en la lista.
+std::vector<Servidor> Servidores() {
+  std::vector<Servidor> l;
+  NSData* datos = [LeerTexto(@"servidores", @"[]") dataUsingEncoding:NSUTF8StringEncoding];
+  NSArray* a = [NSJSONSerialization JSONObjectWithData:datos options:0 error:nil];
+  if ([a isKindOfClass:NSArray.class]) {
+    for (NSDictionary* o in a) {
+      if (![o isKindOfClass:NSDictionary.class]) continue;
+      NSString* d = [o[@"direccion"] isKindOfClass:NSString.class] ? o[@"direccion"] : o[@"ip"];
+      if (![d isKindOfClass:NSString.class] || !DireccionValida(d) || IndiceServidor(l, d) >= 0) continue;
+      NSString* n = [o[@"nombre"] isKindOfClass:NSString.class] ? o[@"nombre"] : @"";
+      l.push_back({[n stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet], d});
+    }
+  }
+  NSString* elegida = LeerTexto(@"servidor_lan", @"");
+  if (DireccionValida(elegida) && IndiceServidor(l, elegida) < 0) l.insert(l.begin(), Servidor{@"", elegida});
+  return l;
+}
+
+void Servidores(const std::vector<Servidor>& l) {
+  NSMutableArray* a = [NSMutableArray array];
+  for (const auto& v : l) [a addObject:@{@"nombre" : v.nombre ?: @"", @"direccion" : v.direccion}];
+  NSData* datos = [NSJSONSerialization dataWithJSONObject:a options:0 error:nil];
+  Poner(@"servidores", [[NSString alloc] initWithData:datos encoding:NSUTF8StringEncoding]);
+}
+
+// El servidor contra el que va el juego: este telefono si es el anfitrion, o la direccion elegida
+// (IP o nombre). Vacio = ninguno.
+NSString* ServidorEfectivo() {
+  if (LeerBool(@"anfitrion_lan", false)) return N(nfsmw::red::IpLocal());
+  return LeerTexto(@"servidor_lan", @"");
+}
+
+// Lo que ven los demas al buscar servidores: el gamertag de este telefono, o su nombre.
+std::string NombreAnfitrion() {
+  NSString* g = [LeerTexto(@"gamertag", @"") stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+  return S(g.length ? g : UIDevice.currentDevice.name);
 }
 
 // --- Preajustes (Ajustes.aplicarAhorro, aplicarFabrica, aplicarMisAjustes)
@@ -509,7 +596,8 @@ double ProporcionPantalla() {
   return std::max(s.width, s.height) / std::max(1.0, double(std::min(s.width, s.height)));
 }
 
-std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, const std::string& argv0) {
+// redDns: la IP del servidor de la LAN a la que va Xbox Live del juego; nil = sin online.
+std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, const std::string& argv0, NSString* redDns) {
   std::vector<std::string> a{argv0};
   auto poner = [&a](NSString* s) { a.emplace_back(s.UTF8String); };
   auto bandera = [](bool v) { return v ? @"true" : @"false"; };
@@ -561,6 +649,16 @@ std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, cons
   if (gamertag.length && GamertagValido(gamertag)) {
     // Un solo argumento aunque lleve espacios: va en el vector, sin shell.
     poner([@"--user_gamertag=" stringByAppendingString:gamertag]);
+  }
+  // Xbox Live del juego contra el servidor de EA de la LAN: los permisos de Live, la red de verdad,
+  // la sesion de Live y todos los nombres (los servidores de EA) a esa IP.
+  if (redDns.length) {
+    poner(@"--grant_user_privileges=true");
+    poner(@"--red_lan=true");
+    poner(@"--red_live=true");
+    poner([@"--red_dns=" stringByAppendingString:redDns]);
+    // Diagnostico del multijugador: las llamadas de red al log.
+    if (LeerBool(@"registro", false)) poner(@"--red_registro=true");
   }
   poner(LeerBool(@"registro", false) ? @"--log_level=debug" : @"--log_level=info");
   return a;
@@ -777,6 +875,31 @@ UIView* Deslizador(NSString* titulo, NSString* resumen, int min, int max, int ac
   return Columna(vistas, 6, 6);
 }
 
+UIButton* BotonIcono(NSString* simbolo, NSString* descripcion, void (^accion)(void)) {
+  UIButtonConfiguration* c = [UIButtonConfiguration plainButtonConfiguration];
+  c.image = [UIImage systemImageNamed:simbolo];
+  c.baseForegroundColor = Color(0xFFD0D0D0);
+  UIButton* b = [UIButton buttonWithConfiguration:c primaryAction:[UIAction actionWithHandler:^(UIAction*) { accion(); }]];
+  b.accessibilityLabel = descripcion;
+  [b.widthAnchor constraintEqualToConstant:44].active = YES;
+  [b.heightAnchor constraintEqualToConstant:44].active = YES;
+  return b;
+}
+
+// Un campo de texto oscuro con su etiqueta encima (el hint de Android).
+UITextField* Campo(NSString* texto, NSString* ejemplo) {
+  UITextField* c = [UITextField new];
+  c.text = texto;
+  c.placeholder = ejemplo;
+  c.borderStyle = UITextBorderStyleRoundedRect;
+  c.font = [UIFont systemFontOfSize:16];
+  c.textColor = UIColor.whiteColor;
+  c.autocorrectionType = UITextAutocorrectionTypeNo;
+  c.spellCheckingType = UITextSpellCheckingTypeNo;
+  [c.heightAnchor constraintGreaterThanOrEqualToConstant:44].active = YES;
+  return c;
+}
+
 UIScrollView* Panel(NSArray<UIView*>* tarjetas) {
   UIScrollView* sv = [UIScrollView new];
   sv.translatesAutoresizingMaskIntoConstraints = NO;
@@ -842,6 +965,37 @@ NSString* NfsmwTexto(NSString* clave) {
   Juego juego_;
   Mirada mirada_;
   int miradas_;
+  UIView* contenido_;
+  UIView* aviso_;
+  // El gamertag: si esta libre en el servidor de la LAN (comprobarGamertag). `comprobaciones_` cuenta
+  // las consultas para tirar las respuestas que llegan tarde.
+  UILabel* comprobacion_;
+  BOOL gamertagEscritoValido_;
+  BOOL comprobandoParaJugar_;
+  int comprobaciones_;
+  NSTimer* comprobacionPendiente_;
+  NSTimer* renovarReserva_;
+  // El servidor de la LAN: la lista de guardados y, con este telefono de anfitrion, en su lugar la IP
+  // que ponen los demas.
+  UISwitch* interruptorAnfitrion_;
+  UILabel* textoAnfitrion_;
+  UIView* bloqueServidores_;
+  UIStackView* listaServidores_;
+  UIStackView* listaEncontrados_;
+  UIView* filaBotonesServidores_;
+  UIButton* botonBuscar_;
+  // Lo que contesto la ultima busqueda (sin valor = no se ha buscado o ya se eligio uno), si este
+  // telefono no estaba en ninguna red y si hay una en marcha.
+  std::optional<std::vector<nfsmw::red::Encontrado>> encontrados_;
+  BOOL busquedaSinRed_;
+  BOOL buscando_;
+  // El formulario de anadir o editar un servidor, metido en la lista; nil = cerrado.
+  // direccionEditada_: la del que se edita, "" = uno nuevo.
+  UIView* editorServidor_;
+  NSString* direccionEditada_;
+  __weak UITextField* ipEditor_;
+  __weak UITextField* nombreEditor_;
+  void (^aceptarEditor_)(void);
 }
 
 - (instancetype)initConArgv0:(std::string)argv0 {
@@ -851,8 +1005,24 @@ NSString* NfsmwTexto(NSString* clave) {
     seccion_ = S_JUEGO;
     edicion_ = LeerEdicion();
     miradas_ = 0;
+    gamertagEscritoValido_ = GamertagValido(LeerTexto(@"gamertag", @""));
+    // El servidor de este telefono, si es el anfitrion: arrancarlo dos veces no hace nada.
+    if (LeerBool(@"anfitrion_lan", false)) [self arrancarAnfitrion];
   }
   return self;
+}
+
+// Cada consulta que sale libre aparta el nombre para este telefono unos minutos (10 en el
+// servidor); mientras esta pantalla se ve, se renueva cada minuto.
+- (void)viewDidAppear:(BOOL)animado {
+  [super viewDidAppear:animado];
+  [renovarReserva_ invalidate];
+  __weak NfsmwLanzador* yo = self;
+  renovarReserva_ = [NSTimer scheduledTimerWithTimeInterval:60
+                                                    repeats:YES
+                                                      block:^(NSTimer*) {
+                                                        [yo comprobarGamertag];
+                                                      }];
 }
 
 - (std::vector<std::string>)argumentos {
@@ -945,11 +1115,14 @@ NSString* NfsmwTexto(NSString* clave) {
 
   // --- La seccion elegida. Todas se construyen al empezar y solo se ve una.
   UIView* contenido = [UIView new];
+  contenido_ = contenido;
+  aviso_ = nil;
   contenido.translatesAutoresizingMaskIntoConstraints = NO;
   [raiz addSubview:contenido];
   paneles_ = [NSMutableArray arrayWithArray:@[
     Panel(@[[self tarjetaJuego]]), Panel(@[[self tarjetaPantalla]]), Panel(@[[self tarjetaGraficos]]),
-    Panel(@[[self tarjetaPerfil]]), Panel(@[[self tarjetaControles]]), Panel(@[[self tarjetaIdioma]]),
+    Panel(@[[self tarjetaPerfil], [self tarjetaServidorLan]]), Panel(@[[self tarjetaControles]]),
+    Panel(@[[self tarjetaIdioma]]),
     Panel(@[[self tarjetaAvanzado]])
   ]];
   for (UIView* p in paneles_) {
@@ -979,6 +1152,7 @@ NSString* NfsmwTexto(NSString* clave) {
   ]];
   [self mostrarSeccion:seccion_];
   [self refrescar];
+  [self programarComprobacion];
 }
 
 - (void)mostrarSeccion:(int)i {
@@ -1258,21 +1432,554 @@ NSString* NfsmwTexto(NSString* clave) {
   [campo.heightAnchor constraintGreaterThanOrEqualToConstant:44].active = YES;
   errorGamertag_ = Etiqueta(T(@"gamertag_error"), 13, UIFontWeightRegular, AVISO);
   errorGamertag_.hidden = GamertagValido(campo.text);
-  __weak UILabel* error = errorGamertag_;
+  // Debajo, si el nombre esta libre en el servidor de la LAN.
+  comprobacion_ = Resumen(@"");
+  comprobacion_.hidden = YES;
+  __weak NfsmwLanzador* yo = self;
   [campo addAction:[UIAction actionWithHandler:^(UIAction* a) {
-           NSString* texto = ((UITextField*)a.sender).text ?: @"";
-           const bool valido = GamertagValido(texto);
-           error.hidden = valido;
-           if (valido) Poner(@"gamertag", texto);
+           UITextField* c = (UITextField*)a.sender;
+           if (c.text.length > 15) c.text = [c.text substringToIndex:15];
+           [yo gamertagEscrito:[c.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet]];
          }]
       forControlEvents:UIControlEventEditingChanged];
   return Tarjeta(@[
-    Seccion(T(@"seccion_perfil")), Resumen(T(@"gamertag_resumen")), Espacio(8), campo, Columna(@[errorGamertag_], 6)
+    Seccion(T(@"seccion_perfil")), Resumen(T(@"gamertag_resumen")), Espacio(8), campo,
+    Columna(@[errorGamertag_, comprobacion_], 6, 0, 4)
   ]);
 }
 
+- (void)gamertagEscrito:(NSString*)g {
+  gamertagEscritoValido_ = GamertagValido(g);
+  errorGamertag_.hidden = gamertagEscritoValido_;
+  if (gamertagEscritoValido_) {
+    Poner(@"gamertag", g);
+    [self programarComprobacion];
+  } else {
+    // Mal escrito: manda el error de formato, no el del servidor.
+    [comprobacionPendiente_ invalidate];
+    comprobaciones_++;
+    comprobacion_.hidden = YES;
+  }
+}
+
+// La comprobacion, medio segundo despues del ultimo cambio; con este telefono de anfitrion, algo
+// mas: su servidor puede estar arrancando.
+- (void)programarComprobacion {
+  [comprobacionPendiente_ invalidate];
+  comprobaciones_++;
+  __weak NfsmwLanzador* yo = self;
+  comprobacionPendiente_ = [NSTimer scheduledTimerWithTimeInterval:LeerBool(@"anfitrion_lan", false) ? 1.5 : .5
+                                                           repeats:NO
+                                                             block:^(NSTimer*) {
+                                                               [yo comprobarGamertag];
+                                                             }];
+}
+
+// Pregunta al servidor de la LAN si el gamertag esta libre y lo dice debajo del campo. Sin
+// servidor no hay nada que comprobar.
+- (void)comprobarGamertag {
+  if (!gamertagEscritoValido_ || comprobandoParaJugar_) return;
+  NSString* servidor = ServidorEfectivo();
+  if (!DireccionValida(servidor)) {
+    comprobacion_.hidden = YES;
+    return;
+  }
+  NSString* gamertag = LeerTexto(@"gamertag", @"");
+  const int n = ++comprobaciones_;
+  __weak NfsmwLanzador* yo = self;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+    const std::string ip = nfsmw::red::ResolverIpv4(S(servidor));
+    const auto r = ip.empty() ? nfsmw::red::Comprobacion::kSinRespuesta : nfsmw::red::ComprobarGamertag(ip, S(gamertag));
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [yo comprobado:r servidor:servidor gamertag:gamertag numero:n];
+    });
+  });
+}
+
+- (void)comprobado:(nfsmw::red::Comprobacion)r servidor:(NSString*)servidor gamertag:(NSString*)gamertag numero:(int)n {
+  if (n != comprobaciones_ || !gamertagEscritoValido_) return;
+  NSString* nombre = N(nfsmw::red::GamertagEfectivo(S(gamertag)));
+  comprobacion_.hidden = NO;
+  switch (r) {
+    case nfsmw::red::Comprobacion::kLibre:
+      comprobacion_.text = NfsmwTextoF(@"gamertag_libre", nombre, servidor);
+      comprobacion_.textColor = Color(GRIS);
+      break;
+    case nfsmw::red::Comprobacion::kEnUso:
+      comprobacion_.text = NfsmwTextoF(@"gamertag_en_uso", nombre, servidor);
+      comprobacion_.textColor = Color(AVISO);
+      break;
+    default:
+      comprobacion_.text = NfsmwTextoF(@"gamertag_sin_respuesta", servidor);
+      comprobacion_.textColor = Color(GRIS);
+      break;
+  }
+}
+
+// ---- Multijugador: el servidor de la LAN (ser el anfitrion o elegir uno de los guardados)
+
+- (UIView*)tarjetaServidorLan {
+  __weak NfsmwLanzador* yo = self;
+  UISwitch* interruptor = nil;
+  UIView* filaAnfitrion = Interruptor(T(@"servidor_anfitrion"), T(@"servidor_anfitrion_resumen"),
+                                      LeerBool(@"anfitrion_lan", false), ^(bool v) { [yo cambiarAnfitrion:v]; }, &interruptor);
+  interruptorAnfitrion_ = interruptor;
+  textoAnfitrion_ = Etiqueta(@"", 15, UIFontWeightRegular, BLANCO);
+
+  // Tocar un servidor lo elige; el lapiz lo edita y la papelera lo quita. Buscar: los que contestan
+  // salen debajo de los guardados, y tocar uno lo guarda y lo elige.
+  listaServidores_ = Columna(@[], 0, 0, 6);
+  listaEncontrados_ = Columna(@[], 6, 0, 6);
+  botonBuscar_ = Boton(T(@"servidor_buscar"), BOTON, BLANCO, ^{ [yo buscarServidores]; });
+  UIButton* anadir = Boton(T(@"servidor_anadir"), BOTON, BLANCO, ^{ [yo abrirEditorDe:nil nombre:nil]; });
+  UIStackView* botones = [[UIStackView alloc] initWithArrangedSubviews:@[botonBuscar_, anadir, [UIView new]]];
+  botones.axis = UILayoutConstraintAxisHorizontal;
+  botones.spacing = 8;
+  filaBotonesServidores_ = Columna(@[botones], 10);
+  bloqueServidores_ = Columna(@[Titulo(T(@"servidores_guardados")), Columna(@[listaServidores_], 6), listaEncontrados_,
+                                filaBotonesServidores_]);
+  UIView* t = Tarjeta(@[
+    Seccion(T(@"servidor_lan")), Resumen(T(@"servidor_lan_resumen")), filaAnfitrion, Columna(@[textoAnfitrion_], 4),
+    Espacio(4), bloqueServidores_
+  ]);
+  [self pintarServidores];
+  [self actualizarAnfitrion];
+  return t;
+}
+
+- (void)arrancarAnfitrion {
+  if (nfsmw::servidor::EnMarcha()) return;
+  NSString* datos = [Documentos() stringByAppendingPathComponent:@"datos/servidor_lan"];
+  NSString* logs = [Documentos() stringByAppendingPathComponent:@"logs"];
+  __weak NfsmwLanzador* yo = self;
+  // Abrir los puertos es red: fuera del hilo principal.
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    std::string error;
+    const bool bien = nfsmw::servidor::Arrancar(
+        S(datos), S(logs), [] {}, [] { return NombreAnfitrion(); }, &error);
+    if (bien) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      // Lo normal: los puertos ya los tiene otro.
+      Poner(@"anfitrion_lan", @NO);
+      [yo anfitrionFallo:N(error)];
+    });
+  });
+}
+
+- (void)anfitrionFallo:(NSString*)error {
+  [interruptorAnfitrion_ setOn:NO animated:YES];
+  [self actualizarAnfitrion];
+  [self aviso:NfsmwTextoF(@"servidor_error", error) deshacer:nil];
+}
+
+// El interruptor de anfitrion: arranca o para el servidor de este telefono.
+- (void)cambiarAnfitrion:(bool)si {
+  Poner(@"anfitrion_lan", @(si));
+  if (si) {
+    [self arrancarAnfitrion];
+  } else {
+    nfsmw::servidor::Parar();
+  }
+  [self actualizarAnfitrion];
+  // Otro servidor, otros jugadores.
+  [self programarComprobacion];
+}
+
+// Con este telefono de anfitrion: la IP que ponen los demas (o que no hay red), y sin la lista de
+// servidores. La IP se mira cada vez: cambia con la Wi-Fi.
+- (void)actualizarAnfitrion {
+  const bool anfitrion = LeerBool(@"anfitrion_lan", false);
+  bloqueServidores_.hidden = anfitrion;
+  textoAnfitrion_.hidden = !anfitrion;
+  if (anfitrion) {
+    const std::string ip = nfsmw::red::IpLocal();
+    textoAnfitrion_.text = ip.empty() ? T(@"servidor_anfitrion_sin_red") : NfsmwTextoF(@"servidor_anfitrion_ip", N(ip));
+    textoAnfitrion_.textColor = Color(ip.empty() ? AVISO : BLANCO);
+  }
+}
+
+// La lista: "Sin servidor" y los guardados, con el elegido marcado.
+- (void)pintarServidores {
+  for (UIView* v in listaServidores_.arrangedSubviews) [v removeFromSuperview];
+  NSString* elegida = LeerTexto(@"servidor_lan", @"");
+  const std::vector<Servidor> guardados = Servidores();
+  [listaServidores_ addArrangedSubview:[self filaServidor:nil elegido:IndiceServidor(guardados, elegida) < 0]];
+  bool editorPuesto = false;
+  for (const auto& v : guardados) {
+    // El que se edita: el formulario en su sitio.
+    if (editorServidor_ && [v.direccion isEqualToString:direccionEditada_]) {
+      [listaServidores_ addArrangedSubview:editorServidor_];
+      editorPuesto = true;
+    } else {
+      Servidor copia = v;
+      [listaServidores_ addArrangedSubview:[self filaServidor:&copia elegido:[v.direccion isEqualToString:elegida]]];
+    }
+  }
+  if (editorServidor_ && !editorPuesto) [listaServidores_ addArrangedSubview:editorServidor_];
+  filaBotonesServidores_.hidden = editorServidor_ != nil;
+  // "Ya guardado" depende de la lista.
+  [self pintarEncontrados];
+}
+
+// Una fila de la lista; s nullptr = "Sin servidor", que no se edita ni se quita.
+- (UIView*)filaServidor:(const Servidor*)s elegido:(bool)elegido {
+  UIView* fila = [UIView new];
+  fila.backgroundColor = Color(elegido ? ELEGIDO : 0xFF262626);
+  fila.layer.cornerRadius = 12;
+  fila.layer.borderWidth = elegido ? 1 : 0;
+  fila.layer.borderColor = Color(ACENTO).CGColor;
+  NSString* etiqueta = !s ? T(@"servidor_ninguno") : s->nombre.length ? s->nombre : s->direccion;
+  NSString* detalle = !s ? T(@"servidor_ninguno_resumen") : s->nombre.length ? s->direccion : nil;
+  UILabel* principal = Etiqueta(etiqueta, 16, elegido ? UIFontWeightBold : UIFontWeightRegular, BLANCO);
+  UIStackView* textos = Columna(detalle ? @[principal, Resumen(detalle)] : @[principal], 0, 0, 2);
+  UIImageView* marca = [[UIImageView alloc] initWithImage:Circulo(elegido)];
+  [marca setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+  NSMutableArray* partes = [NSMutableArray arrayWithArray:@[marca, textos]];
+  __weak NfsmwLanzador* yo = self;
+  NSString* direccion = s ? s->direccion : @"";
+  if (s) {
+    NSString* nombre = s->nombre;
+    [partes addObject:BotonIcono(@"pencil", NfsmwTextoF(@"servidor_editar", etiqueta), ^{
+              [yo abrirEditorDe:direccion nombre:nombre];
+            })];
+    [partes addObject:BotonIcono(@"trash", NfsmwTextoF(@"servidor_eliminar", etiqueta), ^{
+              [yo eliminarServidor:direccion];
+            })];
+  }
+  UIStackView* h = [[UIStackView alloc] initWithArrangedSubviews:partes];
+  h.axis = UILayoutConstraintAxisHorizontal;
+  h.alignment = UIStackViewAlignmentCenter;
+  h.spacing = 12;
+  h.translatesAutoresizingMaskIntoConstraints = NO;
+  [fila addSubview:h];
+  [NSLayoutConstraint activateConstraints:@[
+    [h.leadingAnchor constraintEqualToAnchor:fila.leadingAnchor constant:12],
+    [h.trailingAnchor constraintEqualToAnchor:fila.trailingAnchor constant:-4],
+    [h.topAnchor constraintEqualToAnchor:fila.topAnchor constant:6],
+    [h.bottomAnchor constraintEqualToAnchor:fila.bottomAnchor constant:-6],
+    [fila.heightAnchor constraintGreaterThanOrEqualToConstant:56],
+  ]];
+  AlTocar(fila, ^{
+    [yo elegirServidor:direccion];
+  });
+  return fila;
+}
+
+// "" = sin servidor: el juego como siempre.
+- (void)elegirServidor:(NSString*)direccion {
+  if ([direccion isEqualToString:LeerTexto(@"servidor_lan", @"")]) return;
+  Poner(@"servidor_lan", direccion);
+  [self pintarServidores];
+  // Otro servidor, otros jugadores: el nombre puede estar en uso alli.
+  [self programarComprobacion];
+}
+
+// Anadir (direccion nil) o editar un servidor: nombre opcional e IP. En la propia lista, en el sitio
+// del que se edita (o al final, si es nuevo), con los botones en la linea del titulo para que se vean
+// con el teclado abierto. Guardar solo se puede con una direccion valida que no este ya en la lista.
+// Uno nuevo queda elegido; al editar el elegido, sigue elegido con su direccion nueva.
+- (void)abrirEditorDe:(NSString*)direccion nombre:(NSString*)nombreActual {
+  [self cerrarEditor];
+  const bool nuevo = direccion == nil;
+  direccionEditada_ = direccion ?: @"";
+
+  UITextField* ip = Campo(direccion ?: @"", @"10.0.0.4");
+  // Una IP o un nombre de equipo: teclado de direcciones, sin autocorregir.
+  ip.keyboardType = UIKeyboardTypeURL;
+  ip.autocapitalizationType = UITextAutocapitalizationTypeNone;
+  ip.returnKeyType = UIReturnKeyNext;
+  ip.delegate = self;
+  UITextField* nombre = Campo(nombreActual ?: @"", nil);
+  nombre.returnKeyType = UIReturnKeyDone;
+  nombre.delegate = self;
+  UILabel* error = Etiqueta(@"", 13, UIFontWeightRegular, AVISO);
+  error.hidden = YES;
+  UIStackView* columnaIp = Columna(@[Etiqueta(T(@"servidor_lan_ip"), 13, UIFontWeightRegular, ACENTO_CLARO), ip, error], 0, 0, 4);
+  UIStackView* columnaNombre = Columna(@[Etiqueta(T(@"servidor_nombre"), 13, UIFontWeightRegular, ACENTO_CLARO), nombre], 0, 0, 4);
+  UIStackView* campos = [[UIStackView alloc] initWithArrangedSubviews:@[columnaIp, columnaNombre]];
+  campos.axis = UILayoutConstraintAxisHorizontal;
+  campos.alignment = UIStackViewAlignmentTop;
+  campos.spacing = 8;
+  [columnaNombre.widthAnchor constraintEqualToAnchor:columnaIp.widthAnchor multiplier:1.3].active = YES;
+
+  __weak NfsmwLanzador* yo = self;
+  UIButton* cancelar = Boton(T(@"editor_cancelar").localizedCapitalizedString, BOTON, BLANCO, ^{ [yo cerrarEditor]; });
+  UIButton* guardar = Boton(T(@"guardar"), ACENTO, 0xFF121212, ^{
+    NfsmwLanzador* fuerte = yo;
+    if (fuerte && fuerte->aceptarEditor_) fuerte->aceptarEditor_();
+  });
+  UIView* titulo = Etiqueta(T(nuevo ? @"servidor_anadir" : @"servidor_editar_titulo"), 16, UIFontWeightBold, BLANCO);
+  UIStackView* cabecera = [[UIStackView alloc] initWithArrangedSubviews:@[titulo, cancelar, guardar]];
+  cabecera.axis = UILayoutConstraintAxisHorizontal;
+  cabecera.alignment = UIStackViewAlignmentCenter;
+  cabecera.spacing = 8;
+
+  UIView* editor = [UIView new];
+  editor.backgroundColor = Color(0xFF262626);
+  editor.layer.cornerRadius = 12;
+  editor.layer.borderWidth = 1;
+  editor.layer.borderColor = Color(ACENTO).CGColor;
+  UIStackView* dentro = Columna(@[cabecera, campos], 0, 0, 8);
+  dentro.translatesAutoresizingMaskIntoConstraints = NO;
+  [editor addSubview:dentro];
+  [NSLayoutConstraint activateConstraints:@[
+    [dentro.leadingAnchor constraintEqualToAnchor:editor.leadingAnchor constant:12],
+    [dentro.trailingAnchor constraintEqualToAnchor:editor.trailingAnchor constant:-12],
+    [dentro.topAnchor constraintEqualToAnchor:editor.topAnchor constant:8],
+    [dentro.bottomAnchor constraintEqualToAnchor:editor.bottomAnchor constant:-10],
+  ]];
+
+  // La direccion que se puede guardar, o nil (y el porque, bajo el campo).
+  __weak UITextField* wip = ip;
+  __weak UITextField* wnombre = nombre;
+  __weak UILabel* werror = error;
+  __weak UIButton* wguardar = guardar;
+  NSString* (^validar)(void) = ^NSString*(void) {
+    NSString* t = [wip.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet] ?: @"";
+    const bool valida = DireccionValida(t);
+    const bool repetida = valida && (nuevo || [t caseInsensitiveCompare:direccion] != NSOrderedSame) &&
+                          IndiceServidor(Servidores(), t) >= 0;
+    werror.text = !valida ? T(@"servidor_lan_error") : repetida ? T(@"servidor_repetido") : @"";
+    werror.hidden = t.length == 0 || (valida && !repetida);
+    const bool vale = valida && !repetida;
+    wguardar.enabled = vale;
+    return vale ? t : nil;
+  };
+  [ip addAction:[UIAction actionWithHandler:^(UIAction*) {
+         if (wip.text.length > 253) wip.text = [wip.text substringToIndex:253];
+         validar();
+       }]
+      forControlEvents:UIControlEventEditingChanged];
+  [nombre addAction:[UIAction actionWithHandler:^(UIAction*) {
+            if (wnombre.text.length > 24) wnombre.text = [wnombre.text substringToIndex:24];
+          }]
+      forControlEvents:UIControlEventEditingChanged];
+  validar();
+  aceptarEditor_ = ^{
+    NSString* nueva = validar();
+    if (!nueva) {
+      [wip becomeFirstResponder];
+      return;
+    }
+    std::vector<Servidor> l = Servidores();
+    const Servidor v{[wnombre.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet] ?: @"", nueva};
+    const NSInteger donde = nuevo ? -1 : IndiceServidor(l, direccion);
+    if (donde >= 0) {
+      l[size_t(donde)] = v;
+    } else {
+      l.push_back(v);
+    }
+    const bool eraElegido = !nuevo && [direccion isEqualToString:LeerTexto(@"servidor_lan", @"")];
+    // Primero la lista: Servidores() mete la elegida si no esta.
+    Servidores(l);
+    if (nuevo || eraElegido) {
+      Poner(@"servidor_lan", nueva);
+      [yo programarComprobacion];
+    }
+    [yo cerrarEditor];
+  };
+
+  editorServidor_ = editor;
+  ipEditor_ = ip;
+  nombreEditor_ = nombre;
+  [self pintarServidores];
+  [ip becomeFirstResponder];
+}
+
+// Quita el formulario de la lista (sin guardar) y el teclado.
+- (void)cerrarEditor {
+  if (!editorServidor_) return;
+  [self.view endEditing:YES];
+  [editorServidor_ removeFromSuperview];
+  editorServidor_ = nil;
+  direccionEditada_ = nil;
+  aceptarEditor_ = nil;
+  [self pintarServidores];
+}
+
+// Quita un servidor guardado, con la opcion de deshacerlo. Si era el elegido, queda "Sin servidor".
+- (void)eliminarServidor:(NSString*)direccion {
+  std::vector<Servidor> l = Servidores();
+  const NSInteger donde = IndiceServidor(l, direccion);
+  if (donde < 0) return;
+  const Servidor quitado = l[size_t(donde)];
+  const bool eraElegido = [direccion isEqualToString:LeerTexto(@"servidor_lan", @"")];
+  l.erase(l.begin() + donde);
+  if (eraElegido) {
+    Poner(@"servidor_lan", @"");
+    [self programarComprobacion];
+  }
+  Servidores(l);
+  [self pintarServidores];
+  __weak NfsmwLanzador* yo = self;
+  [self aviso:NfsmwTextoF(@"servidor_eliminado", quitado.nombre.length ? quitado.nombre : quitado.direccion)
+      deshacer:^{
+        std::vector<Servidor> ahora = Servidores();
+        if (IndiceServidor(ahora, quitado.direccion) >= 0) return;
+        ahora.insert(ahora.begin() + std::min<NSInteger>(donde, NSInteger(ahora.size())), quitado);
+        Servidores(ahora);
+        if (eraElegido && LeerTexto(@"servidor_lan", @"").length == 0) {
+          Poner(@"servidor_lan", quitado.direccion);
+          [yo programarComprobacion];
+        }
+        [yo pintarServidores];
+      }];
+}
+
+// Busca servidores en la red (~1,5 s) y los pone bajo los guardados.
+- (void)buscarServidores {
+  if (buscando_) return;
+  buscando_ = YES;
+  [self pintarEncontrados];
+  __weak NfsmwLanzador* yo = self;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    const auto r = nfsmw::red::BuscarServidores();
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [yo encontrados:r];
+    });
+  });
+}
+
+- (void)encontrados:(std::optional<std::vector<nfsmw::red::Encontrado>>)r {
+  buscando_ = NO;
+  busquedaSinRed_ = !r;
+  encontrados_ = r ? *r : std::vector<nfsmw::red::Encontrado>();
+  [self pintarEncontrados];
+}
+
+// Lo que encontro la ultima busqueda, o por que no hay nada.
+- (void)pintarEncontrados {
+  botonBuscar_.enabled = !buscando_;
+  UIButtonConfiguration* c = botonBuscar_.configuration;
+  c.title = T(buscando_ ? @"servidor_buscando" : @"servidor_buscar");
+  botonBuscar_.configuration = c;
+  for (UIView* v in listaEncontrados_.arrangedSubviews) [v removeFromSuperview];
+  listaEncontrados_.hidden = !encontrados_;
+  if (!encontrados_) return;
+  [listaEncontrados_ addArrangedSubview:Titulo(T(@"servidores_encontrados"))];
+  if (encontrados_->empty()) {
+    [listaEncontrados_ addArrangedSubview:Resumen(T(busquedaSinRed_ ? @"servidor_anfitrion_sin_red" : @"servidor_ninguno_encontrado"))];
+    return;
+  }
+  const std::vector<Servidor> guardados = Servidores();
+  for (const auto& e : *encontrados_) {
+    [listaEncontrados_ addArrangedSubview:[self filaEncontrado:e guardado:IndiceServidor(guardados, N(e.ip)) >= 0]];
+  }
+}
+
+// Un servidor que contesto a la busqueda; tocarlo lo guarda (si no lo estaba) y lo elige.
+- (UIView*)filaEncontrado:(const nfsmw::red::Encontrado&)e guardado:(bool)guardado {
+  UIView* fila = [UIView new];
+  fila.backgroundColor = Color(0xFF262626);
+  fila.layer.cornerRadius = 12;
+  NSString* ip = N(e.ip);
+  NSString* nombre = N(e.nombre);
+  NSString* etiqueta = nombre.length ? nombre : ip;
+  UIImageView* icono = [[UIImageView alloc]
+      initWithImage:[[UIImage systemImageNamed:@"server.rack"] imageWithTintColor:Color(ACENTO_CLARO)
+                                                                    renderingMode:UIImageRenderingModeAlwaysOriginal]];
+  [icono setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+  UIStackView* textos = Columna(@[
+    Etiqueta(etiqueta, 16, UIFontWeightRegular, BLANCO),
+    Resumen(NfsmwTextoF(guardado ? @"servidor_encontrado_guardado" : @"servidor_encontrado_detalle", ip, e.jugadores))
+  ], 0, 0, 2);
+  NSMutableArray* partes = [NSMutableArray arrayWithArray:@[icono, textos]];
+  __weak NfsmwLanzador* yo = self;
+  const int jugadores = e.jugadores;
+  void (^usar)(void) = ^{
+    [yo usarEncontrado:ip nombre:nombre jugadores:jugadores];
+  };
+  if (!guardado) [partes addObject:BotonIcono(@"plus", NfsmwTextoF(@"servidor_encontrado_anadir", etiqueta), usar)];
+  UIStackView* h = [[UIStackView alloc] initWithArrangedSubviews:partes];
+  h.axis = UILayoutConstraintAxisHorizontal;
+  h.alignment = UIStackViewAlignmentCenter;
+  h.spacing = 12;
+  h.translatesAutoresizingMaskIntoConstraints = NO;
+  [fila addSubview:h];
+  [NSLayoutConstraint activateConstraints:@[
+    [h.leadingAnchor constraintEqualToAnchor:fila.leadingAnchor constant:12],
+    [h.trailingAnchor constraintEqualToAnchor:fila.trailingAnchor constant:-4],
+    [h.topAnchor constraintEqualToAnchor:fila.topAnchor constant:6],
+    [h.bottomAnchor constraintEqualToAnchor:fila.bottomAnchor constant:-6],
+    [fila.heightAnchor constraintGreaterThanOrEqualToConstant:56],
+  ]];
+  AlTocar(fila, usar);
+  return fila;
+}
+
+- (void)usarEncontrado:(NSString*)ip nombre:(NSString*)nombre jugadores:(int)jugadores {
+  [self cerrarEditor];
+  std::vector<Servidor> l = Servidores();
+  const bool nuevo = IndiceServidor(l, ip) < 0;
+  if (nuevo) {
+    // El nombre, con el limite del formulario.
+    l.push_back({nombre.length > 24 ? [nombre substringToIndex:24] : nombre, ip});
+    Servidores(l);
+  }
+  // Ya esta en la lista de arriba, elegido: la busqueda ha cumplido.
+  encontrados_.reset();
+  [self elegirServidor:ip];
+  [self pintarServidores];
+  if (nuevo) [self aviso:NfsmwTextoF(@"servidor_guardado", nombre.length ? nombre : ip) deshacer:nil];
+}
+
+// Un aviso abajo de la seccion, unos segundos (el Snackbar de Android), con Deshacer si se da.
+- (void)aviso:(NSString*)texto deshacer:(void (^)(void))deshacer {
+  [aviso_ removeFromSuperview];
+  UIView* caja = [UIView new];
+  caja.backgroundColor = Color(0xFF323232);
+  caja.layer.cornerRadius = 10;
+  caja.translatesAutoresizingMaskIntoConstraints = NO;
+  NSMutableArray* partes = [NSMutableArray arrayWithObject:Etiqueta(texto, 14, UIFontWeightRegular, BLANCO)];
+  __weak UIView* wcaja = caja;
+  if (deshacer) {
+    UIButtonConfiguration* c = [UIButtonConfiguration plainButtonConfiguration];
+    c.title = T(@"deshacer");
+    c.baseForegroundColor = Color(ACENTO_CLARO);
+    UIButton* b = [UIButton buttonWithConfiguration:c
+                                      primaryAction:[UIAction actionWithHandler:^(UIAction*) {
+                                        deshacer();
+                                        [wcaja removeFromSuperview];
+                                      }]];
+    [b setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [partes addObject:b];
+  }
+  UIStackView* h = [[UIStackView alloc] initWithArrangedSubviews:partes];
+  h.axis = UILayoutConstraintAxisHorizontal;
+  h.alignment = UIStackViewAlignmentCenter;
+  h.spacing = 8;
+  h.translatesAutoresizingMaskIntoConstraints = NO;
+  [caja addSubview:h];
+  [contenido_ addSubview:caja];
+  [NSLayoutConstraint activateConstraints:@[
+    [h.leadingAnchor constraintEqualToAnchor:caja.leadingAnchor constant:14],
+    [h.trailingAnchor constraintEqualToAnchor:caja.trailingAnchor constant:-8],
+    [h.topAnchor constraintEqualToAnchor:caja.topAnchor constant:8],
+    [h.bottomAnchor constraintEqualToAnchor:caja.bottomAnchor constant:-8],
+    [caja.leadingAnchor constraintEqualToAnchor:contenido_.leadingAnchor constant:12],
+    [caja.trailingAnchor constraintEqualToAnchor:contenido_.trailingAnchor constant:-12],
+    [caja.bottomAnchor constraintEqualToAnchor:contenido_.bottomAnchor constant:-12],
+  ]];
+  aviso_ = caja;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, int64_t((deshacer ? 5 : 2.5) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    [UIView animateWithDuration:.2
+        animations:^{
+          wcaja.alpha = 0;
+        }
+        completion:^(BOOL) {
+          [wcaja removeFromSuperview];
+        }];
+  });
+}
+
 - (BOOL)textFieldShouldReturn:(UITextField*)campo {
-  [campo resignFirstResponder];
+  if (campo == ipEditor_) {
+    [nombreEditor_ becomeFirstResponder];
+  } else if (campo == nombreEditor_ && aceptarEditor_) {
+    aceptarEditor_();
+  } else {
+    [campo resignFirstResponder];
+  }
   return YES;
 }
 
@@ -1353,6 +2060,10 @@ NSString* NfsmwTexto(NSString* clave) {
 
 // ---- Jugar
 
+// Jugar. Con servidor de la LAN se pregunta otra vez antes de entrar (otro jugador ha podido
+// conectarse con ese nombre desde que se escribio) y, si esta en uso, no se entra. Sin servidor, o
+// si no contesta, se juega como siempre. Un servidor puesto por nombre se pasa aqui a su IP: el
+// juego solo entiende IPs. Si la red no lo encuentra, se pregunta.
 - (void)jugar {
   [self.view endEditing:YES];
   juego_ = BuscarJuego();
@@ -1360,10 +2071,74 @@ NSString* NfsmwTexto(NSString* clave) {
     [self refrescar];
     return;
   }
-  argumentos_ = Argumentos(juego_, edicion_, argv0_);
+  NSString* servidor = ServidorEfectivo();
+  if (!DireccionValida(servidor)) {
+    [self lanzarConRed:nil];
+    return;
+  }
+  if (comprobandoParaJugar_) return;
+  comprobandoParaJugar_ = YES;
+  jugar_.enabled = NO;
+  NSString* gamertag = LeerTexto(@"gamertag", @"");
+  const int n = ++comprobaciones_;
+  __weak NfsmwLanzador* yo = self;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    const std::string ip = nfsmw::red::ResolverIpv4(S(servidor));
+    const auto r = ip.empty() ? nfsmw::red::Comprobacion::kSinRespuesta : nfsmw::red::ComprobarGamertag(ip, S(gamertag));
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [yo comprobadoParaJugar:r servidor:servidor ip:N(ip) gamertag:gamertag numero:n];
+    });
+  });
+}
+
+- (void)comprobadoParaJugar:(nfsmw::red::Comprobacion)r
+                   servidor:(NSString*)servidor
+                         ip:(NSString*)ip
+                   gamertag:(NSString*)gamertag
+                     numero:(int)n {
+  comprobandoParaJugar_ = NO;
+  jugar_.enabled = juego_.fuente != Fuente::NINGUNA;
+  if (n == comprobaciones_) [self comprobado:r servidor:servidor gamertag:gamertag numero:n];
+  __weak NfsmwLanzador* yo = self;
+  if (ip.length == 0) {
+    // El nombre del servidor no da ninguna IP en esta red: o se corrige, o se juega sin online.
+    [self preguntar:T(@"servidor_no_encontrado_titulo")
+            mensaje:NfsmwTextoF(@"servidor_no_encontrado", servidor)
+                 si:^{ [yo lanzarConRed:nil]; }];
+    return;
+  }
+  if (r == nfsmw::red::Comprobacion::kEnUso) {
+    // El gamertag lo tiene otro telefono: o se cambia, o se juega esta vez sin el modo online.
+    [self preguntar:T(@"gamertag_en_uso_titulo")
+            mensaje:NfsmwTextoF(@"gamertag_en_uso_pregunta", N(nfsmw::red::GamertagEfectivo(S(gamertag))), servidor)
+                 si:^{ [yo lanzarConRed:nil]; }];
+    return;
+  }
+  [self lanzarConRed:ip];
+}
+
+- (void)preguntar:(NSString*)titulo mensaje:(NSString*)mensaje si:(void (^)(void))si {
+  UIAlertController* a = [UIAlertController alertControllerWithTitle:titulo
+                                                             message:mensaje
+                                                      preferredStyle:UIAlertControllerStyleAlert];
+  [a addAction:[UIAlertAction actionWithTitle:T(@"editor_cancelar").localizedCapitalizedString
+                                        style:UIAlertActionStyleCancel
+                                      handler:nil]];
+  [a addAction:[UIAlertAction actionWithTitle:T(@"jugar_sin_online")
+                                        style:UIAlertActionStyleDefault
+                                      handler:^(UIAlertAction*) { si(); }]];
+  [self presentViewController:a animated:YES completion:nil];
+}
+
+// ip: la del servidor de la LAN a la que va Xbox Live del juego; nil = sin online (el servidor
+// guardado no se toca).
+- (void)lanzarConRed:(NSString*)ip {
+  argumentos_ = Argumentos(juego_, edicion_, argv0_, ip);
   std::string linea;
   for (const auto& a : argumentos_) linea += " " + a;
   os_log(OS_LOG_DEFAULT, "[lanzador] jugar:%{public}s", linea.c_str());
+  [comprobacionPendiente_ invalidate];
+  [renovarReserva_ invalidate];
   _terminado = YES;
 }
 
@@ -1401,6 +2176,10 @@ std::vector<std::string> NfsmwLanzadorIos(int argc, char** argv) {
     }
   }
   std::vector<std::string> argumentos = [lanzador argumentos];
+  // Escribir en un socket que el otro lado ya cerro manda SIGPIPE, que mata la app: el juego (y el
+  // servidor del anfitrion) cuentan con el EPIPE de Winsock. El SDK pide MSG_NOSIGNAL, pero en Darwin
+  // es SO_NOSIGPIPE por socket; asi vale para todos.
+  signal(SIGPIPE, SIG_IGN);
   ventana.hidden = YES;
   ventana.rootViewController = nil;
   return argumentos;

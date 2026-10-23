@@ -49,11 +49,17 @@ target_link_libraries(nfsmw PRIVATE
 # on-screen gamepad (TouchControllerView), which lays itself over SDL's window. What the gamepad asks the game (the
 # pad state, where in the game we are, the menus by touch, the pause) is the Android app's own native code,
 # nativo_android.cpp, compiled without JNI. Objective-C++ with ARC.
+# The LAN multiplayer of the launcher (red_lan.cpp) and the host's EA server (servidor_ea.cpp, the Android app's
+# ServidorEa), which runs in the game's process while the app is in front.
 target_sources(nfsmw PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/lanzador.mm"
+    "${CMAKE_CURRENT_LIST_DIR}/red_lan.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/servidor_ea.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/controles_tactiles.mm"
     "${CMAKE_CURRENT_LIST_DIR}/../../android/app/src/main/cpp/nativo/nativo_android.cpp")
 target_compile_options(nfsmw PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+# nlohmann/json for the EA server's stats, the copy that comes with the SDK (inja's).
+target_include_directories(nfsmw PRIVATE "${REXSDK_DIR}/thirdparty/inja/third_party/include")
 target_link_libraries(nfsmw PRIVATE
     "-framework GameController"
     "-framework CoreMotion"
