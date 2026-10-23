@@ -62,10 +62,12 @@ REXCVAR_DEFINE_STRING(android_turnip_debug, "", "UI/Vulkan",
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 #endif
 
-#if REX_PLATFORM_SWITCH
+#if REX_PLATFORM_SWITCH || REX_PLATFORM_IOS
 // NVK for Horizon is linked statically (Mesa's libvulkan.a) and exports the
 // entry points directly. api.h defines VK_NO_PROTOTYPES, so they have to be
 // declared by hand.
+// PARCHE LOCAL - iOS: the same with MoltenVK (libMoltenVK.a of the Khronos release), which
+// implements the entry points itself: an app cannot load a loader or ICDs from elsewhere.
 extern "C" {
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr(VkInstance instance, const char* pName);
 VKAPI_ATTR void VKAPI_CALL vkDestroyInstance(VkInstance instance,
@@ -91,7 +93,13 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
 
   bool functions_loaded = true;
   bool loader_loaded = false;
-#if REX_PLATFORM_MAC
+#if REX_PLATFORM_IOS
+  // PARCHE LOCAL - iOS: MoltenVK is inside the executable (see the declarations above).
+  ifn.vkGetInstanceProcAddr = &::vkGetInstanceProcAddr;
+  ifn.vkDestroyInstance = &::vkDestroyInstance;
+  loader_loaded = true;
+  REXLOG_INFO("Vulkan: MoltenVK enlazado en el ejecutable");
+#elif REX_PLATFORM_MAC
   const MacOSVulkanRuntimePaths macos_runtime_paths = DetectMacOSVulkanRuntimePaths();
   ConfigureMacOSVulkanEnvironment(macos_runtime_paths);
 
@@ -189,7 +197,7 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
   }
 #endif
 
-#if !REX_PLATFORM_SWITCH
+#if !REX_PLATFORM_SWITCH && !REX_PLATFORM_IOS
 #define XE_VULKAN_LOAD_LOADER_FUNCTION(name) \
   functions_loaded &= (ifn.name = vulkan_instance->loader_.GetSymbol<PFN_##name>(#name)) != nullptr;
   XE_VULKAN_LOAD_LOADER_FUNCTION(vkGetInstanceProcAddr);

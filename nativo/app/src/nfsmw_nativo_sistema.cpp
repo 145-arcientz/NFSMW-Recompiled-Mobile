@@ -122,12 +122,20 @@ std::string Resumen();
 #include "../../sdk/src/core/threading_switch.h"
 #endif
 
+#if REX_PLATFORM_IOS
+// iOS has only the native renderer: the Xenos emulation plugin is not built there.
+REXCVAR_DEFINE_STRING(nfsmw_renderizador, "nativo", "NFSMW",
+                      "nativo = renderizador nativo (en iOS no hay emulacion de la GPU)")
+    .allowed({"nativo"})
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+#else
 REXCVAR_DEFINE_STRING(nfsmw_renderizador, "xenos", "NFSMW",
                       "xenos = emulacion de la GPU; nativo = renderizador nativo en desarrollo "
                       "(pieza C1: el juego corre sin emulacion y la pantalla muestra un color de "
                       "prueba)")
     .allowed({"xenos", "nativo"})
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+#endif
 
 REXCVAR_DEFINE_STRING(nfsmw_nativo_api, "vulkan", "NFSMW",
                       "API del renderizador nativo: vulkan, o gles (OpenGL ES 3.1/3.2, solo en Android, en obras: "

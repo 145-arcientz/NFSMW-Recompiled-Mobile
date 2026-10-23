@@ -24,6 +24,9 @@ option(REXGLUE_ENABLE_FIDELITYFX "Enable optional AMD FidelityFX integration (ex
 option(REXGLUE_ENABLE_TRACY                "Enable Tracy profiler integration" ON)
 option(REXGLUE_ENABLE_PERF_COUNTERS        "Enable lightweight perf counter registry and overlay" ON)
 option(REXGLUE_PLATFORM_SWITCH             "Build for Nintendo Switch (devkitA64 + libnx; set by the toolchain file)" OFF)
+# PARCHE LOCAL - iOS: the app can leave out the Xenos GPU emulation plugin (iOS uses only the
+# native renderer, and an app cannot load a plugin it did not link).
+option(REXGLUE_BUILD_XENOS                 "Build the rexgpu-xenos GPU emulation plugin" ON)
 # Propagate profiling defines globally (compiled out in Release)
 if(REXGLUE_ENABLE_TRACY)
     add_compile_definitions($<$<NOT:$<CONFIG:Release>>:REXGLUE_ENABLE_PROFILING>)
@@ -197,6 +200,11 @@ elseif(UNIX AND NOT APPLE)
         set(REX_PLATFORM "linux-${REX_TARGET_PROCESSOR}")
     endif()
     add_compile_definitions(REX_PLATFORM_LINUX=1)
+elseif(IOS)
+    # PARCHE LOCAL - iOS: the macOS paths (REX_PLATFORM_MAC) plus REX_PLATFORM_IOS, which
+    # rex/platform.h also derives from TARGET_OS_IPHONE.
+    set(REX_PLATFORM "ios-arm64")
+    add_compile_definitions(REX_PLATFORM_MAC=1 REX_PLATFORM_IOS=1)
 elseif(APPLE)
     if(REX_TARGET_PROCESSOR MATCHES "AMD64|x86_64")
         set(REX_PLATFORM "mac-amd64")
@@ -294,7 +302,7 @@ add_subdirectory(src/audio)
 add_subdirectory(src/graphics)
 add_subdirectory(src/system)
 add_subdirectory(src/kernel)
-if(NOT REXGLUE_PLATFORM_SWITCH AND NOT ANDROID)
+if(NOT REXGLUE_PLATFORM_SWITCH AND NOT ANDROID AND NOT IOS)
     # Host tools. Code generation runs on the PC; a Switch build compiles its
     # output.
     add_subdirectory(src/codegen)
@@ -325,7 +333,7 @@ message(STATUS "  Perf Counters: ${REXGLUE_ENABLE_PERF_COUNTERS}")
 message(STATUS "===========================================")
 
 # SDK install/export rules (skipped when consumed as a subdirectory)
-if(PROJECT_IS_TOP_LEVEL AND ANDROID)
+if(PROJECT_IS_TOP_LEVEL AND (ANDROID OR IOS))
     message(STATUS "Skipping desktop SDK install/export rules for the Android cross-build")
 elseif(PROJECT_IS_TOP_LEVEL)
     include(cmake/rexglue_devenv.cmake)

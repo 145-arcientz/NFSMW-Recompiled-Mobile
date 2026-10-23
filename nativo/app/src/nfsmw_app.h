@@ -136,7 +136,7 @@ class NfsmwApp : public rex::ReXApp {
       return;  // given on the command line
     }
     std::filesystem::path carpeta;
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
     carpeta = user_data_root;
 #else
     carpeta = rex::filesystem::GetExecutableFolder();
@@ -151,7 +151,53 @@ class NfsmwApp : public rex::ReXApp {
     }
   }
 
+#if REX_PLATFORM_IOS
+  // ==========================================================================
+  //  iOS: EVERYTHING IN DOCUMENTS
+  //
+  //  The executable is inside the .app bundle, which is read-only and replaced on every install.
+  //  What the player brings (the extracted game, nfsmw_shaders.nfsp, nfsmw.toml) and what the game
+  //  writes (saves, cache, logs) goes in the app's Documents folder, which the Files app shows
+  //  (UIFileSharingEnabled in Info.plist):
+  //      Documents/game_root/default.xex, NFS/, Movies/, nfsmw_shaders.nfsp
+  //      Documents/nfsmw.toml
+  //      Documents/datos/            user data (saves, cache)
+  //  default.xex directly in Documents also works.
+  // ==========================================================================
+  static std::filesystem::path CarpetaDocumentos() {
+    const char* home = std::getenv("HOME");  // the app container on iOS
+    return home && *home ? std::filesystem::path(home) / "Documents" : std::filesystem::path();
+  }
+
+  void RutasIos(rex::PathConfig& paths) {
+    const auto documentos = CarpetaDocumentos();
+    if (documentos.empty()) {
+      return;
+    }
+    std::error_code ec;
+    if (rex::cvar::GetFlagByName("user_data_root").empty()) {
+      paths.user_data_root = documentos / "datos";
+      paths.cache_root = paths.user_data_root / "cache";
+    }
+    paths.config_path = documentos / "nfsmw.toml";
+    if (paths.game_data_root.empty()) {
+      if (std::filesystem::is_regular_file(documentos / "game_root" / "default.xex", ec)) {
+        paths.game_data_root = documentos / "game_root";
+      } else if (std::filesystem::is_regular_file(documentos / "default.xex", ec)) {
+        paths.game_data_root = documentos;
+      }
+    }
+    // The native renderer looks for nfsmw_shaders.nfsp through the cvar (nfsmw_nativo_sistema.cpp).
+    if (!paths.game_data_root.empty() && rex::cvar::GetFlagByName("game_data_root").empty()) {
+      rex::cvar::SetFlagByName("game_data_root", rex::path_to_utf8(paths.game_data_root));
+    }
+  }
+#endif
+
   void OnConfigurePaths(rex::PathConfig& paths) override {
+#if REX_PLATFORM_IOS
+    RutasIos(paths);
+#endif
     ElegirCarpetaDeGuardados(paths.user_data_root);
 #if REX_PLATFORM_ANDROID
     // The "executable" is app_process under /system/bin: nfsmw.toml lives in the user data folder, where
@@ -257,9 +303,12 @@ class NfsmwApp : public rex::ReXApp {
     nfsmw::ajustes::OcultarAjustesSinEfecto();
     // Optional post-processing (Graficos/Posproceso) and antialiasing: the output pass picks them up live.
     nfsmw::ajustes::VigilarAjustesEnVivo();
+#if !REX_PLATFORM_IOS
     // Without a GPU plugin the screen stays black: the game runs, but the
     // runtime discards its graphics calls with "no GPU emulation loaded".
+    // iOS has no plugin: the native renderer (OnPreSetup) is its graphics system.
     PonerSiNadieLoPidio("gpu_plugin", "xenos");
+#endif
 #if defined(NFSMW_NATIVE_SHADER_LIBRARY)
     // VkDevice must be created with these capabilities; enabling them after
     // SetupPresentation does not change a device that already exists.

@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Builds the native engine for iOS in WSL, from the Windows checkout.
+#
+#   wsl -e bash /mnt/c/.../ios/motor/compilar.sh [--dependencias] [--limpio] [--instalar]
+#
+# Leaves build-ios/NFSMW.ipa; --instalar signs and installs it on the iPhone with xtool (it must be
+# attached to WSL: usbipd attach --wsl --busid <id>).
+#
+# The sources are copied to ~/nfsmw first: building on /mnt/c is several times slower. The SDK's
+# third-party clones and the generated game code are not in git, so they come from the main checkout
+# (NFSMW_PRINCIPAL), once or with --dependencias.
+set -euo pipefail
+
+aqui=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo=$(CDPATH= cd -- "$aqui/../.." && pwd)
+principal=${NFSMW_PRINCIPAL:-$(dirname "$repo")/NFSMW-Recompiled}
+copia=${NFSMW_COPIA:-$HOME/nfsmw}
+build=${NFSMW_BUILD:-$copia/build-ios}
+moltenvk=${NFSMW_MOLTENVK:-$HOME/deps/moltenvk}
+version_moltenvk=v1.4.1
+
+dependencias=0
+limpio=0
+instalar=0
+for arg in "$@"; do
+    case "$arg" in
+        --dependencias) dependencias=1 ;;
+        --limpio) limpio=1 ;;
+        --instalar) instalar=1 ;;
+        *) echo "Opcion desconocida: $arg" >&2; exit 2 ;;
+    esac
+done
+
+# Without the game, Android, Mesa, the other editions and the build folders.
+excluir=(--exclude=.git --exclude=/nativo/assets/ --exclude=/nativo/out/ --exclude=/nativo/sdk/out/
+         --exclude=/nativo/app/out/ --exclude=/nativo/android/ --exclude=/nativo/mesa/ --exclude='/nativo/app_*/'
+         --exclude=/nativo/pgo/ --exclude=/nativo/extras/ --exclude=build/)
+
+mkdir -p "$copia"
+if [ "$dependencias" = 1 ] || [ ! -d "$copia/nativo/sdk/thirdparty/sdl3" ] || [ ! -d "$copia/nativo/app/generated/default" ]; then
+    echo "== Dependencias y codigo generado desde $principal"
+    [ -f "$principal/nativo/app/generated/default/sources.cmake" ] || {
+        echo "No hay codigo generado en $principal/nativo/app/generated" >&2; exit 1; }
+    rsync -a "${excluir[@]}" "$principal/nativo/sdk/thirdparty/" "$copia/nativo/sdk/thirdparty/"
+    rsync -a "$principal/nativo/app/generated/" "$copia/nativo/app/generated/"
+fi
+echo "== Fuentes desde $repo"
+rsync -a "${excluir[@]}" "$repo/nativo" "$repo/ios" "$copia/"
+
+if [ ! -f "$moltenvk/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a" ]; then
+    echo "== MoltenVK $version_moltenvk (release de Khronos)"
+    mkdir -p "$moltenvk"
+    curl -fL -o "$moltenvk/MoltenVK-ios.tar" \
+        "https://github.com/KhronosGroup/MoltenVK/releases/download/$version_moltenvk/MoltenVK-ios.tar"
+    tar -xf "$moltenvk/MoltenVK-ios.tar" -C "$moltenvk"
+fi
+
+[ "$limpio" = 1 ] && rm -rf "$build"
+if [ ! -f "$build/build.ninja" ]; then
+    echo "== Configurando en $build"
+    cmake -G Ninja -S "$copia/ios/motor" -B "$build" \
+        -DCMAKE_TOOLCHAIN_FILE="$copia/ios/motor/ios.toolchain.cmake" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DNFSMW_MOLTENVK="$moltenvk/MoltenVK/MoltenVK"
+fi
+
+echo "== Compilando"
+cmake --build "$build" --target nfsmw -- -j "${NFSMW_JOBS:-6}"
+
+echo "== Empaquetando $build/NFSMW.ipa"
+rm -rf "$build/Payload" "$build/NFSMW.ipa"
+mkdir -p "$build/Payload"
+cp -R "$build/nfsmw-app/nfsmw.app" "$build/Payload/"
+(cd "$build" && python3 -m zipfile -c NFSMW.ipa Payload/)
+ls -lh "$build/NFSMW.ipa"
+
+if [ "$instalar" = 1 ]; then
+    echo "== Instalando con xtool"
+    xtool install "$build/NFSMW.ipa"
+fi

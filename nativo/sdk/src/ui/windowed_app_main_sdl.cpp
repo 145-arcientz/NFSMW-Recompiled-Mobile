@@ -19,7 +19,9 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 #include <rex/platform.h>
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
+// PARCHE LOCAL - iOS: SDL owns the real main there too (UIApplicationMain), and calls ours
+// as SDL_main once UIKit has started.
 #include <SDL3/SDL_main.h>
 #endif
 #include <rex/ui/windowed_app.h>

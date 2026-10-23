@@ -94,6 +94,22 @@ function(rexglue_configure_target target_name)
     target_compile_definitions(${target_name} PRIVATE
         REXGLUE_BUILD_CONFIG="$<CONFIG>")
 
+    if(IOS)
+        # PARCHE LOCAL - iOS: one static executable, as on the Switch. From an archive the
+        # linker only pulls members that resolve an undefined symbol; -force_load keeps the
+        # ones that only register themselves from a static constructor (cvars, kernel exports).
+        target_link_options(${target_name} PRIVATE
+            "LINKER:-force_load,$<TARGET_FILE:rexruntime>")
+        set_property(TARGET ${target_name} APPEND PROPERTY LINK_DEPENDS "$<TARGET_FILE:rexruntime>")
+        target_include_directories(${target_name} PRIVATE
+            $<TARGET_PROPERTY:imgui,INTERFACE_INCLUDE_DIRECTORIES>)
+        rexglue_apply_target_settings(${target_name})
+        if(ARG_GPU_PLUGINS)
+            message(FATAL_ERROR "rexglue_configure_target: iOS cannot load GPU plugins")
+        endif()
+        return()
+    endif()
+
     if(UNIX AND NOT APPLE)
         set_target_properties(${target_name} PROPERTIES
             INSTALL_RPATH "$ORIGIN"
