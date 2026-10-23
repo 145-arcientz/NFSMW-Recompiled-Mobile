@@ -23,6 +23,32 @@
 #if defined(__ANDROID__)
 #include <spdlog/sinks/android_sink.h>
 #endif
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#if TARGET_OS_IPHONE
+#include <os/log.h>
+#include <spdlog/sinks/base_sink.h>
+
+namespace {
+// PARCHE LOCAL - iOS: an app's stdout goes nowhere. os_log reaches the device log (idevicesyslog,
+// Console.app), as logcat does on Android.
+class OsLogSink : public spdlog::sinks::base_sink<std::mutex> {
+ protected:
+  void sink_it_(const spdlog::details::log_msg& msg) override {
+    spdlog::memory_buf_t buf;
+    formatter_->format(msg, buf);
+    std::string texto(buf.data(), buf.size());
+    while (!texto.empty() && (texto.back() == '\n' || texto.back() == '\r')) {
+      texto.pop_back();
+    }
+    const os_log_type_t tipo = msg.level >= spdlog::level::err ? OS_LOG_TYPE_ERROR : OS_LOG_TYPE_DEFAULT;
+    os_log_with_type(OS_LOG_DEFAULT, tipo, "%{public}s", texto.c_str());
+  }
+  void flush_() override {}
+};
+}  // namespace
+#endif
+#endif
 
 #include <toml++/toml.hpp>
 
@@ -218,6 +244,8 @@ void InitLoggingEarly() {
 
 #if REX_PLATFORM_WIN32
   auto sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
+#elif REX_PLATFORM_IOS
+  auto sink = std::make_shared<OsLogSink>();
 #else
   auto sink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
 #endif
@@ -310,6 +338,15 @@ void InitLogging(const LogConfig& config) {
     auto sink = std::make_shared<spdlog::sinks::android_sink_mt>("NFSMW-rex");
     sink->set_level(spdlog::level::info);
     sink->set_pattern("%v");
+    g_extra_sinks.push_back(sink);
+  }
+#endif
+#if REX_PLATFORM_IOS
+  // PARCHE LOCAL - iOS: the same with os_log (idevicesyslog), at info and above.
+  {
+    auto sink = std::make_shared<OsLogSink>();
+    sink->set_level(spdlog::level::info);
+    sink->set_pattern("[%n] %v");
     g_extra_sinks.push_back(sink);
   }
 #endif

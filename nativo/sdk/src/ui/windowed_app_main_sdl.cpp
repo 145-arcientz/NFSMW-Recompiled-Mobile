@@ -27,6 +27,15 @@
 #include <rex/ui/windowed_app.h>
 #include <rex/ui/windowed_app_context_sdl.h>
 
+#if REX_PLATFORM_IOS
+// PARCHE LOCAL - iOS: start-up steps straight to the device log (idevicesyslog), before and
+// independently of the engine's logging.
+#include <os/log.h>
+#define REX_TRAZA_ARRANQUE(texto) os_log(OS_LOG_DEFAULT, "[arranque] %{public}s", texto)
+#else
+#define REX_TRAZA_ARRANQUE(texto) ((void)0)
+#endif
+
 #if REX_PLATFORM_WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -42,16 +51,20 @@
 namespace {
 
 int RunWindowedApp(int argc, char** argv) {
+  REX_TRAZA_ARRANQUE("main");
   auto remaining = rex::cvar::Init(argc, argv);
   rex::cvar::ApplyEnvironment();
   rex::InitLoggingEarly();
+  REX_TRAZA_ARRANQUE("cvars y log temprano");
 
   int result;
   {
     rex::ui::SDLWindowedAppContext app_context;
     if (!app_context.Initialize()) {
+      REX_TRAZA_ARRANQUE("SDLWindowedAppContext::Initialize fallo");
       return EXIT_FAILURE;
     }
+    REX_TRAZA_ARRANQUE("SDL inicializado");
 
 #if REX_PLATFORM_WIN32
     // Apartment-threaded COM for shell dialogs.
@@ -81,7 +94,10 @@ int RunWindowedApp(int argc, char** argv) {
     }
     app->SetParsedArguments(std::move(parsed));
 
-    result = app->OnInitialize() ? app_context.RunMainMessageLoop() : EXIT_FAILURE;
+    REX_TRAZA_ARRANQUE("app creada, OnInitialize");
+    const bool iniciada = app->OnInitialize();
+    REX_TRAZA_ARRANQUE(iniciada ? "OnInitialize bien, bucle de mensajes" : "OnInitialize fallo");
+    result = iniciada ? app_context.RunMainMessageLoop() : EXIT_FAILURE;
 
     app->InvokeOnDestroy();
   }

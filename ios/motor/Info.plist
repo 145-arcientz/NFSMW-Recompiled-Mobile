@@ -56,6 +56,26 @@
     <!-- Without a launch screen iOS runs the app letterboxed at an old phone size. -->
     <key>UILaunchScreen</key>
     <dict/>
+    <!-- SDL3 uses the UIScene life cycle: without this UIKit never connects SDL's scene delegate,
+         the app shows an empty window and SDL never calls our main ("Info.plist contained no
+         UIScene configuration dictionary (looking for configuration named SDLSceneConfiguration)"). -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>SDLSceneConfiguration</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>SDLUIKitSceneDelegate</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
     <!-- Documents in the Files app: the player copies the game and nfsmw_shaders.nfsp there. -->
     <key>UIFileSharingEnabled</key>
     <true/>

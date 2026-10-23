@@ -60,3 +60,5 @@ target_link_libraries(nfsmw PRIVATE "${NFSMW_CLANG_RT_IOS}")
 set_target_properties(nfsmw PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_LIST_DIR}/Info.plist")
+# CMake copies it into the bundle when it configures: a change to it has to reconfigure.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/Info.plist")
