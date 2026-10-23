@@ -11,6 +11,7 @@
   - la ISO leída sin extraerla;
   - los 10 idiomas;
   - la vibración del móvil;
+  - el sonido de baja latencia con `AVAudioEngine`;
   - el contador de fps;
   - el multijugador LAN, incluido el iPhone de anfitrión.
 
@@ -195,6 +196,11 @@ Cómo compilarlas está en la cabecera de `prueba_servidor_ea.py`.
    - Los 10 idiomas de la app, también en los controles táctiles.
    - Los preajustes gráficos.
    - La vibración del móvil con la del juego (Core Haptics) y el contador de fps.
+   - El sonido de baja latencia ([audio_ios.mm](motor/audio_ios.mm)): el driver AAudio de Android con
+     `AVAudioEngine`, en lugar del de SDL, que en iOS va por `AudioQueue`. El búfer de E/S es de un
+     bloque del juego, 5,33 ms. Las películas siguen por SDL, sobre un dispositivo suyo que queda
+     abierto todo el juego para que no toque la sesión de audio. Cada 10 s el registro dice cuántos
+     fotogramas se quedaron sin datos (`[audio ios] en 10 s`).
    - El multijugador LAN: los servidores guardados, buscar en la red y comprobar el gamertag
      ([red_lan.cpp](motor/red_lan.cpp)).
    - El iPhone de anfitrión: `ServidorEa` en C++ ([servidor_ea.cpp](motor/servidor_ea.cpp)),
