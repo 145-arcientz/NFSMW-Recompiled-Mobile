@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ios_app_con_juego">Cette app contient le jeu. Elle est réservée à vos propres appareils : ne la partagez pas.</string>
+    <string name="ios_juego_extraido">Jeu extrait : %1$s</string>
+    <string name="ios_edicion_app">Cette app a été compilée pour l\'édition %1$s du jeu.</string>
+    <string name="ios_iso_otra_edicion">Cette ISO est une autre édition du jeu. Cette app a été compilée pour l\'édition %1$s et ne démarrera pas avec une autre : choisissez l\'ISO %1$s, ou compilez l\'app à partir de cette ISO.</string>
+    <string name="ios_ayuda_iso">Copiez votre ISO avec l\'app Fichiers dans Sur mon iPhone › NFS Most Wanted, ou depuis un ordinateur avec le Finder (onglet Fichiers de l\'iPhone). Vous pouvez aussi la choisir n\'importe où dans Fichiers avec le bouton : elle est lue là où elle est, sans copie.</string>
+    <string name="ios_iso_sin_acceso">iOS ne donne plus accès à l\'ISO choisie : elle a peut-être été déplacée ou supprimée. Choisissez-la à nouveau.</string>
+    <string name="ios_cerrar_para_ajustes">Les réglages s\'appliquent en touchant Jouer. Pour les changer ensuite, fermez l\'app depuis le sélecteur d\'apps et rouvrez-la.</string>
+    <string name="ios_editar_tactil_resumen">Dans le jeu, l\'engrenage à côté du bouton MASQUER ouvre l\'éditeur : déplacez les boutons tactiles et changez leur taille et leur opacité.</string>
+    <string name="ios_vibracion_probada">Le téléphone vibre ainsi quand le jeu fait vibrer les commandes tactiles. Une manette physique vibre d\'elle-même.</string>
+    <string name="ios_sin_biblioteca">La bibliothèque de shaders (nfsmw_shaders.nfsp), dont le moteur de rendu natif a besoin, est absente. Copiez-la dans le dossier de l\'app, à côté de l\'ISO, ou compilez l\'app avec elle.</string>
+</resources>

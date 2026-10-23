@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ios_app_con_juego">이 앱에는 게임이 들어 있습니다. 본인 기기에서만 사용하고 공유하지 마세요.</string>
+    <string name="ios_juego_extraido">압축 해제된 게임: %1$s</string>
+    <string name="ios_edicion_app">이 앱은 게임의 %1$s 판용으로 빌드되었습니다.</string>
+    <string name="ios_iso_otra_edicion">이 ISO는 게임의 다른 판입니다. 이 앱은 %1$s 판용으로 빌드되어 다른 판으로는 시작되지 않습니다. %1$s 판 ISO를 선택하거나 이 ISO로 앱을 빌드하세요.</string>
+    <string name="ios_ayuda_iso">파일 앱으로 ISO를 나의 iPhone › NFS Most Wanted에 복사하거나, 컴퓨터의 Finder(iPhone의 파일 탭)로 복사하세요. 버튼으로 파일 앱의 어느 위치에서든 선택할 수도 있습니다. 복사하지 않고 그 자리에서 읽습니다.</string>
+    <string name="ios_iso_sin_acceso">선택한 ISO에 iOS가 더 이상 접근을 허용하지 않습니다. 옮겨졌거나 삭제되었을 수 있습니다. 다시 선택하세요.</string>
+    <string name="ios_cerrar_para_ajustes">설정은 플레이를 누를 때 적용됩니다. 나중에 바꾸려면 앱 전환기에서 앱을 닫고 다시 여세요.</string>
+    <string name="ios_editar_tactil_resumen">게임 중 숨기기 버튼 옆의 톱니바퀴를 누르면 편집기가 열립니다. 터치 버튼을 옮기고 크기와 불투명도를 바꿀 수 있습니다.</string>
+    <string name="ios_vibracion_probada">게임이 터치 조작을 진동시키면 휴대폰이 이렇게 진동합니다. 실물 컨트롤러는 스스로 진동합니다.</string>
+    <string name="ios_sin_biblioteca">네이티브 렌더러에 필요한 셰이더 라이브러리(nfsmw_shaders.nfsp)가 없습니다. ISO 옆, 앱 폴더에 복사하거나 라이브러리를 넣어 앱을 빌드하세요.</string>
+</resources>

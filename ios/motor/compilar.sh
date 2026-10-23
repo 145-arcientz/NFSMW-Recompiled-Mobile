@@ -74,6 +74,19 @@ echo "== Empaquetando $build/NFSMW.ipa"
 rm -rf "$build/Payload" "$build/NFSMW.ipa"
 mkdir -p "$build/Payload"
 cp -R "$build/nfsmw-app/nfsmw.app" "$build/Payload/"
+app="$build/Payload/nfsmw.app"
+# Lo que lleva el APK en sus assets: los textos de la app en sus 10 idiomas (los de Android y los
+# propios de iOS), la edicion del juego del codigo generado (el lanzador la ensena, la compara con la
+# ISO y le pasa su idioma y su pais al juego) y la biblioteca de shaders de esa edicion, que sale de
+# TU copia del juego: como el codigo generado, es una razon mas para no compartir la app.
+python3 "$aqui/textos.py" "$repo/android/app/src/main/res" "$aqui/textos" "$app/textos.json"
+for f in edicion.json nfsmw_shaders.nfsp; do
+    if [ -f "$principal/nativo/out/$f" ]; then
+        cp "$principal/nativo/out/$f" "$app/"
+    else
+        echo "Aviso: no hay $principal/nativo/out/$f; la app va sin el" >&2
+    fi
+done
 (cd "$build" && python3 -m zipfile -c NFSMW.ipa Payload/)
 ls -lh "$build/NFSMW.ipa"
 

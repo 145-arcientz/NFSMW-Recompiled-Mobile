@@ -833,6 +833,14 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
       if (!juego.empty() && std::filesystem::is_regular_file(std::filesystem::path(juego) / nombre_biblioteca, ec)) {
         biblioteca = std::filesystem::path(juego) / nombre_biblioteca;
       }
+#if REX_PLATFORM_IOS
+      // iOS: the one inside the app (ios/motor/compilar.sh puts it there), as the APK carries it on
+      // Android; one copied to Documents or next to the extracted game wins over it.
+      else if (const auto app = rex::filesystem::GetExecutablePath().parent_path() / nombre_biblioteca;
+               std::filesystem::is_regular_file(app, ec)) {
+        biblioteca = app;
+      }
+#endif
     }
     if (shaders_.Cargar(biblioteca)) {
       ActivarGanchos(&shaders_);  // step C5b: shader objects and Draw* records

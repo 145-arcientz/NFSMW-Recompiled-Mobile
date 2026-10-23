@@ -6,17 +6,19 @@
 //
 // Lo que cambia respecto a Java:
 //   - Las preferencias van en NSUserDefaults, con las mismas claves que en Android
-//     ("nfsmw_touch_controller.<clave>" y "ajustes.<clave>"). Sin lanzador todavia, los
-//     ajustes de Ajustes.java tienen sus valores por defecto.
+//     ("nfsmw_touch_controller.<clave>" y "ajustes.<clave>"); las de "ajustes" las pone el
+//     lanzador (lanzador.mm). Los textos son los de Android, en sus 10 idiomas (ios_app.h).
 //   - Los controles se colocan en la zona segura (fuera de la isla o la muesca y de las
 //     esquinas redondeadas); la imagen del juego (los toques de los menus) es la de la
-//     pantalla entera: el 16:9 del centro, o toda si se estira (ajustes.estirar).
+//     pantalla entera: el 16:9 del centro, o toda si se estira o va en pantalla ancha.
 //   - Un mando fisico se ve con GameController: conectado, o usado (se mira cada 200 ms).
-//   - Sin la vibracion del movil con la del juego (GameActivity.vibrarMando), por ahora.
+//   - El movil vibra con Core Haptics (GameActivity.vibrarMando), y el contador de fps
+//     (GameActivity.ponerContadorFps) va en esta misma vista.
 //
 // La vista se coloca sola: un constructor estatico espera a que la ventana de SDL (la de
 // SDL_uikitviewcontroller) sea la principal y se pone encima. Nada del motor la llama.
 
+#import <CoreHaptics/CoreHaptics.h>
 #import <CoreMotion/CoreMotion.h>
 #import <GameController/GameController.h>
 #import <QuartzCore/QuartzCore.h>
@@ -28,17 +30,21 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include <rex/cvar.h>
+
+#include "ios_app.h"
 
 // android/app/src/main/cpp/nativo/nativo_android.cpp
 extern "C" void NfsmwTactilEstado(int32_t botones, float izq_x, float izq_y, float der_x, float der_y,
@@ -51,6 +57,8 @@ extern "C" bool NfsmwTactilMenuRotar();
 extern "C" bool NfsmwTactilMenuEsLista();
 extern "C" int32_t NfsmwTactilMenuRumbo();
 std::string NfsmwTactilMenuDiagnostico();
+// Fotogramas que ha presentado el juego (nativo/app/src/nfsmw_d3d_trace.cpp, en su gancho del Swap).
+extern std::atomic<uint64_t> g_nfsmw_fotogramas_juego;
 
 namespace {
 
@@ -134,29 +142,27 @@ struct Rect {
   CGRect cg() const { return CGRectMake(left, top, right - left, bottom - top); }
 };
 
-// Los textos de la app de Android (values/strings.xml y values-es).
+// Los textos de la app de Android (res/values*/strings.xml), en el idioma de la app.
 struct Textos {
   NSString *ocultar, *mostrar, *mando, *gestos, *tamano, *opacidad, *restaurar, *cancelar, *listo, *ayuda;
   NSString* disp[3];
 };
 
 Textos CargarTextos() {
-  const bool es = [NSLocale.preferredLanguages.firstObject hasPrefix:@"es"];
   Textos t;
-  t.ocultar = es ? @"OCULTAR" : @"HIDE";
-  t.mostrar = es ? @"TÁCTIL" : @"TOUCH";
-  t.mando = es ? @"MANDO" : @"PAD";
-  t.gestos = es ? @"DEDO" : @"FINGER";
-  t.tamano = es ? @"TAMAÑO" : @"SIZE";
-  t.opacidad = es ? @"OPACIDAD" : @"OPACITY";
-  t.restaurar = es ? @"RESTAURAR" : @"RESET";
-  t.cancelar = es ? @"CANCELAR" : @"CANCEL";
-  t.listo = es ? @"LISTO" : @"DONE";
-  t.ayuda = es ? @"Arrastra un control para moverlo. TAMAÑO cambia el elegido, o todos si no hay ninguno."
-               : @"Drag a control to move it. SIZE changes the selected one, or all of them if none is selected.";
-  t.disp[NORMAL] = es ? @"CONTROLES: NORMALES" : @"CONTROLS: NORMAL";
-  t.disp[ACELERACION] = es ? @"CONTROLES: ACELERACIÓN" : @"CONTROLS: DRAG";
-  t.disp[CONDUCIENDO] = es ? @"CONTROLES: CONDUCIENDO" : @"CONTROLS: DRIVING";
+  t.ocultar = NfsmwTexto(@"tactil_ocultar");
+  t.mostrar = NfsmwTexto(@"tactil_mostrar");
+  t.mando = NfsmwTexto(@"tactil_mando");
+  t.gestos = NfsmwTexto(@"tactil_gestos");
+  t.tamano = NfsmwTexto(@"editor_tamano");
+  t.opacidad = NfsmwTexto(@"editor_opacidad");
+  t.restaurar = NfsmwTexto(@"editor_restaurar");
+  t.cancelar = NfsmwTexto(@"editor_cancelar");
+  t.listo = NfsmwTexto(@"editor_listo");
+  t.ayuda = NfsmwTexto(@"editor_ayuda");
+  t.disp[NORMAL] = NfsmwTexto(@"editor_disposicion_normal");
+  t.disp[ACELERACION] = NfsmwTexto(@"editor_disposicion_aceleracion");
+  t.disp[CONDUCIENDO] = NfsmwTexto(@"editor_disposicion_conduciendo");
   return t;
 }
 
@@ -198,6 +204,105 @@ void Quitar(const char* f, const std::string& k) {
 
 constexpr const char* PREFS = "nfsmw_touch_controller";
 constexpr const char* AJUSTES = "ajustes";
+
+// ---------------------------------------------------------------------------------------------
+//  La vibracion del movil (GameActivity.vibrarMando y callarVibracion)
+// ---------------------------------------------------------------------------------------------
+//
+// El juego pide una fuerza de 0 a 255 desde su hilo (NfsmwAndroidVibrar, abajo) y dura hasta que
+// la cambie, como en el mando de la Xbox 360: un evento continuo de Core Haptics que se repite, y
+// su intensidad cambia sobre la marcha. Se calla (sin perder lo pedido) en segundo plano, con el
+// editor abierto y con un mando fisico, que vibra el (por SDL).
+
+constexpr int CALLADA_SEGUNDO_PLANO = 1, CALLADA_EDITOR = 2, CALLADA_MANDO = 4;
+
+std::mutex g_vibracion_mutex;
+int g_vibracion_pedida = 0, g_vibracion_puesta = 0, g_vibracion_callada = 0;
+std::atomic<int> g_nivel_vibracion{-1};
+
+// El motor de hapticos y lo que suena, solo desde su cola.
+dispatch_queue_t ColaVibracion() {
+  static dispatch_queue_t cola = dispatch_queue_create("nfsmw.vibracion", DISPATCH_QUEUE_SERIAL);
+  return cola;
+}
+CHHapticEngine* g_hapticos = nil;
+bool g_hapticos_en_marcha = false;
+id<CHHapticAdvancedPatternPlayer> g_vibrando = nil;
+
+bool ArrancarHapticos() {
+  if (!g_hapticos) {
+    if (!CHHapticEngine.capabilitiesForHardware.supportsHaptics) return false;
+    g_hapticos = [[CHHapticEngine alloc] initAndReturnError:nil];
+    if (!g_hapticos) return false;
+    g_hapticos.playsHapticsOnly = YES;
+    // iOS lo para (segundo plano, otra app con hapticos): lo que sonaba se pierde.
+    g_hapticos.stoppedHandler = ^(CHHapticEngineStoppedReason) {
+      dispatch_async(ColaVibracion(), ^{
+        g_hapticos_en_marcha = false;
+        g_vibrando = nil;
+      });
+    };
+    g_hapticos.resetHandler = ^{
+      dispatch_async(ColaVibracion(), ^{
+        g_hapticos_en_marcha = false;
+        g_vibrando = nil;
+      });
+    };
+  }
+  if (!g_hapticos_en_marcha) {
+    g_hapticos_en_marcha = [g_hapticos startAndReturnError:nil];
+  }
+  return g_hapticos_en_marcha;
+}
+
+// En la cola: la fuerza de 0 a 255.
+void PonerVibracion(int fuerza) {
+  if (fuerza <= 0) {
+    [g_vibrando stopAtTime:CHHapticTimeImmediate error:nil];
+    g_vibrando = nil;
+    return;
+  }
+  if (!ArrancarHapticos()) return;
+  if (!g_vibrando) {
+    CHHapticEvent* e = [[CHHapticEvent alloc]
+        initWithEventType:CHHapticEventTypeHapticContinuous
+               parameters:@[[[CHHapticEventParameter alloc] initWithParameterID:CHHapticEventParameterIDHapticIntensity value:1],
+                            [[CHHapticEventParameter alloc] initWithParameterID:CHHapticEventParameterIDHapticSharpness value:.3f]]
+             relativeTime:0
+                 duration:30];
+    CHHapticPattern* patron = [[CHHapticPattern alloc] initWithEvents:@[e] parameters:@[] error:nil];
+    g_vibrando = patron ? [g_hapticos createAdvancedPlayerWithPattern:patron error:nil] : nil;
+    g_vibrando.loopEnabled = YES;
+    [g_vibrando startAtTime:CHHapticTimeImmediate error:nil];
+  }
+  CHHapticDynamicParameter* intensidad =
+      [[CHHapticDynamicParameter alloc] initWithParameterID:CHHapticDynamicParameterIDHapticIntensityControl
+                                                      value:fuerza / 255.f
+                                               relativeTime:0];
+  [g_vibrando sendParameters:@[intensidad] atTime:CHHapticTimeImmediate error:nil];
+}
+
+void AplicarVibracion() {
+  const bool activa = LeerBool(AJUSTES, "vibracion", true);
+  int fuerza;
+  {
+    std::lock_guard<std::mutex> l(g_vibracion_mutex);
+    fuerza = activa && g_vibracion_callada == 0 ? std::min(255, g_vibracion_pedida) : 0;
+    if (fuerza == g_vibracion_puesta) return;
+    g_vibracion_puesta = fuerza;
+  }
+  dispatch_async(ColaVibracion(), ^{
+    PonerVibracion(fuerza);
+  });
+}
+
+void CallarVibracion(int motivo, bool callar) {
+  {
+    std::lock_guard<std::mutex> l(g_vibracion_mutex);
+    g_vibracion_callada = callar ? g_vibracion_callada | motivo : g_vibracion_callada & ~motivo;
+  }
+  AplicarVibracion();
+}
 
 // Ajustes.anguloGiro: los grados para girar del todo, de 45 (1) a 6 (20).
 float AnguloGiro(int sensibilidad) {
@@ -786,10 +891,12 @@ Tactil::Tactil(UIView* vista) : vista_(vista), textos_(CargarTextos()) {
   flechasAlConducir = !inclinar && LeerTexto(AJUSTES, "giro_carrera", "stick") == "flechas";
   senoGiroCompleto = float(std::sin(AnguloGiro(LeerInt(AJUSTES, "sensibilidad_giro", 10)) * M_PI / 180.0));
   menusTactiles = LeerBool(AJUSTES, "menus_tactiles", true);
-  estirar = LeerBool(AJUSTES, "estirar", false);
+  // Con la pantalla ancha la imagen tambien llena la pantalla (GameActivity: estirar || panoramico).
+  estirar = LeerBool(AJUSTES, "estirar", false) || LeerBool(AJUSTES, "panoramico", false);
   opacidad = LeerFloat(PREFS, "opacidad", 1.f);
   mandoEnMenus = LeerBool(PREFS, "mando_en_menus", false);
   mandoFisico = GCController.controllers.count > 0;
+  CallarVibracion(CALLADA_MANDO, mandoFisico);
   controlsVisible = !mandoFisico && LeerBool(PREFS, "visible", true);
   toggleVisible = !mandoFisico;
 }
@@ -817,6 +924,8 @@ void Tactil::mandoUsado() {
 void Tactil::entrarModoMando() {
   if (editando) return;
   mandoFisico = true;
+  // Con mando fisico vibra el (por SDL), no el movil.
+  CallarVibracion(CALLADA_MANDO, true);
   Cancelar(ocultarToggle_);
   toggleVisible = false;
   if (controlsVisible) {
@@ -830,6 +939,7 @@ void Tactil::entrarModoMando() {
 void Tactil::salirModoMando() {
   if (editando) return;
   mandoFisico = false;
+  CallarVibracion(CALLADA_MANDO, false);
   controlsVisible = LeerBool(PREFS, "visible", true);
   rehacer();
   mostrarToggle();
@@ -1883,6 +1993,7 @@ void Tactil::cambiarDisposicionEditada() {
 void Tactil::abrirEditor() {
   clearInput();
   NfsmwTactilPausarJuego(true);
+  CallarVibracion(CALLADA_EDITOR, true);
   visiblesAntesDeEditar = controlsVisible;
   Cancelar(ocultarToggle_);
   toggleVisible = false;
@@ -1903,6 +2014,7 @@ void Tactil::terminarEdicion() {
   controlsVisible = visiblesAntesDeEditar;
   rehacer();
   mostrarToggle();
+  CallarVibracion(CALLADA_EDITOR, false);
   NfsmwTactilPausarJuego(false);
 }
 
@@ -2037,6 +2149,12 @@ void Tactil::sendState() {
   CMMotionManager* movimiento_;
   NSTimer* vigilante_;
   BOOL empezado_;
+  // El contador de fps (GameActivity.ponerContadorFps): los fotogramas presentados desde la vez
+  // anterior, entre el tiempo que ha pasado, cada medio segundo.
+  UILabel* fps_;
+  NSTimer* relojFps_;
+  CFTimeInterval antesFps_;
+  uint64_t fotogramasAntes_;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -2055,6 +2173,36 @@ void Tactil::sendState() {
   NSNotificationCenter* centro = NSNotificationCenter.defaultCenter;
   [centro addObserver:self selector:@selector(mandosCambiaron) name:GCControllerDidConnectNotification object:nil];
   [centro addObserver:self selector:@selector(mandosCambiaron) name:GCControllerDidDisconnectNotification object:nil];
+  // En segundo plano no vibra (GameActivity.onPause); al volver sigue lo que pidiera el juego.
+  [centro addObserverForName:UIApplicationDidEnterBackgroundNotification
+                      object:nil
+                       queue:NSOperationQueue.mainQueue
+                  usingBlock:^(NSNotification*) {
+                    CallarVibracion(CALLADA_SEGUNDO_PLANO, true);
+                  }];
+  [centro addObserverForName:UIApplicationWillEnterForegroundNotification
+                      object:nil
+                       queue:NSOperationQueue.mainQueue
+                  usingBlock:^(NSNotification*) {
+                    CallarVibracion(CALLADA_SEGUNDO_PLANO, false);
+                  }];
+
+  if (LeerBool(AJUSTES, "mostrar_fps", true)) {
+    fps_ = [UILabel new];
+    fps_.font = [UIFont monospacedSystemFontOfSize:13 weight:UIFontWeightBold];
+    fps_.textColor = UIColor.whiteColor;
+    fps_.backgroundColor = [UIColor colorWithWhite:0 alpha:0x99 / 255.0];
+    fps_.textAlignment = NSTextAlignmentCenter;
+    fps_.userInteractionEnabled = NO;
+    fps_.text = @"-- fps";
+    [self addSubview:fps_];
+    __weak NfsmwControlesTactiles* yo = self;
+    relojFps_ = [NSTimer scheduledTimerWithTimeInterval:.5
+                                                repeats:YES
+                                                  block:^(NSTimer*) {
+                                                    [yo medirFps];
+                                                  }];
+  }
 
   if (tactil_->escuchandoInclinacion()) {
     movimiento_ = [[CMMotionManager alloc] init];
@@ -2088,6 +2236,30 @@ void Tactil::sendState() {
 
 - (void)mandosCambiaron {
   tactil_->revisarMandos();
+}
+
+- (void)medirFps {
+  const CFTimeInterval ahora = CACurrentMediaTime();
+  const uint64_t fotogramas = g_nfsmw_fotogramas_juego.load(std::memory_order_relaxed);
+  if (antesFps_ > 0) {
+    const double segundos = ahora - antesFps_;
+    const double fps = double(fotogramas - fotogramasAntes_) / std::max(segundos, 1e-3);
+    NSString* texto = fps > 0 ? [NSString stringWithFormat:@"%.0f fps  %.1f ms", fps, 1000.0 / fps] : @"0 fps";
+    if (![texto isEqualToString:fps_.text]) {
+      fps_.text = texto;
+      [self colocarFps];
+    }
+  }
+  antesFps_ = ahora;
+  fotogramasAntes_ = fotogramas;
+}
+
+// Arriba a la izquierda, dentro de la zona segura, con 6 puntos de margen alrededor del texto.
+- (void)colocarFps {
+  if (!fps_) return;
+  const CGRect z = [self zona];
+  const CGSize t = [fps_ sizeThatFits:CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX)];
+  fps_.frame = CGRectMake(z.origin.x + 12, z.origin.y + 12, std::ceil(t.width) + 12, std::ceil(t.height) + 6);
 }
 
 - (void)vigilar {
@@ -2127,6 +2299,7 @@ void Tactil::sendState() {
     empezado_ = YES;
     tactil_->empezar();
   }
+  [self colocarFps];
   [self setNeedsDisplay];
 }
 
@@ -2219,6 +2392,42 @@ __attribute__((constructor)) void EsperarVentanaDeSdl() {
                                               usingBlock:^(NSNotification* n) {
                                                 Colocar(n.object);
                                               }];
+  // El primer toque del boton de probar del lanzador ya vibra: la cola de hapticos, preparada.
+  ColaVibracion();
 }
 
 }  // namespace
+
+// ---- La vibracion: lo que llaman el SDK y el lanzador -----------------------------------------
+
+// El SDK le pasa a la app lo que el juego le pide al mando tactil (sdl_input_driver.cpp, con el
+// nombre de Android): la fuerza de los dos motores del mando de la Xbox 360, de 0 a 65535. El
+// movil tiene uno: se usa el mas fuerte, en 16 niveles, y solo se cambia cuando cambia de nivel
+// (el juego lo repite a menudo), como en nativo_android.cpp. La llama el hilo del juego.
+extern "C" void NfsmwAndroidVibrar(uint16_t izquierdo, uint16_t derecho) {
+  const int fuerza = std::max<int>(izquierdo, derecho);
+  const int nivel = (fuerza + 4095) / 4096;  // 0..16
+  if (g_nivel_vibracion.exchange(nivel) == nivel) {
+    return;
+  }
+  {
+    std::lock_guard<std::mutex> l(g_vibracion_mutex);
+    g_vibracion_pedida = std::min(255, nivel * 16);
+  }
+  AplicarVibracion();
+}
+
+// Medio segundo a toda fuerza (SetupActivity.vibrarUnRato), para el boton de probar.
+void NfsmwVibrarUnRato() {
+  dispatch_async(ColaVibracion(), ^{
+    if (!ArrancarHapticos()) return;
+    CHHapticEvent* e = [[CHHapticEvent alloc]
+        initWithEventType:CHHapticEventTypeHapticContinuous
+               parameters:@[[[CHHapticEventParameter alloc] initWithParameterID:CHHapticEventParameterIDHapticIntensity value:1]]
+             relativeTime:0
+                 duration:.5];
+    CHHapticPattern* patron = [[CHHapticPattern alloc] initWithEvents:@[e] parameters:@[] error:nil];
+    id<CHHapticPatternPlayer> uno = patron ? [g_hapticos createPlayerWithPattern:patron error:nil] : nil;
+    [uno startAtTime:CHHapticTimeImmediate error:nil];
+  });
+}

@@ -166,12 +166,33 @@ int WINAPI wWinMain(HINSTANCE hinstance, HINSTANCE hinstance_prev, LPWSTR comman
 extern "C" int NfsmwSondaSiSePide(int argc, char** argv) __attribute__((weak));
 #endif
 
+#if REX_PLATFORM_IOS
+// PARCHE LOCAL - iOS: the app's launcher (ios/motor/lanzador.mm) shows before the game, in the same
+// process, and returns the command line with what was chosen there (argv[0] included); empty to start
+// with the usual one.
+std::vector<std::string> NfsmwLanzadorIos(int argc, char** argv) __attribute__((weak));
+#endif
+
 int main(int argc, char* argv[]) {
 #if REX_PLATFORM_ANDROID
   if (NfsmwSondaSiSePide) {
     const int sonda = NfsmwSondaSiSePide(argc, argv);
     if (sonda >= 0) {
       return sonda;
+    }
+  }
+#endif
+#if REX_PLATFORM_IOS
+  if (NfsmwLanzadorIos) {
+    // Static: the cvars may keep pointers into argv.
+    static std::vector<std::string> argumentos = NfsmwLanzadorIos(argc, argv);
+    if (!argumentos.empty()) {
+      static std::vector<char*> punteros;
+      for (auto& a : argumentos) {
+        punteros.push_back(a.data());
+      }
+      punteros.push_back(nullptr);
+      return RunWindowedApp(static_cast<int>(argumentos.size()), punteros.data());
     }
   }
 #endif

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ios_app_con_juego">Ta aplikacja zawiera grę. Jest tylko na twoje własne urządzenia: nie udostępniaj jej.</string>
+    <string name="ios_juego_extraido">Rozpakowana gra: %1$s</string>
+    <string name="ios_edicion_app">Tę aplikację zbudowano dla wydania %1$s gry.</string>
+    <string name="ios_iso_otra_edicion">To ISO to inne wydanie gry. Tę aplikację zbudowano dla wydania %1$s i nie uruchomi się z innym: wybierz ISO %1$s albo zbuduj aplikację z tego ISO.</string>
+    <string name="ios_ayuda_iso">Skopiuj swoje ISO aplikacją Pliki do Na moim iPhonie › NFS Most Wanted albo z komputera przez Findera (karta Pliki iPhone’a). Możesz też wybrać je przyciskiem w dowolnym miejscu w Plikach: jest czytane tam, gdzie leży, bez kopiowania.</string>
+    <string name="ios_iso_sin_acceso">iOS nie daje już dostępu do wybranego ISO: może zostało przeniesione lub usunięte. Wybierz je ponownie.</string>
+    <string name="ios_cerrar_para_ajustes">Ustawienia działają po dotknięciu Graj. Aby je potem zmienić, zamknij aplikację w przełączniku aplikacji i otwórz ją ponownie.</string>
+    <string name="ios_editar_tactil_resumen">W grze zębatka obok przycisku UKRYJ otwiera edytor: przesuwaj przyciski dotykowe i zmieniaj ich rozmiar oraz przezroczystość.</string>
+    <string name="ios_vibracion_probada">Tak wibruje telefon, gdy gra włącza wibracje sterowania dotykowego. Fizyczny kontroler wibruje sam.</string>
+    <string name="ios_sin_biblioteca">Brakuje biblioteki shaderów (nfsmw_shaders.nfsp), której potrzebuje natywny renderer. Skopiuj ją do folderu aplikacji, obok ISO, albo zbuduj aplikację z nią.</string>
+</resources>
