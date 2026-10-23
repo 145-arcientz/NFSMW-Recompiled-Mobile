@@ -16,10 +16,10 @@
 #include <os/proc.h>
 #endif
 
-// Los tamanos del SDK (xmemory.cpp): 4 GB virtuales + 4,5 GB fisicos.
+// Los tamanos del SDK (xmemory.cpp). En iOS entra por MapViewsMac (TARGET_OS_MAC vale 1): una
+// sola reserva de 4,5 GB con todas las vistas dentro, no los 8,5 GB de MapViews en Linux.
 #define TAM_COMPARTIDA 0x120000000ull
-#define TAM_RESERVA 0x220000000ull
-#define VISTA_FISICA 0x100000000ull
+#define TAM_RESERVA 0x120000000ull
 
 static char* g_salida;
 static size_t g_tam, g_usado;
@@ -121,10 +121,10 @@ int nfsmw_prueba_memoria(const char* dir_tmp, char* salida, size_t tam_salida) {
   uint8_t* base = mmap(NULL, TAM_RESERVA, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
   if (base == MAP_FAILED) {
     linea("2. Reserva de %.0f MB: NO (errno %d %s)\n", mb(TAM_RESERVA), errno, strerror(errno));
-    for (uint64_t prueba = TAM_RESERVA; prueba >= 0x10000000ull; prueba /= 2) {
+    for (uint64_t prueba = TAM_RESERVA; prueba >= 0x10000000ull; prueba -= 0x10000000ull) {
       void* p = mmap(NULL, prueba, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
       if (p != MAP_FAILED) {
-        linea("   la mayor que cabe (bajando a la mitad): %.0f MB\n", mb(prueba));
+        linea("   la mayor que cabe (en pasos de 256 MB): %.0f MB\n", mb(prueba));
         munmap(p, prueba);
         break;
       }
@@ -135,23 +135,25 @@ int nfsmw_prueba_memoria(const char* dir_tmp, char* salida, size_t tam_salida) {
   }
   linea("2. Reserva de %.0f MB: si, en %p\n", mb(TAM_RESERVA), (void*)base);
 
-  // 3. Las dos vistas en espejo de la misma zona, en sitios fijos de la reserva.
-  void* v = mmap(base, VISTA_FISICA, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0);
-  void* f = mmap(base + VISTA_FISICA, TAM_COMPARTIDA, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
-                 fd, 0);
+  // 3. Dos vistas en espejo como en MapViewsMac: 0xA0000000 y 0x100000000 apuntan las dos al
+  // desplazamiento 0x100000000 de la zona compartida.
+  void* v = mmap(base + 0xA0000000ull, 0x20000000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
+                 0x100000000ll);
+  void* f = mmap(base + 0x100000000ull, 0x20000000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
+                 0x100000000ll);
   if (v == MAP_FAILED || f == MAP_FAILED) {
     linea("3. Vistas fijas: NO (virtual %s, fisica %s; errno %d %s)\n", v == MAP_FAILED ? "NO" : "si",
           f == MAP_FAILED ? "NO" : "si", errno, strerror(errno));
     bien = 0;
   } else {
-    base[0x1000] = 0x5A;
-    int espejo = base[VISTA_FISICA + 0x1000] == 0x5A;
+    base[0xA0000000ull + 0x1000] = 0x5A;
+    int espejo = base[0x100000000ull + 0x1000] == 0x5A;
     linea("3. Vistas fijas: si; espejo (escribir en una, leer en la otra): %s\n", espejo ? "si" : "NO");
     bien &= espejo;
 
     // 4. Usar memoria de verdad: 256 MB, a ver cuanto baja lo disponible.
     uint64_t antes = disponible();
-    for (uint64_t o = 0; o < 0x10000000ull; o += 4096) base[0x2000000 + o] = 1;
+    for (uint64_t o = 0; o < 0x10000000ull; o += 4096) base[0xA0000000ull + 0x2000000 + o] = 1;
     linea("4. Tocar 256 MB: disponible %.0f -> %.0f MB\n", mb(antes), mb(disponible()));
   }
 

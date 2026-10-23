@@ -1,6 +1,7 @@
 # NFSMW Recompiled para iOS
 
-**Estado: fase 0, sin probar todavía.** Nada de esto ha corrido en un iPhone.
+**Estado: fase 0 superada** (2026-10-22, iPhone 13 Pro con iOS 26.6.2 y Apple ID gratuita). El
+motor todavía no se ha compilado para iOS.
 
 El port reutiliza el motor nativo de Android tal cual (`../nativo/`: el SDK, el código del juego
 recompilado y el renderizador). Solo cambia lo que rodea al motor: el lanzador, que en Android es
@@ -21,8 +22,9 @@ Java y aquí será Swift, la compilación y la firma.
   renderizador es el de Vulkan, a través de MoltenVK.
 - **No puede ir a la App Store**, porque lleva código del juego. Cada persona compila e instala la
   suya, con su ISO.
-- **Con Apple ID gratuita**, la app caduca a los 7 días y hay que volver a instalarla. Puede que
-  tampoco deje los permisos de memoria (ver la fase 0).
+- **Con Apple ID gratuita**, la app caduca a los 7 días y hay que volver a instalarla. Los permisos
+  de memoria (`increased-memory-limit`, `extended-virtual-addressing`) firman pero no se aplican:
+  iOS deja unos 3 GB y la reserva del juego cabe sin ellos (ver la fase 0).
 
 ## Herramientas: xtool en WSL
 
@@ -42,20 +44,52 @@ corre en WSL, no en Windows directamente. Hay que instalar, una vez:
 
 Para comprobarlo: `swift sdk list` tiene que decir `darwin`, e `ideviceinfo` tiene que ver el iPhone.
 
+### Instalar se cuelga en `Connecting`
+
+Por usbip, `xtool dev` firma pero se queda en `Connecting`, y después todo da `Mux error (-8)`. El
+log (`sudo journalctl -u usbmuxd`) dice `message was too large` o `expected 49152 bytes, received
+58008`: usbip pierde el paquete vacío (ZLP) que cierra una transferencia de tamaño múltiplo de 512
+bytes, y el iPhone junta dos mensajes. No lo arregla actualizar usbmuxd; hay que compilarlo de
+[git](https://github.com/libimobiledevice/usbmuxd) con un parche en `device_client_process`
+(`src/device.c`), que manda en dos segmentos TCP (n−1 y 1 byte) los datos cuyo mensaje mux daría
+múltiplo de 512:
+
+```c
+int mux_header_size = ((conn->dev->version < 2) ? 8 : sizeof(struct mux_header));
+int first = size;
+if(size > 1 && (mux_header_size + (int)sizeof(struct tcphdr) + size) % USB_PACKET_SIZE == 0)
+	first = size - 1;
+res = send_tcp(conn, TH_ACK, conn->ob_buf, first);
+/* ... y si first < size, otro send_tcp con el último byte; tx_seq avanza cada vez */
+```
+
+Partir la transferencia USB en vez del mensaje no vale: el iPhone exige un mensaje entero por
+transferencia. Si el iPhone se cuelga, usbipd lo suelta (`Shared`) y hay que volver a hacer
+`usbipd attach --wsl`. Un `apt upgrade` de usbmuxd quita el parche.
+
 ## Fases
 
 0. **[PruebaMemoria](PruebaMemoria/)**: una app sin nada del juego que mide en el iPhone lo que el
    SDK necesita:
    - una zona compartida de 4,5 GB (`shm_open` o un fichero);
-   - la reserva de 8,5 GB de espacio de direcciones, con las dos vistas en espejo de
-     `nativo/sdk/src/system/xmemory.cpp`;
+   - la reserva de 4,5 GB de espacio de direcciones, con las vistas en espejo de `MapViewsMac` en
+     `nativo/sdk/src/system/xmemory.cpp` (en iOS entra por esa rama);
    - los fallos de página capturados del `mmio_handler`;
    - cuánta memoria deja iOS antes de cerrar la app.
 
    Se compila e instala con `cd ios/PruebaMemoria && xtool dev`; se pulsa «Probar» y el informe sale
    en pantalla y en Archivos (`prueba_memoria.txt`). Si la firma falla por los permisos
    (`PruebaMemoria.entitlements`), se quita `entitlementsPath` de `xtool.yml` y se prueba sin ellos:
-   el informe dirá entonces si la reserva cabe o no.
+   el informe dirá entonces si la reserva cabe o no. xtool cambia el identificador de la app
+   (`XTL-<equipo>.io.github...`, se ve con `ideviceinstaller list --user`); con él, el informe se
+   saca por USB: `afcclient --container <id> get Documents/prueba_memoria.txt`.
+
+   **Resultado** (iPhone 13 Pro, 6 GB, páginas de 16 KB, Apple ID gratuita): la zona compartida y
+   la reserva de 4,5 GB caben, el espejo funciona y los fallos de página se capturan. iOS deja
+   unos 3063 MB. Para la fase 1:
+   - `shm_open` da `EPERM`: la zona compartida tiene que ser un fichero en tmp.
+   - Una reserva de 8,5 GB (la de Linux) no cabe; la de 4,5 GB, sí.
+   - Páginas de 16 KB: revisar la vista de `0xE0000000`, que apunta a `0x100001000`.
 1. **El motor nativo compilado para iOS** con CMake y el kit de iOS que instala xtool, como
    bibliotecas estáticas, enlazadas en una app SwiftPM mínima: elegir la ISO y jugar con mando.
    MoltenVK como Vulkan. Lo que haya que tocar del SDK y del renderizador va en `nativo/`, con
