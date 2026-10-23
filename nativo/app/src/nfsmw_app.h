@@ -35,6 +35,10 @@
 #if REX_PLATFORM_ANDROID
 // android/app/src/main/cpp/android_rendimiento.cpp
 extern "C" void nfsmw_android_nucleos_grandes_aplicar();
+#elif REX_PLATFORM_IOS
+// android/app/src/main/cpp/nativo/nativo_android.cpp, que iOS tambien compila: parar el juego
+// y el audio en segundo plano (en iOS, ademas, no se puede usar la GPU ahi).
+extern "C" void NfsmwVigilarSegundoPlano();
 #endif
 
 #if REX_PLATFORM_ANDROID
@@ -293,6 +297,8 @@ class NfsmwApp : public rex::ReXApp {
 #if REX_PLATFORM_ANDROID
     // Before any game thread exists: they inherit the mask (nfsmw_android_nucleos_grandes).
     nfsmw_android_nucleos_grandes_aplicar();
+#elif REX_PLATFORM_IOS
+    NfsmwVigilarSegundoPlano();
 #endif
     // Mesa/NVK environment variables (nfsmw_mesa_entorno): the toml has already been read and Vulkan is
     // created later, in SetupPresentation.

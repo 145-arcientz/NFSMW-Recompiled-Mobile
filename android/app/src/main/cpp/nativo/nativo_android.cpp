@@ -22,8 +22,16 @@
 //      pide al mando (GameActivity.vibrarMando).
 //  10. Los menus con el dedo: que hay debajo de un toque (las indicaciones de
 //      botones y las opciones), para TouchControllerView.
+//
+// iOS (ios/motor/controles_tactiles.mm, el TouchControllerView de alli) compila
+// tambien este fichero, sin lo que es de Android (JNI, AAudio, afinidad, el URI
+// content://, la sonda, los fps y la vibracion): el mando tactil (1), la pausa
+// (7), el contexto (8) y los menus con el dedo (10) son los mismos. Lo que hacian
+// las funciones de JNI esta en las NfsmwTactil*, que llaman las de JNI y iOS.
 
+#if defined(__ANDROID__)
 #include <jni.h>
+#endif
 
 #include <algorithm>
 #include <atomic>
@@ -49,6 +57,7 @@
 #include <rex/memory.h>
 #include <rex/runtime.h>
 
+#if defined(__ANDROID__)
 #include "../afinidad.h"
 #include "../audio/aaudio_driver.h"
 
@@ -58,6 +67,23 @@ REXCVAR_DEFINE_BOOL(nfsmw_audio_aaudio, true, "Audio",
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 int NfsmwSondaVulkan(int argc, char** argv);  // ../sonda_vulkan.cpp
+#else
+// Sin JNI: las secciones 8 y 10 usan jint como tipo, el entero de 32 bits de JNI.
+using jint = int32_t;
+#endif
+
+// Lo que usan las funciones de JNI de abajo y, en iOS, controles_tactiles.mm.
+extern "C" void NfsmwTactilEstado(int32_t botones, float izq_x, float izq_y, float der_x, float der_y,
+                                  float gatillo_izq, float gatillo_der);
+extern "C" void NfsmwTactilPausarJuego(bool pausa);
+extern "C" void NfsmwVigilarSegundoPlano();
+extern "C" int32_t NfsmwTactilContexto();
+extern "C" void NfsmwTactilContextoDiagnostico(char* linea, size_t tam);
+extern "C" int32_t NfsmwTactilMenuTocar(float u, float v);
+extern "C" bool NfsmwTactilMenuRotar();
+extern "C" bool NfsmwTactilMenuEsLista();
+extern "C" int32_t NfsmwTactilMenuRumbo();
+std::string NfsmwTactilMenuDiagnostico();
 
 // El mando tactil del SDK del motor nativo (sdk/src/input/sdl/sdl_input_driver.cpp):
 // el estado va directo al mando del juego, sin pasar por un mando virtual de SDL.
@@ -102,6 +128,7 @@ uint8_t Gatillo(float v) {
   return static_cast<uint8_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f);
 }
 
+#if defined(__ANDROID__)
 // ---------------------------------------------------------------------------
 //  2. Fps
 // ---------------------------------------------------------------------------
@@ -185,9 +212,11 @@ int AbrirContent(const char* uri, const char* modo) {
 const struct ApuntarAbrirContent {
   ApuntarAbrirContent() { rex::filesystem::SetAndroidContentOpener(&AbrirContent); }
 } g_apuntar_abrir_content;
+#endif  // __ANDROID__: secciones 2 y 3
 
 }  // namespace
 
+#if defined(__ANDROID__)
 // ---------------------------------------------------------------------------
 //  4. La sonda de Vulkan
 // ---------------------------------------------------------------------------
@@ -229,6 +258,7 @@ extern "C" int NfsmwSondaSiSePide(int argc, char** argv) {
 namespace {
 nfsmw::afinidad::VigilantePtr g_vigilante;
 }  // namespace
+#endif  // __ANDROID__: secciones 4 y 5
 
 // ---------------------------------------------------------------------------
 //  7. Segundo plano
@@ -375,13 +405,32 @@ extern "C" void NfsmwAndroidPausaEnSwap() {
 
 // El editor del mando en la partida (TouchControllerView): el juego se queda
 // quieto mientras se mueven los controles.
-extern "C" JNIEXPORT void JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_pausarJuego(
-    JNIEnv*, jclass, jboolean pausa) {
+extern "C" void NfsmwTactilPausarJuego(bool pausa) {
   if (pausa) {
     Pausar(kPausaEditor);
   } else {
     Reanudar(kPausaEditor);
   }
+}
+
+// Parar el juego y el audio en segundo plano. Vive lo que el proceso. En iOS la
+// llama su nfsmw_app.h en OnPostInitLogging, como a la de abajo en Android.
+extern "C" void NfsmwVigilarSegundoPlano() {
+  static bool vigilando_segundo_plano = false;
+  if (!vigilando_segundo_plano) {
+    vigilando_segundo_plano = SDL_AddEventWatch(EventosSegundoPlano, nullptr);
+    // Antes de que arranque el juego, y con el, el hilo servidor de audio.
+    if (!g_reloj_real && nfsmw::audio_servidor::g_reloj_ms) {
+      g_reloj_real = nfsmw::audio_servidor::g_reloj_ms;
+      nfsmw::audio_servidor::g_reloj_ms = &RelojSinPausas;
+    }
+  }
+}
+
+#if defined(__ANDROID__)
+extern "C" JNIEXPORT void JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_pausarJuego(
+    JNIEnv*, jclass, jboolean pausa) {
+  NfsmwTactilPausarJuego(pausa);
 }
 
 // Su nfsmw_app.h la llama en OnPostInitLogging, cuando ya estan leidos los
@@ -396,15 +445,7 @@ extern "C" void nfsmw_android_nucleos_grandes_aplicar() {
   if (!g_vigilante) {
     g_vigilante = nfsmw::afinidad::Arrancar();
   }
-  static bool vigilando_segundo_plano = false;
-  if (!vigilando_segundo_plano) {
-    vigilando_segundo_plano = SDL_AddEventWatch(EventosSegundoPlano, nullptr);
-    // Antes de que arranque el juego, y con el, el hilo servidor de audio.
-    if (!g_reloj_real && nfsmw::audio_servidor::g_reloj_ms) {
-      g_reloj_real = nfsmw::audio_servidor::g_reloj_ms;
-      nfsmw::audio_servidor::g_reloj_ms = &RelojSinPausas;
-    }
-  }
+  NfsmwVigilarSegundoPlano();
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +463,24 @@ void NfsmwAndroidAudio(rex::RuntimeConfig& config) {
 extern "C" JNIEXPORT void JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_setState(
     JNIEnv*, jclass, jint buttons, jfloat left_x, jfloat left_y, jfloat right_x, jfloat right_y,
     jfloat left_trigger, jfloat right_trigger) {
-  // -1 es "mando oculto o desconectado": todo suelto.
+  NfsmwTactilEstado(buttons, left_x, left_y, right_x, right_y, left_trigger, right_trigger);
+}
+
+extern "C" JNIEXPORT jfloat JNICALL Java_io_github_nfsmwrecomp_GameActivity_nativeFps(JNIEnv*,
+                                                                                    jclass) {
+  return MedirFps();
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_io_github_nfsmwrecomp_GameActivity_nativeMsPorFotograma(JNIEnv*, jclass) {
+  return g_fps > 0.0f ? 1000.0f / g_fps : -1.0f;
+}
+#endif  // __ANDROID__: JNI de la pausa, seccion 6 y fps
+
+// Los botones con el indice de SDL_GamepadButton (TouchControllerView), los sticks y los
+// gatillos de 0 a 1. -1 en los botones es "mando oculto o desconectado": todo suelto.
+extern "C" void NfsmwTactilEstado(int32_t buttons, float left_x, float left_y, float right_x,
+                                  float right_y, float left_trigger, float right_trigger) {
   if (buttons < 0) {
     buttons = 0;
   }
@@ -436,16 +494,6 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_nfsmwrecomp_TouchControllerBrid
   // de la Xbox 360 es al reves.
   rex_sdl_set_touch_gamepad_state(mascara, Eje(left_x), Eje(-left_y), Eje(right_x), Eje(-right_y),
                                   Gatillo(left_trigger), Gatillo(right_trigger));
-}
-
-extern "C" JNIEXPORT jfloat JNICALL Java_io_github_nfsmwrecomp_GameActivity_nativeFps(JNIEnv*,
-                                                                                    jclass) {
-  return MedirFps();
-}
-
-extern "C" JNIEXPORT jfloat JNICALL
-Java_io_github_nfsmwrecomp_GameActivity_nativeMsPorFotograma(JNIEnv*, jclass) {
-  return g_fps > 0.0f ? 1000.0f / g_fps : -1.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -940,8 +988,7 @@ jint LeerContexto(Lectura& l) {
 
 // TouchControllerView pregunta cada 250 ms mientras se ve. Cada cambio queda en
 // el log, para comprobarlo con una partida.
-extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_contexto(JNIEnv*,
-                                                                                         jclass) {
+extern "C" int32_t NfsmwTactilContexto() {
   Lectura l;
   const jint contexto = LeerContexto(l);
   if (contexto != g_ultimo_contexto) {
@@ -957,19 +1004,31 @@ extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBrid
 // Diagnostico: lo leido, en una linea. TouchControllerView la guarda en
 // files/logs/contexto.txt cada vez que cambia (el APK release no escribe el
 // log del juego).
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_github_nfsmwrecomp_TouchControllerBridge_contextoDiagnostico(JNIEnv* env, jclass) {
+extern "C" void NfsmwTactilContextoDiagnostico(char* linea, size_t tam) {
   Lectura l;
   const jint contexto = LeerContexto(l);
-  char linea[256];
-  std::snprintf(linea, sizeof(linea),
+  std::snprintf(linea, tam,
                 "contexto=%d instr=%d estado=%u pausas=%u nis=%08X/%u fObj=%08X parms=%08X idx=%08X col=%08X "
                 "tipo=%d (%s \"%s\")",
                 int(contexto), g_instrucciones_bien, l.estado, l.pausas, l.cinematica, l.estado_cinematica,
                 l.carrera, l.parametros, l.indice, l.coleccion, l.tipo, l.via, l.nombre);
-  return env->NewStringUTF(linea);
 }
 
+#if defined(__ANDROID__)
+extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_contexto(JNIEnv*,
+                                                                                         jclass) {
+  return NfsmwTactilContexto();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_github_nfsmwrecomp_TouchControllerBridge_contextoDiagnostico(JNIEnv* env, jclass) {
+  char linea[256];
+  NfsmwTactilContextoDiagnostico(linea, sizeof(linea));
+  return env->NewStringUTF(linea);
+}
+#endif
+
+#if defined(__ANDROID__)
 // ---------------------------------------------------------------------------
 //  9. La vibracion del mando tactil
 // ---------------------------------------------------------------------------
@@ -1010,6 +1069,7 @@ extern "C" void NfsmwAndroidVibrar(uint16_t izquierdo, uint16_t derecho) {
   env->DeleteLocalRef(clase);
   env->DeleteLocalRef(actividad);
 }
+#endif  // __ANDROID__: seccion 9
 
 // ---------------------------------------------------------------------------
 //  10. Los menus con el dedo
@@ -2306,29 +2366,28 @@ std::string TextoCaja(const Caja& c) {
 
 // Que hay en (u, v), la posicion del toque en la imagen del juego (0..1). Si es una
 // opcion por resaltar, se queda como objetivo de menuRumbo.
-extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_menuTocar(JNIEnv*, jclass,
-                                                                                          jfloat u, jfloat v) {
+extern "C" int32_t NfsmwTactilMenuTocar(float u, float v) {
   g_toque_resultado = Tocar(u, v);
   return g_toque_resultado;
 }
 
 // Si la pantalla se maneja con la cruceta mantenida ("Rotar" al visualizar un coche):
 // TouchControllerView la pisa mientras se arrastra el dedo, en vez de dar pasos.
-extern "C" JNIEXPORT jboolean JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_menuRotar(JNIEnv*, jclass) {
+extern "C" bool NfsmwTactilMenuRotar() {
   Menu menu;
   return LeerMenu(menu) && menu.rotar;
 }
 
 // Si lo que hay en pantalla es una lista de opciones (EsLista): TouchControllerView lo
 // pregunta al empezar a deslizar en horizontal.
-extern "C" JNIEXPORT jboolean JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_menuEsLista(JNIEnv*, jclass) {
+extern "C" bool NfsmwTactilMenuEsLista() {
   Menu menu;
   return LeerMenu(menu) && EsLista(menu);
 }
 
 // Despues de cada pulsacion de la cruceta hacia el objetivo: la siguiente, o que ya ha
 // llegado, o que no se sabe llegar.
-extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_menuRumbo(JNIEnv*, jclass) {
+extern "C" int32_t NfsmwTactilMenuRumbo() {
   if (!g_objetivo) {
     return kMenusSinRumbo;
   }
@@ -2344,8 +2403,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBrid
 // Diagnostico: el ultimo toque, en coordenadas del menu, y el ultimo menu leido (no se
 // vuelve a leer). TouchControllerView lo guarda en files/logs/menus.txt con cada toque (el
 // APK release no escribe el log del juego).
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_github_nfsmwrecomp_TouchControllerBridge_menuDiagnostico(JNIEnv* env, jclass) {
+std::string NfsmwTactilMenuDiagnostico() {
   const Menu& menu = g_menu;
   const bool leido = g_menu_leido;
   std::string s;
@@ -2403,5 +2461,29 @@ Java_io_github_nfsmwrecomp_TouchControllerBridge_menuDiagnostico(JNIEnv* env, jc
     std::snprintf(linea, sizeof(linea), "  icono textura=%08X %s\n", i.first, TextoCaja(i.second).c_str());
     s += linea;
   }
-  return env->NewStringUTF(s.c_str());
+  return s;
 }
+
+#if defined(__ANDROID__)
+extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_menuTocar(JNIEnv*, jclass,
+                                                                                          jfloat u, jfloat v) {
+  return NfsmwTactilMenuTocar(u, v);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_menuRotar(JNIEnv*, jclass) {
+  return NfsmwTactilMenuRotar();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_menuEsLista(JNIEnv*, jclass) {
+  return NfsmwTactilMenuEsLista();
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_io_github_nfsmwrecomp_TouchControllerBridge_menuRumbo(JNIEnv*, jclass) {
+  return NfsmwTactilMenuRumbo();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_github_nfsmwrecomp_TouchControllerBridge_menuDiagnostico(JNIEnv* env, jclass) {
+  return env->NewStringUTF(NfsmwTactilMenuDiagnostico().c_str());
+}
+#endif

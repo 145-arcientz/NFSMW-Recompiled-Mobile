@@ -127,7 +127,9 @@ void SDLInputDriver::OnWindowAvailable(rex::ui::Window* window) {
       }
       SDL_Gamepad_initialized_ = true;
 
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
+      // PARCHE LOCAL - iOS: the same touch pad, fed by the app's UIKit overlay
+      // (ios/motor/controles_tactiles.mm) instead of Android's TouchControlsView.
       ControllerState touch = {};
       touch.id = AllocateDeviceId();
       touch.is_touch = true;
@@ -135,7 +137,7 @@ void SDLInputDriver::OnWindowAvailable(rex::ui::Window* window) {
       touch_device_id_ = touch.id;
       UpdateXCapabilities(touch);
       controllers_.push_back(touch);
-      REXLOG_INFO("SDL input: Android touch gamepad is ready");
+      REXLOG_INFO("SDL input: touch gamepad is ready");
 #endif
 
       // Load custom controller mappings if available

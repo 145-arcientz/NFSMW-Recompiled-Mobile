@@ -45,6 +45,15 @@ target_link_libraries(nfsmw PRIVATE
     "-framework UIKit"
     "-framework Foundation")
 
+# On-screen gamepad (the Android app's TouchControllerView in UIKit): it lays itself over SDL's window. What it
+# asks the game (the pad state, where in the game we are, the menus by touch, the pause) is the Android app's own
+# native code, nativo_android.cpp, compiled without JNI. Objective-C++ with ARC.
+target_sources(nfsmw PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/controles_tactiles.mm"
+    "${CMAKE_CURRENT_LIST_DIR}/../../android/app/src/main/cpp/nativo/nativo_android.cpp")
+target_compile_options(nfsmw PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+target_link_libraries(nfsmw PRIVATE "-framework GameController" "-framework CoreMotion")
+
 # Compiler runtime for iOS (__isPlatformVersionAtLeast, behind the @available checks in SDL's
 # Objective-C). The Swift toolchain for Linux has none; xtool extracted Xcode's.
 file(GLOB NFSMW_CLANG_RT_IOS

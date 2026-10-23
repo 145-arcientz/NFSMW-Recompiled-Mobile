@@ -46,6 +46,9 @@ if [ "$dependencias" = 1 ] || [ ! -d "$copia/nativo/sdk/thirdparty/sdl3" ] || [ 
 fi
 echo "== Fuentes desde $repo"
 rsync -a "${excluir[@]}" "$repo/nativo" "$repo/ios" "$copia/"
+# El codigo nativo del mando tactil de la app de Android (nativo_android.cpp), que iOS comparte.
+mkdir -p "$copia/android/app/src/main/cpp"
+rsync -a "$repo/android/app/src/main/cpp/nativo" "$copia/android/app/src/main/cpp/"
 
 if [ ! -f "$moltenvk/MoltenVK/MoltenVK/static/MoltenVK.xcframework/ios-arm64/libMoltenVK.a" ]; then
     echo "== MoltenVK $version_moltenvk (release de Khronos)"

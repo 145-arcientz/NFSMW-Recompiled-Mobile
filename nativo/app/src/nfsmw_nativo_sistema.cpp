@@ -31,9 +31,10 @@
 
 #include "nfsmw_nativo_sistema.h"
 
-#if REX_PLATFORM_ANDROID
-// PARCHE LOCAL (NFSMW Recompiled): la define la app de Android (nativo_android.cpp).
-// Espera mientras la app esta en segundo plano.
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
+// PARCHE LOCAL (NFSMW Recompiled): la define la app de Android (nativo_android.cpp), que
+// iOS tambien compila. Espera mientras la app esta en segundo plano o con el editor del
+// mando tactil abierto.
 extern "C" void NfsmwAndroidPausaEnSwap() __attribute__((weak));
 #endif
 
@@ -1981,7 +1982,7 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
           swap_alto_.store(datos.Leer(), std::memory_order_relaxed);
         }
         TrazaSwap();
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
         // PARCHE LOCAL (NFSMW Recompiled): en segundo plano el anillo se para aqui, en el
         // cambio de fotograma, y el juego se queda esperando sitio en el anillo.
         if (NfsmwAndroidPausaEnSwap) {
