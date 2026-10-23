@@ -1,0 +1,6 @@
+version: 1
+bundleID: io.github.victorgbd.nfsmw.prueba
+infoPath: Info.plist
+# Mas memoria y mas espacio de direcciones. Si la Apple ID gratuita no deja
+# firmar con ellos, se quita esta linea y la prueba dice cuanto hay sin ellos.
+entitlementsPath: PruebaMemoria.entitlements
