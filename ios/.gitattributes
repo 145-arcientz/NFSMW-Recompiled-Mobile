@@ -1,0 +1,2 @@
+# Run in WSL: bash refuses CRLF.
+*.sh text eol=lf
