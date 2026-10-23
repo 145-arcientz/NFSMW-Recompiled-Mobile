@@ -13,7 +13,8 @@
   - la vibración del móvil;
   - el sonido de baja latencia con `AVAudioEngine`;
   - el contador de fps;
-  - el multijugador LAN, incluido el iPhone de anfitrión.
+  - el multijugador LAN, incluido el iPhone de anfitrión;
+  - los arreglos de los gráficos con MoltenVK (los cuadrados de colores y los destellos).
 
   El servidor del anfitrión sí está probado sin teléfono, contra el de Python (ver *Pruebas*).
 
@@ -113,9 +114,36 @@ Dentro de la app van, del checkout principal:
 - `textos.json`: los textos de Android en sus 10 idiomas y los propios de iOS, los de
   [motor/textos](motor/textos/), que junta [motor/textos.py](motor/textos.py);
 - `edicion.json`: la edición del código generado (`nativo/out`);
-- `nfsmw_shaders.nfsp`: su biblioteca de shaders.
+- `nfsmw_shaders.nfsp`: su biblioteca de shaders;
+- `nfsmw.toml`: los ajustes del motor que lleva el APK de Android
+  (`nativo/android/app/src/main/assets/nfsmw.toml`). Al pulsar Jugar, el lanzador lo copia a
+  `Documents`, como `MotorNativo.instalarAjustes` en Android: si falta, o si la app trae otro y el de
+  `Documents` no se ha cambiado.
 
 Como el código generado, salen de tu copia del juego: la app no se comparte.
+
+## Gráficos con MoltenVK
+
+El renderizador es el de Android, y en el iPhone tiene que dibujar igual. Tres diferencias
+salieron como cuadrados de colores y destellos blancos en la mitad de abajo:
+
+- **Los ajustes del motor.** Sin el `nfsmw.toml` de Android, el motor se quedaba con los valores del
+  código, que para varios son los de PC. El principal: la escena en **tres franjas de 1280x256 con
+  MSAA 4x**, el modo de la Xbox 360, que en Android no se usa nunca. Ahora va el toml, y además el
+  lanzador pasa `--nfsmw_render_sin_mosaico=true`, que manda aunque el toml de `Documents` sea uno
+  guardado desde el menú del juego.
+- **Los abanicos de triángulos.** Metal no los tiene. Por cada uno, MoltenVK cierra el pase de Metal
+  (guarda todos los adjuntos), convierte los índices con un compute y lo abre otra vez (los carga).
+  Son abanicos el cuadrado de la consulta de oclusión del sol y los halos de las luces. Con
+  MoltenVK, el renderizador los dibuja como listas (`nfsmw_nativo_abanicos_a_listas`, que en
+  Android sirve para probarlo).
+- **La matemática rápida de Metal.** MoltenVK compila con ella los shaders que no piden conservar
+  NaN e infinitos, y la biblioteca nativa no lo pide: el compilador puede quitar un `isnan()` o
+  aproximar divisiones, senos y cosenos. Va apagada (`moltenvk_matematica_rapida`, por
+  `VK_EXT_layer_settings`), como las cuentas en Android. Se enciende en *Avanzado* para comparar.
+
+El registro dice qué se usó: `[compatibilidad] abanicos de triangulos: ...` y
+`Vulkan: matematica rapida de Metal ...`.
 
 ## El juego en el iPhone
 
@@ -205,3 +233,4 @@ Cómo compilarlas está en la cabecera de `prueba_servidor_ea.py`.
      ([red_lan.cpp](motor/red_lan.cpp)).
    - El iPhone de anfitrión: `ServidorEa` en C++ ([servidor_ea.cpp](motor/servidor_ea.cpp)),
      probado contra el de Python.
+   - Los arreglos de los gráficos con MoltenVK (ver *Gráficos con MoltenVK*).

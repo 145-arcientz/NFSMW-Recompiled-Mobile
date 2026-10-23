@@ -12,4 +12,6 @@
     <string name="ios_sin_biblioteca">Die Shader-Bibliothek (nfsmw_shaders.nfsp), die der native Renderer braucht, fehlt. Kopiere sie in den Ordner der App, neben die ISO, oder baue die App mit ihr.</string>
     <string name="ios_audio">Ton mit niedriger Latenz (AVAudioEngine)</string>
     <string name="ios_audio_resumen">Die iOS-Ausgabe dieser App mit niedriger Latenz, wie AAudio unter Android. Aus: die SDL-Ausgabe der nativen Engine.</string>
+    <string name="ios_metal_rapida">Schnelle Metal-Mathematik</string>
+    <string name="ios_metal_rapida_resumen">Schnellere Shader auf der GPU des iPhone, mit weniger genauer Rechnung: Farbige Quadrate oder Blitze können zurückkehren. Aus: dieselbe Rechnung wie unter Android.</string>
 </resources>

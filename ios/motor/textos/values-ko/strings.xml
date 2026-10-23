@@ -12,4 +12,6 @@
     <string name="ios_sin_biblioteca">네이티브 렌더러에 필요한 셰이더 라이브러리(nfsmw_shaders.nfsp)가 없습니다. ISO 옆, 앱 폴더에 복사하거나 라이브러리를 넣어 앱을 빌드하세요.</string>
     <string name="ios_audio">저지연 사운드(AVAudioEngine)</string>
     <string name="ios_audio_resumen">이 앱의 iOS 저지연 출력입니다(Android의 AAudio와 같음). 끄면 네이티브 엔진의 SDL 출력을 씁니다.</string>
+    <string name="ios_metal_rapida">Metal 빠른 연산</string>
+    <string name="ios_metal_rapida_resumen">iPhone GPU에서 셰이더가 빨라지지만 계산이 덜 정확합니다. 색깔 있는 사각형이나 번쩍임이 다시 나올 수 있습니다. 끄면 Android와 같은 계산을 씁니다.</string>
 </resources>

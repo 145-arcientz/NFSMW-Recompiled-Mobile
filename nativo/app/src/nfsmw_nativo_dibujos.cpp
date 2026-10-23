@@ -636,6 +636,18 @@ REXCVAR_DEFINE_BOOL(nfsmw_nativo_subidas_ayuda, true, "NFSMW",
                     "de vertices, copia el mismo las que el hilo de copias aun no ha empezado y espera la que este en "
                     "curso con herencia de prioridad. Mismos datos (se comprueba sola). false = espera como antes")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+/*
+ * Triangle fans as triangle lists (the sun flare's occlusion quad and the light halos are fans). Metal has no
+ * fans: MoltenVK draws each one by closing the Metal render pass (storing every attachment), converting the
+ * indices with a compute dispatch and opening the pass again (loading them all back). On a tiled GPU that is a
+ * full store and load of the render targets per fan, in the middle of the game's occlusion queries. The SDK's
+ * Xenos emulation converts them too (graphics/vulkan/primitive_processor.cpp).
+ */
+REXCVAR_DEFINE_BOOL(nfsmw_nativo_abanicos_a_listas, false, "NFSMW",
+                    "Renderizador nativo: dibujar los abanicos de triangulos como listas en cualquier GPU. Con "
+                    "MoltenVK (iOS) se hace siempre: Metal no tiene abanicos y MoltenVK parte el pase de render "
+                    "por cada uno")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 REXCVAR_DEFINE_BOOL(nfsmw_nativo_diag_vacias_grises, false, "NFSMW",
                     "Renderizador nativo: las texturas que aun no se soportan (cubo, 3D, "
@@ -2009,6 +2021,11 @@ class DibujosVulkanImpl final : public DibujosVulkan {
       REXLOG_INFO("[compatibilidad] BC1: {}", bc1_16_ ? "a 16 bits (A1R5G5B5), la mitad que RGBA8"
                                                       : "RGBA8 (el driver no deja muestrear A1R5G5B5)");
     }
+    // nfsmw_nativo_abanicos_a_listas. MoltenVK has no triangleFans in its portability subset.
+    abanicos_a_listas_ =
+        REXCVAR_GET(nfsmw_nativo_abanicos_a_listas) || propiedades.driverID == VK_DRIVER_ID_MOLTENVK;
+    REXLOG_INFO("[compatibilidad] abanicos de triangulos: {}",
+                abanicos_a_listas_ ? "como listas (los convierte el renderizador)" : "los dibuja el driver");
     // 64-bit pointers (shaderInt64 and buffer device address) are optional: the shaders read every constant
     // from the set 4 UBOs, and with the current library they do not even contain the pointer path. Many Mali,
     // Adreno and PowerVR drivers have neither. Without them the push constants carry zeros.
@@ -2095,6 +2112,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     }
     VkPrimitiveTopology topologia;
     bool cuadrilateros = false;
+    bool abanico = false;  // nfsmw_nativo_abanicos_a_listas: the fan goes as a list
     bool admite_reinicio = false;
     switch (tipo) {
       case 2:
@@ -2108,7 +2126,9 @@ class DibujosVulkanImpl final : public DibujosVulkan {
         topologia = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         break;
       case 5:
-        topologia = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+        abanico = abanicos_a_listas_;
+        topologia = abanico ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+        // As a list the resets are still read: they say where each fan starts.
         admite_reinicio = true;
         break;
       case 6:
@@ -2404,7 +2424,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
       }
       const uint8_t* datos = memoria_->TranslatePhysical(base & 0x1FFFFFFF);
       const uint32_t indice_reinicio = r[gr::XE_GPU_REG_VGT_MULTI_PRIM_IB_RESET_INDX] & 0xFFFFFF;
-      if (!indices32 && !reinicio && !desplazamiento && !cuadrilateros &&
+      if (!indices32 && !reinicio && !desplazamiento && !cuadrilateros && !abanico &&
           (orden == xenos::Endian::k8in16 || orden == xenos::Endian::kNone)) {
         // The normal case in NFSMW: 16 bits without restart or offset. They are uploaded as 16 bits, with a
         // branch-free loop the compiler can vectorize.
@@ -2448,7 +2468,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     } else {
       vmin = desplazamiento;
       vmax = desplazamiento + cuenta - 1;
-      if (cuadrilateros) {
+      if (cuadrilateros || abanico) {
         indices_.resize(cuenta);
         for (uint32_t i = 0; i < cuenta; ++i) {
           indices_[i] = desplazamiento + i;
@@ -2469,6 +2489,28 @@ class DibujosVulkanImpl final : public DibujosVulkan {
         o[3] = i[0]; o[4] = i[2]; o[5] = i[3];
       }
       indices_.swap(convertidos_);
+    }
+    if (abanico) {
+      // In the order Vulkan gives a fan (triangle k is k+1, k+2, 0): the same winding and the same provoking
+      // vertex. A reset index (UINT32_MAX here) starts another fan.
+      convertidos_.clear();
+      convertidos_.reserve(indices_.size() * 3);
+      size_t centro = 0;
+      for (size_t i = 0; i <= indices_.size(); ++i) {
+        if (i < indices_.size() && indices_[i] != UINT32_MAX) {
+          continue;
+        }
+        for (size_t k = centro + 2; k < i; ++k) {
+          convertidos_.push_back(indices_[k - 1]);
+          convertidos_.push_back(indices_[k]);
+          convertidos_.push_back(indices_[centro]);
+        }
+        centro = i + 1;
+      }
+      indices_.swap(convertidos_);
+      if (indices_.empty()) {
+        return true;  // no fan with 3 vertices
+      }
     }
     CortarSubetapa(17, t_indices_185);  // indices
     // The indices stay as they come: vkCmdDrawIndexed subtracts vmin through vertexOffset.
@@ -3115,7 +3157,8 @@ class DibujosVulkanImpl final : public DibujosVulkan {
         REXCVAR_GET(nfsmw_nativo_prueba_oclusion_siempre)) {
       clave.profundidad |= 0x7 << 4;  // test: Z function always
     }
-    clave.rasterizado = (modo_sc & 0x7) | (reinicio ? 0x8 : 0) | (con_sesgo ? 0x10 : 0);
+    // A fan drawn as a list has no resets left (and a list cannot have them).
+    clave.rasterizado = (modo_sc & 0x7) | (reinicio && !abanico ? 0x8 : 0) | (con_sesgo ? 0x10 : 0);
     VkPipeline pipeline = VK_NULL_HANDLE;
     // Looked up with ClaveDeBusqueda (phase 0a: canonical form; phases 1 and 2: without the state set through
     // vkCmdSet*). clave stays raw: the deferred sky (opaco_en_todos), the counter and the dynamic state read
@@ -12076,6 +12119,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
   const VulkanDevice* dispositivo_;
   std::array<bool, 5> bc_cpu_{};
   bool bc1_16_ = false;  // nfsmw_nativo_bc1_16_bits
+  bool abanicos_a_listas_ = false;  // nfsmw_nativo_abanicos_a_listas
   const VulkanDevice::Functions& dfn_;
   VkDevice device_;
   rex::memory::Memory* memoria_;

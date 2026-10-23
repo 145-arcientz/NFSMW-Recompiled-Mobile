@@ -12,4 +12,6 @@
     <string name="ios_sin_biblioteca">缺少原生渲染器所需的著色器庫（nfsmw_shaders.nfsp）。請把它複製到 App 的資料夾、ISO 旁邊，或建置含有它的 App。</string>
     <string name="ios_audio">低延遲音效（AVAudioEngine）</string>
     <string name="ios_audio_resumen">這個 App 的 iOS 低延遲輸出，如同 Android 上的 AAudio。關閉：使用原生引擎的 SDL 輸出。</string>
+    <string name="ios_metal_rapida">Metal 快速運算</string>
+    <string name="ios_metal_rapida_resumen">iPhone GPU 上的著色器更快，但計算較不精確：可能再次出現彩色方塊或閃光。關閉：與 Android 相同的計算。</string>
 </resources>

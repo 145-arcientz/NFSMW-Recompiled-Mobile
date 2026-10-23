@@ -12,4 +12,6 @@
     <string name="ios_sin_biblioteca">Brakuje biblioteki shaderów (nfsmw_shaders.nfsp), której potrzebuje natywny renderer. Skopiuj ją do folderu aplikacji, obok ISO, albo zbuduj aplikację z nią.</string>
     <string name="ios_audio">Dźwięk o niskim opóźnieniu (AVAudioEngine)</string>
     <string name="ios_audio_resumen">Wyjście iOS tej aplikacji o niskim opóźnieniu, jak AAudio na Androidzie. Wyłączone: wyjście SDL natywnego silnika.</string>
+    <string name="ios_metal_rapida">Szybka matematyka Metal</string>
+    <string name="ios_metal_rapida_resumen">Szybsze shadery na GPU iPhone\'a, z mniej dokładnymi obliczeniami: mogą wrócić kolorowe kwadraty lub błyski. Wyłączone: te same obliczenia co na Androidzie.</string>
 </resources>

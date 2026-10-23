@@ -12,4 +12,6 @@
     <string name="ios_sin_biblioteca">ネイティブレンダラーに必要なシェーダーライブラリ（nfsmw_shaders.nfsp）がありません。ISO と同じアプリのフォルダにコピーするか、ライブラリ入りでアプリをビルドしてください。</string>
     <string name="ios_audio">低遅延サウンド（AVAudioEngine）</string>
     <string name="ios_audio_resumen">このアプリの iOS 低遅延出力です（Android の AAudio と同様）。オフ：ネイティブエンジンの SDL 出力。</string>
+    <string name="ios_metal_rapida">Metal の高速演算</string>
+    <string name="ios_metal_rapida_resumen">iPhone の GPU でシェーダーが速くなりますが、計算の精度は下がります。色付きの四角やフラッシュが出ることがあります。オフ：Android と同じ計算。</string>
 </resources>

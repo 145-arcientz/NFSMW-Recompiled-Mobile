@@ -62,6 +62,18 @@ REXCVAR_DEFINE_STRING(android_turnip_debug, "", "UI/Vulkan",
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 #endif
 
+// PARCHE LOCAL - iOS: MoltenVK's settings, passed with VK_EXT_layer_settings when the instance is created
+// (MoltenVK's preferred way; it reads its environment variables through NSProcessInfo). kInitOnly: MoltenVK
+// reads them once, in vkCreateInstance.
+#if REX_PLATFORM_IOS
+REXCVAR_DEFINE_BOOL(moltenvk_matematica_rapida, false, "UI/Vulkan",
+                    "iOS: Metal fast math in the shaders (MVK_CONFIG_FAST_MATH_ENABLED). MoltenVK turns it on unless "
+                    "a shader asks to keep NaN and infinities, and the native shader library does not ask: the "
+                    "compiler may then drop isnan() and use approximate division, sin and cos. Off = IEEE math, as "
+                    "on Android")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+#endif
+
 #if REX_PLATFORM_SWITCH || REX_PLATFORM_IOS
 // NVK for Horizon is linked statically (Mesa's libvulkan.a) and exports the
 // entry points directly. api.h defines VK_NO_PROTOTYPES, so they have to be
@@ -254,6 +266,11 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
   // #395.
   requested_extensions.emplace("VK_KHR_portability_enumeration",
                                &vulkan_instance->extensions_.ext_KHR_portability_enumeration);
+#if REX_PLATFORM_IOS
+  // #497. MoltenVK's settings (moltenvk_matematica_rapida).
+  bool ext_layer_settings = false;
+  requested_extensions.emplace("VK_EXT_layer_settings", &ext_layer_settings);
+#endif
   if (with_surface) {
     // #1.
     requested_extensions.emplace("VK_KHR_surface", &vulkan_instance->extensions_.ext_KHR_surface);
@@ -482,6 +499,26 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
   instance_create_info.ppEnabledLayerNames = enabled_layers.data();
   instance_create_info.enabledExtensionCount = uint32_t(enabled_extensions.size());
   instance_create_info.ppEnabledExtensionNames = enabled_extensions.data();
+#if REX_PLATFORM_IOS
+  // MVKConfigFastMath: 0 = never, 1 = always (2, MoltenVK's default: unless the shader asks otherwise).
+  const uint32_t matematica_rapida = REXCVAR_GET(moltenvk_matematica_rapida) ? 1 : 0;
+  VkLayerSettingEXT ajuste_moltenvk = {};
+  ajuste_moltenvk.pLayerName = "MoltenVK";
+  ajuste_moltenvk.pSettingName = "MVK_CONFIG_FAST_MATH_ENABLED";
+  ajuste_moltenvk.type = VK_LAYER_SETTING_TYPE_UINT32_EXT;
+  ajuste_moltenvk.valueCount = 1;
+  ajuste_moltenvk.pValues = &matematica_rapida;
+  VkLayerSettingsCreateInfoEXT ajustes_moltenvk = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT};
+  ajustes_moltenvk.settingCount = 1;
+  ajustes_moltenvk.pSettings = &ajuste_moltenvk;
+  if (ext_layer_settings) {
+    instance_create_info.pNext = &ajustes_moltenvk;
+  }
+  REXLOG_INFO("Vulkan: matematica rapida de Metal {}",
+              !ext_layer_settings  ? "la de MoltenVK (no tiene VK_EXT_layer_settings)"
+              : matematica_rapida ? "encendida"
+                                  : "apagada (IEEE, como en Android)");
+#endif
   VkResult instance_create_result =
       ifn.vkCreateInstance(&instance_create_info, nullptr, &vulkan_instance->instance_);
 

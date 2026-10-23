@@ -12,4 +12,6 @@
     <string name="ios_sin_biblioteca">La bibliothèque de shaders (nfsmw_shaders.nfsp), dont le moteur de rendu natif a besoin, est absente. Copiez-la dans le dossier de l\'app, à côté de l\'ISO, ou compilez l\'app avec elle.</string>
     <string name="ios_audio">Son à faible latence (AVAudioEngine)</string>
     <string name="ios_audio_resumen">La sortie iOS à faible latence de cette app, comme AAudio sur Android. Désactivé : la sortie SDL du moteur natif.</string>
+    <string name="ios_metal_rapida">Calcul rapide de Metal</string>
+    <string name="ios_metal_rapida_resumen">Des shaders plus rapides sur le GPU de l\'iPhone, avec des calculs moins exacts : des carrés de couleur ou des flashs peuvent revenir. Désactivé : les mêmes calculs que sur Android.</string>
 </resources>

@@ -596,6 +596,36 @@ double ProporcionPantalla() {
   return std::max(s.width, s.height) / std::max(1.0, double(std::min(s.width, s.height)));
 }
 
+// nfsmw.toml: los ajustes del motor que el lanzador no ensena, los mismos que lleva el APK de Android
+// (nativo/android/app/src/main/assets/nfsmw.toml, que compilar.sh mete en la app). Sin el, el motor
+// se queda con los valores del codigo, que para varios son los de PC: la escena en tres franjas con
+// MSAA, la cara del retrovisor del cubemap no en cada fotograma, dos mapas de sombras... Como
+// MotorNativo.instalarAjustes: se pone el de la app y se renueva cuando la app trae otro, salvo que el
+// de Documents se haya cambiado a mano o desde el menu del juego.
+void InstalarAjustesMotor() {
+  NSString* origen = [NSBundle.mainBundle pathForResource:@"nfsmw" ofType:@"toml"];
+  NSData* deLaApp = origen ? [NSData dataWithContentsOfFile:origen] : nil;
+  if (!deLaApp.length) {
+    os_log(OS_LOG_DEFAULT, "[lanzador] la app no lleva nfsmw.toml");
+    return;
+  }
+  const auto huella = [](NSData* d) {
+    const auto* p = static_cast<const uint8_t*>(d.bytes);
+    return Sha256(std::vector<uint8_t>(p, p + d.length));
+  };
+  const std::string huellaApp = huella(deLaApp);
+  NSString* destino = [Documentos() stringByAppendingPathComponent:@"nfsmw.toml"];
+  if (NSData* actual = [NSData dataWithContentsOfFile:destino]) {
+    const std::string huellaActual = huella(actual);
+    if (huellaActual == huellaApp || huellaActual != S(LeerTexto(@"motor_toml_sha256", @""))) return;
+  }
+  if ([deLaApp writeToFile:destino atomically:YES]) {
+    Poner(@"motor_toml_sha256", N(huellaApp));
+  } else {
+    os_log(OS_LOG_DEFAULT, "[lanzador] no se pudo escribir %{public}@", destino);
+  }
+}
+
 // redDns: la IP del servidor de la LAN a la que va Xbox Live del juego; nil = sin online.
 std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, const std::string& argv0, NSString* redDns) {
   std::vector<std::string> a{argv0};
@@ -620,7 +650,10 @@ std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, cons
   poner([@"--nfsmw_resolucion_interna=" stringByAppendingString:LeerTexto(@"resolucion_interna", @"1280x720")]);
   const int fps = LeerInt(@"limite_fps", 60);
   poner(fps == FPS_SIN_LIMITE ? @"--nfsmw_limite_fps=sin_limite" : [NSString stringWithFormat:@"--nfsmw_limite_fps=%d", fps]);
-  // MSAA no hay: la escena se pinta en una pasada. Solo FXAA.
+  // MSAA no hay: la escena se pinta en una pasada. Solo FXAA. Tambien va en nfsmw.toml, pero aqui
+  // manda aunque el de Documents sea uno guardado desde el menu del juego con el valor del codigo (tres
+  // franjas con MSAA 4x, que en Android no se usa: con MoltenVK salen cuadrados y destellos).
+  poner(@"--nfsmw_render_sin_mosaico=true");
   poner([Antialiasing() isEqualToString:AA_FXAA] ? @"--nfsmw_antialiasing=fxaa" : @"--nfsmw_antialiasing=apagado");
   poner([NSString stringWithFormat:@"--nfsmw_nativo_anisotropico=%d", Anisotropico(LeerInt(@"anisotropico", 3))]);
   poner([@"--nfsmw_tratamiento_visual=" stringByAppendingString:LeerTexto(@"filtro_color", @"original")]);
@@ -642,6 +675,8 @@ std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, cons
   poner([@"--input_vibracion=" stringByAppendingString:bandera(LeerBool(@"vibracion", true))]);
   // La salida de audio: AVAudioEngine (audio_ios.mm) o la de SDL de su SDK.
   poner([@"--nfsmw_audio_ios=" stringByAppendingString:bandera(LeerBool(@"audio_avaudio", true))]);
+  // La matematica rapida de Metal en los shaders (vulkan_instance.cpp): apagada, como en Android.
+  poner([@"--moltenvk_matematica_rapida=" stringByAppendingString:bandera(LeerBool(@"metal_rapida", false))]);
   poner(@"--nfsmw_renderizador=nativo");
 
   // El idioma y el pais de la consola, los de la edicion de esta app.
@@ -2073,6 +2108,8 @@ NSString* NfsmwTexto(NSString* clave) {
 - (UIView*)tarjetaAvanzado {
   return Tarjeta(@[
     Seccion(T(@"seccion_avanzado")), Resumen(T(@"avanzado_resumen")),
+    Interruptor(T(@"ios_metal_rapida"), T(@"ios_metal_rapida_resumen"), LeerBool(@"metal_rapida", false),
+                ^(bool v) { Poner(@"metal_rapida", @(v)); }),
     Interruptor(T(@"registro_detallado"), T(@"registro_detallado_resumen"), LeerBool(@"registro", false),
                 ^(bool v) { Poner(@"registro", @(v)); })
   ]);
@@ -2153,6 +2190,7 @@ NSString* NfsmwTexto(NSString* clave) {
 // ip: la del servidor de la LAN a la que va Xbox Live del juego; nil = sin online (el servidor
 // guardado no se toca).
 - (void)lanzarConRed:(NSString*)ip {
+  InstalarAjustesMotor();
   argumentos_ = Argumentos(juego_, edicion_, argv0_, ip);
   std::string linea;
   for (const auto& a : argumentos_) linea += " " + a;

@@ -80,6 +80,8 @@ app="$build/Payload/nfsmw.app"
 # ISO y le pasa su idioma y su pais al juego) y la biblioteca de shaders de esa edicion, que sale de
 # TU copia del juego: como el codigo generado, es una razon mas para no compartir la app.
 python3 "$aqui/textos.py" "$repo/android/app/src/main/res" "$aqui/textos" "$app/textos.json"
+# Los ajustes del motor que lleva el APK (assets/nativo/nfsmw.toml): el lanzador los copia a Documents.
+cp "$repo/nativo/android/app/src/main/assets/nfsmw.toml" "$app/nfsmw.toml"
 for f in edicion.json nfsmw_shaders.nfsp; do
     if [ -f "$principal/nativo/out/$f" ]; then
         cp "$principal/nativo/out/$f" "$app/"

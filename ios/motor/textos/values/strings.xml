@@ -16,4 +16,6 @@
     <string name="ios_sin_biblioteca">The shader library (nfsmw_shaders.nfsp), which the native renderer needs, is missing. Copy it to the app\'s folder, next to the ISO, or build the app with it.</string>
     <string name="ios_audio">Low-latency sound (AVAudioEngine)</string>
     <string name="ios_audio_resumen">The iOS low-latency output of this app, like AAudio on Android. Off: the SDL output of the native engine.</string>
+    <string name="ios_metal_rapida">Metal fast math</string>
+    <string name="ios_metal_rapida_resumen">Faster shaders on the iPhone GPU, with less exact math: it can bring back colored squares or flashes. Off: the same math as on Android.</string>
 </resources>
