@@ -886,6 +886,17 @@ UIButton* BotonIcono(NSString* simbolo, NSString* descripcion, void (^accion)(vo
   return b;
 }
 
+// Botones en fila, cada uno de su tamano, pegados a la izquierda.
+UIStackView* FilaBotones(NSArray<UIView*>* botones) {
+  for (UIView* b in botones) {
+    [b setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+  }
+  UIStackView* fila = [[UIStackView alloc] initWithArrangedSubviews:[botones arrayByAddingObject:[UIView new]]];
+  fila.axis = UILayoutConstraintAxisHorizontal;
+  fila.spacing = 8;
+  return fila;
+}
+
 // Un campo de texto oscuro con su etiqueta encima (el hint de Android).
 UITextField* Campo(NSString* texto, NSString* ejemplo) {
   UITextField* c = [UITextField new];
@@ -1183,8 +1194,7 @@ NSString* NfsmwTexto(NSString* clave) {
   // Por que Jugar, en el menu, no se puede pulsar.
   avisoJugar_ = Etiqueta(T(@"jugar_sin_iso"), 13, UIFontWeightRegular, AVISO);
   avisoBiblioteca_ = Etiqueta(T(@"ios_sin_biblioteca"), 13, UIFontWeightRegular, AVISO);
-  UIStackView* boton = [[UIStackView alloc] initWithArrangedSubviews:@[elegir, [UIView new]]];
-  boton.axis = UILayoutConstraintAxisHorizontal;
+  UIStackView* boton = FilaBotones(@[elegir]);
   return Tarjeta(@[
     Seccion(T(@"seccion_juego")), Columna(@[Resumen(T(@"ios_app_con_juego"))], 0, 12), textoIso_,
     Columna(@[textoEdicion_], 4), Espacio(12), boton, Columna(@[Resumen(T(@"ios_ayuda_iso"))], 8),
@@ -1532,9 +1542,7 @@ NSString* NfsmwTexto(NSString* clave) {
   listaEncontrados_ = Columna(@[], 6, 0, 6);
   botonBuscar_ = Boton(T(@"servidor_buscar"), BOTON, BLANCO, ^{ [yo buscarServidores]; });
   UIButton* anadir = Boton(T(@"servidor_anadir"), BOTON, BLANCO, ^{ [yo abrirEditorDe:nil nombre:nil]; });
-  UIStackView* botones = [[UIStackView alloc] initWithArrangedSubviews:@[botonBuscar_, anadir, [UIView new]]];
-  botones.axis = UILayoutConstraintAxisHorizontal;
-  botones.spacing = 8;
+  UIStackView* botones = FilaBotones(@[botonBuscar_, anadir]);
   filaBotonesServidores_ = Columna(@[botones], 10);
   bloqueServidores_ = Columna(@[Titulo(T(@"servidores_guardados")), Columna(@[listaServidores_], 6), listaEncontrados_,
                                 filaBotonesServidores_]);
@@ -1925,6 +1933,7 @@ NSString* NfsmwTexto(NSString* clave) {
 
 // Un aviso abajo de la seccion, unos segundos (el Snackbar de Android), con Deshacer si se da.
 - (void)aviso:(NSString*)texto deshacer:(void (^)(void))deshacer {
+  if (!contenido_) return;  // la pantalla aun no esta hecha
   [aviso_ removeFromSuperview];
   UIView* caja = [UIView new];
   caja.backgroundColor = Color(0xFF323232);
@@ -1993,8 +2002,7 @@ NSString* NfsmwTexto(NSString* clave) {
     NfsmwVibrarUnRato();
     probada.hidden = NO;
   });
-  UIStackView* filaProbar = [[UIStackView alloc] initWithArrangedSubviews:@[probar, [UIView new]]];
-  filaProbar.axis = UILayoutConstraintAxisHorizontal;
+  UIStackView* filaProbar = FilaBotones(@[probar]);
   return Tarjeta(@[
     Seccion(T(@"seccion_tactil")), Resumen(T(@"ios_editar_tactil_resumen")), Espacio(8),
     Interruptor(T(@"vibracion"), T(@"vibracion_resumen"), LeerBool(@"vibracion", true),
@@ -2153,6 +2161,10 @@ NSString* NfsmwTexto(NSString* clave) {
 // bucle, como hace SDL con sus mensajes. Devuelve la linea de comandos del juego; vacia = la de
 // siempre (sin escena a la que poner la ventana, que no deberia pasar).
 std::vector<std::string> NfsmwLanzadorIos(int argc, char** argv) {
+  // Escribir en un socket que el otro lado ya cerro manda SIGPIPE, que mata la app: el juego (y el
+  // servidor del anfitrion, que puede arrancar ya aqui) cuentan con el EPIPE de Winsock. El SDK pide
+  // MSG_NOSIGNAL, pero en Darwin es SO_NOSIGPIPE por socket; asi vale para todos.
+  signal(SIGPIPE, SIG_IGN);
   UIWindowScene* escena = nil;
   for (UIScene* s in UIApplication.sharedApplication.connectedScenes) {
     if ([s isKindOfClass:UIWindowScene.class]) {
@@ -2176,10 +2188,6 @@ std::vector<std::string> NfsmwLanzadorIos(int argc, char** argv) {
     }
   }
   std::vector<std::string> argumentos = [lanzador argumentos];
-  // Escribir en un socket que el otro lado ya cerro manda SIGPIPE, que mata la app: el juego (y el
-  // servidor del anfitrion) cuentan con el EPIPE de Winsock. El SDK pide MSG_NOSIGNAL, pero en Darwin
-  // es SO_NOSIGPIPE por socket; asi vale para todos.
-  signal(SIGPIPE, SIG_IGN);
   ventana.hidden = YES;
   ventana.rootViewController = nil;
   return argumentos;

@@ -1,11 +1,25 @@
 # NFSMW Recompiled para iOS
 
-**Estado: fase 0 superada** (2026-10-22, iPhone 13 Pro con iOS 26.6.2 y Apple ID gratuita). El
-motor todavía no se ha compilado para iOS.
+**Estado** (2026-10-23, iPhone 13 Pro con iOS 26.6.2 y Apple ID gratuita):
+
+- **El juego corre en el iPhone** con el renderizador nativo sobre MoltenVK: vídeos, menús, carreras,
+  sonido y mando por Bluetooth (fase 1).
+- **Los controles táctiles de la app de Android** funcionan: menús con el dedo, carreras y pausa
+  (fase 2).
+- **Escritos y compilados, sin probar todavía en el iPhone**:
+  - el lanzador;
+  - la ISO leída sin extraerla;
+  - los 10 idiomas;
+  - la vibración del móvil;
+  - el contador de fps;
+  - el multijugador LAN, incluido el iPhone de anfitrión.
+
+  El servidor del anfitrión sí está probado sin teléfono, contra el de Python (ver *Pruebas*).
 
 El port reutiliza el motor nativo de Android tal cual (`../nativo/`: el SDK, el código del juego
-recompilado y el renderizador). Solo cambia lo que rodea al motor: el lanzador, que en Android es
-Java y aquí será Swift, la compilación y la firma.
+recompilado y el renderizador). Lo que cambia en el SDK y en la app va con `#if` de iOS
+(`REX_PLATFORM_IOS`), y Android no cambia. Lo propio de iOS está en [motor/](motor/), en
+Objective-C++ y C++: no hace falta Swift ni Xcode.
 
 ## Por qué es posible
 
@@ -24,7 +38,16 @@ Java y aquí será Swift, la compilación y la firma.
   suya, con su ISO.
 - **Con Apple ID gratuita**, la app caduca a los 7 días y hay que volver a instalarla. Los permisos
   de memoria (`increased-memory-limit`, `extended-virtual-addressing`) firman pero no se aplican:
-  iOS deja unos 3 GB y la reserva del juego cabe sin ellos (ver la fase 0).
+  iOS deja unos 3 GB y la reserva del juego cabe sin ellos (ver la fase 0). Sin el espacio de
+  direcciones ampliado, una ISO de 7-8 GB no cabe mapeada: en iOS se lee con `pread`
+  (`nativo/sdk/src/filesystem/devices/disc_image_device.cpp`).
+- **Volver al lanzador es cerrar la app** desde el selector de apps y abrirla otra vez: iOS no deja
+  que una app se cierre sola.
+- **Buscar servidores por broadcast** pide un permiso de Apple (`multicast`) que una Apple ID
+  gratuita no tiene: la búsqueda pregunta a cada IP de la red, como ya hacía Android cuando el router
+  se comía los broadcast.
+- **De anfitrión, el iPhone sirve mientras la app está delante.** En segundo plano iOS la suspende y
+  los demás pierden la conexión.
 
 ## Herramientas: xtool en WSL
 
@@ -67,6 +90,68 @@ Partir la transferencia USB en vez del mensaje no vale: el iPhone exige un mensa
 transferencia. Si el iPhone se cuelga, usbipd lo suelta (`Shared`) y hay que volver a hacer
 `usbipd attach --wsl`. Un `apt upgrade` de usbmuxd quita el parche.
 
+## Compilar e instalar
+
+En WSL, desde la copia de Windows:
+
+```sh
+bash /mnt/c/.../NFSMW-ios/ios/motor/compilar.sh [--dependencias] [--limpio] [--instalar]
+```
+
+- Copia las fuentes a `~/nfsmw`, porque compilar en `/mnt/c` es varias veces más lento.
+- Trae las dependencias del SDK y el código generado del checkout principal
+  (`NFSMW_PRINCIPAL`, por defecto `../NFSMW-Recompiled`). Lo hace la primera vez y con
+  `--dependencias`.
+- Si falta, baja MoltenVK de su release de Khronos.
+- Compila con el clang de Swift y el kit de iOS que instala xtool.
+- Deja `~/nfsmw/build-ios/NFSMW.ipa`. Con `--instalar`, la firma y la instala con xtool. El iPhone
+  tiene que estar conectado a WSL (`usbipd attach --wsl --busid <id>`).
+
+Dentro de la app van, del checkout principal:
+
+- `textos.json`: los textos de Android en sus 10 idiomas y los propios de iOS, los de
+  [motor/textos](motor/textos/), que junta [motor/textos.py](motor/textos.py);
+- `edicion.json`: la edición del código generado (`nativo/out`);
+- `nfsmw_shaders.nfsp`: su biblioteca de shaders.
+
+Como el código generado, salen de tu copia del juego: la app no se comparte.
+
+## El juego en el iPhone
+
+La app sale en Archivos como **NFS Most Wanted**, con su carpeta `Documents`. El lanzador busca el
+juego en este orden:
+
+1. **La ISO elegida con «Elegir ISO…»**, en cualquier sitio de Archivos. Se lee donde está, sin
+   copiarla, con un marcador de seguridad.
+2. **El juego extraído** en `Documents/game_root` (`default.xex`, `NFS/`, `Movies/`).
+3. **La primera `.iso` de `Documents`**, copiada con Archivos, con el Finder o con
+   `afcclient --container <id> put`.
+
+El lanzador mira de qué edición es (el SHA-256 de su `default.xex`) y si le falta el final, como
+`IsoXex` en Android.
+
+Lo que escribe la app, en `Documents`:
+
+- `logs/`: `nfsmw_NNN.log`, `contexto.txt`, `menus.txt` y `servidor_lan.log`;
+- `datos/`: partidas, caché y el `stats.json` del anfitrión;
+- `nfsmw.toml`.
+
+Se sacan por USB con `afcclient --container XTL-<equipo>.io.github.victorgbd.nfsmw` y
+`get Documents/logs/...`. El registro del sistema se ve con `idevicesyslog -p nfsmw`.
+
+## Pruebas
+
+[motor/pruebas](motor/pruebas/) prueba sin teléfono la red del lanzador y el servidor del
+anfitrión, compilados para Linux (en WSL):
+
+- **`prueba_servidor_ea.py`** pasa una carrera LAN de dos jugadores por el servidor de Python
+  (`ea_server.py` de nfsmw-server-lan) y por el de iOS, y compara cada mensaje. Los campos son los
+  del juego, sacados del `logs/server.log` de una partida real. El 2026-10-23 salen iguales los 123.
+- **`prueba_red.cpp`** prueba la parte cliente contra ese servidor: direcciones, gamertag y
+  búsqueda.
+
+Cómo compilarlas está en la cabecera de `prueba_servidor_ea.py`.
+
 ## Fases
 
 0. **[PruebaMemoria](PruebaMemoria/)**: una app sin nada del juego que mide en el iPhone lo que el
@@ -90,10 +175,27 @@ transferencia. Si el iPhone se cuelga, usbipd lo suelta (`Shared`) y hay que vol
    - `shm_open` da `EPERM`: la zona compartida tiene que ser un fichero en tmp.
    - Una reserva de 8,5 GB (la de Linux) no cabe; la de 4,5 GB, sí.
    - Páginas de 16 KB: revisar la vista de `0xE0000000`, que apunta a `0x100001000`.
-1. **El motor nativo compilado para iOS** con CMake y el kit de iOS que instala xtool, como
-   bibliotecas estáticas, enlazadas en una app SwiftPM mínima: elegir la ISO y jugar con mando.
-   MoltenVK como Vulkan. Lo que haya que tocar del SDK y del renderizador va en `nativo/`, con
-   `#if` de iOS, para que Android no cambie.
-2. **Controles táctiles y lanzador** en SwiftUI: lo que hoy hacen `SetupActivity`,
-   `TouchControllerView` y `EditorTactilActivity` en Android.
-3. **El resto**: idiomas, servidor LAN (`ServidorEa`), preajustes.
+1. **El motor nativo compilado para iOS** ([motor/](motor/)). **Hecho y probado.** Va todo en un
+   ejecutable estático, con CMake y [ios.toolchain.cmake](motor/ios.toolchain.cmake), y MoltenVK
+   enlazado dentro.
+   - Solo el renderizador nativo: sin la emulación de Xenos.
+   - SDL3 con su escena de UIKit.
+   - La zona compartida de memoria es un fichero en `tmp`, porque `shm_open` da `EPERM`.
+   - El registro también va a `os_log`.
+2. **Controles táctiles y lanzador.**
+   - **Controles táctiles: hechos y probados.** Son `TouchControllerView` en UIKit
+     ([controles_tactiles.mm](motor/controles_tactiles.mm)), con su editor en la partida. Lo
+     nativo es el mismo `nativo_android.cpp` de Android, compilado sin JNI.
+   - **Lanzador: escrito, sin probar.** Es `SetupActivity` en UIKit
+     ([lanzador.mm](motor/lanzador.mm)). El `SDL_main` del SDK lo enseña antes del juego, en el
+     mismo proceso, y le pasa la línea de comandos. Tiene las secciones de Android menos lo que
+     iOS no tiene: resolución de pantalla, API gráfica, AAudio, hilos, driver de GPU, sonda y modo
+     de compatibilidad.
+3. **El resto: escrito, sin probar en el iPhone.**
+   - Los 10 idiomas de la app, también en los controles táctiles.
+   - Los preajustes gráficos.
+   - La vibración del móvil con la del juego (Core Haptics) y el contador de fps.
+   - El multijugador LAN: los servidores guardados, buscar en la red y comprobar el gamertag
+     ([red_lan.cpp](motor/red_lan.cpp)).
+   - El iPhone de anfitrión: `ServidorEa` en C++ ([servidor_ea.cpp](motor/servidor_ea.cpp)),
+     probado contra el de Python.
