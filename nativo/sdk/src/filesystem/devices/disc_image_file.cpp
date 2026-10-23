@@ -9,6 +9,7 @@
  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
  */
 
+#include <rex/filesystem/devices/disc_image_device.h>
 #include <rex/filesystem/devices/disc_image_entry.h>
 #include <rex/filesystem/devices/disc_image_file.h>
 
@@ -32,7 +33,15 @@ X_STATUS DiscImageFile::ReadSync(std::span<uint8_t> buffer, size_t byte_offset,
   }
   size_t real_offset = entry_->data_offset() + byte_offset;
   size_t real_length = std::min(buffer.size(), entry_->data_size() - byte_offset);
+#if REX_PLATFORM_IOS
+  // PARCHE LOCAL - iOS: read from the image file (disc_image_device.cpp).
+  if (!static_cast<DiscImageDevice*>(entry_->device())->ReadAt(real_offset, buffer.data(),
+                                                                 real_length)) {
+    return X_STATUS_UNSUCCESSFUL;
+  }
+#else
   std::memcpy(buffer.data(), entry_->mmap()->data() + real_offset, real_length);
+#endif
   *out_bytes_read = real_length;
   return X_STATUS_SUCCESS;
 }

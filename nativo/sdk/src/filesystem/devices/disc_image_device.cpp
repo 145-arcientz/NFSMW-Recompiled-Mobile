@@ -17,6 +17,15 @@
 #include <rex/math.h>
 #include <rex/memory.h>
 
+#if REX_PLATFORM_IOS
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <vector>
+#endif
+
 namespace rex::filesystem {
 
 using namespace rex::literals;
@@ -27,6 +36,72 @@ DiscImageDevice::DiscImageDevice(const std::string_view mount_path,
                                  const std::filesystem::path& host_path)
     : Device(mount_path), name_("GDFX"), host_path_(host_path) {}
 
+#if REX_PLATFORM_IOS
+DiscImageDevice::~DiscImageDevice() {
+  if (file_descriptor_ >= 0) {
+    close(file_descriptor_);
+  }
+}
+
+// PARCHE LOCAL - iOS
+//
+// Without the extended-virtual-addressing entitlement (a free Apple ID cannot get it), iOS gives an
+// app a few GB of address space, and the guest memory reservation already takes 4.5 of them: a 7-8 GB
+// image does not fit mapped. It is read with pread instead: the folder tables when mounting, and each
+// file when the game reads it (DiscImageFile::ReadSync). DiscImageEntry::can_map() is false, so the
+// xex loader reads default.xex into a buffer.
+bool DiscImageDevice::ReadAt(size_t offset, void* buffer, size_t length) const {
+  auto* destino = static_cast<uint8_t*>(buffer);
+  while (length) {
+    const ssize_t leidos = pread(file_descriptor_, destino, length, off_t(offset));
+    if (leidos < 0 && errno == EINTR) {
+      continue;
+    }
+    if (leidos <= 0) {
+      return false;
+    }
+    destino += leidos;
+    offset += size_t(leidos);
+    length -= size_t(leidos);
+  }
+  return true;
+}
+
+bool DiscImageDevice::Initialize() {
+  file_descriptor_ = open(host_path_.c_str(), O_RDONLY);
+  if (file_descriptor_ < 0) {
+    REXFS_ERROR("Disc image could not be opened ({})", errno);
+    return false;
+  }
+  struct stat datos;
+  if (fstat(file_descriptor_, &datos) != 0) {
+    REXFS_ERROR("Disc image size unknown ({})", errno);
+    return false;
+  }
+  host_size_ = size_t(datos.st_size);
+
+  ParseState state = {};
+  state.size = host_size_;
+  auto result = Verify(&state);
+  if (result != Error::kSuccess) {
+    REXFS_ERROR("Failed to verify disc image header: {}", static_cast<int>(result));
+    return false;
+  }
+
+  std::vector<uint8_t> raiz(rex::round_up(state.root_size, kXESectorSize));
+  if (!ReadAt(state.root_offset, raiz.data(), raiz.size())) {
+    REXFS_ERROR("Failed to read the GDFX root folder");
+    return false;
+  }
+  result = ReadAllEntries(&state, raiz.data());
+  if (result != Error::kSuccess) {
+    REXFS_ERROR("Failed to read all GDFX entries: {}", static_cast<int>(result));
+    return false;
+  }
+
+  return true;
+}
+#else
 DiscImageDevice::~DiscImageDevice() = default;
 
 bool DiscImageDevice::Initialize() {
@@ -53,6 +128,7 @@ bool DiscImageDevice::Initialize() {
 
   return true;
 }
+#endif  // REX_PLATFORM_IOS
 
 void DiscImageDevice::Dump(string::StringBuffer* string_buffer) {
   auto global_lock = global_critical_region_.Acquire();
@@ -94,7 +170,15 @@ DiscImageDevice::Error DiscImageDevice::Verify(ParseState* state) {
   if (state->size < state->game_offset + (32 * kXESectorSize)) {
     return Error::kErrorReadError;
   }
+#if REX_PLATFORM_IOS
+  uint8_t sector_fs[28];
+  if (!ReadAt(state->game_offset + (32 * kXESectorSize), sector_fs, sizeof(sector_fs))) {
+    return Error::kErrorReadError;
+  }
+  const uint8_t* fs_ptr = sector_fs;
+#else
   uint8_t* fs_ptr = state->ptr + state->game_offset + (32 * kXESectorSize);
+#endif
   state->root_sector = memory::load<uint32_t>(fs_ptr + 20);
   state->root_size = memory::load<uint32_t>(fs_ptr + 24);
   state->root_offset = state->game_offset + (state->root_sector * kXESectorSize);
@@ -116,7 +200,13 @@ bool DiscImageDevice::VerifyMagic(ParseState* state, size_t offset) {
   }
 
   // Simple check to see if the given offset contains the magic value.
+#if REX_PLATFORM_IOS
+  char magia[20];
+  return ReadAt(offset, magia, sizeof(magia)) &&
+         std::memcmp(magia, "MICROSOFT*XBOX*MEDIA", 20) == 0;
+#else
   return std::memcmp(state->ptr + offset, "MICROSOFT*XBOX*MEDIA", 20) == 0;
+#endif
 }
 
 DiscImageDevice::Error DiscImageDevice::ReadAllEntries(ParseState* state,
@@ -171,10 +261,19 @@ bool DiscImageDevice::ReadEntry(ParseState* state, const uint8_t* buffer, uint16
         return false;
       }
       // Read child list.
+#if REX_PLATFORM_IOS
+      // Whole sectors, as they sit in the image: the table ends where its last entry ends.
+      std::vector<uint8_t> carpeta(rex::round_up(length, kXESectorSize));
+      if (!ReadAt(state->game_offset + (sector * kXESectorSize), carpeta.data(), carpeta.size()) ||
+          !ReadEntry(state, carpeta.data(), 0, entry.get())) {
+        return false;
+      }
+#else
       uint8_t* folder_ptr = state->ptr + state->game_offset + (sector * kXESectorSize);
       if (!ReadEntry(state, folder_ptr, 0, entry.get())) {
         return false;
       }
+#endif
     }
   } else {
     // File.

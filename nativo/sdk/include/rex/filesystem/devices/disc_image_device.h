@@ -47,11 +47,21 @@ class DiscImageDevice : public Device {
   uint32_t component_name_max_length() const override { return 255; }
 
   uint32_t total_allocation_units() const override {
+#if REX_PLATFORM_IOS
+    return uint32_t(host_size_ / sectors_per_allocation_unit() / bytes_per_sector());
+#else
     return uint32_t(mmap_->size() / sectors_per_allocation_unit() / bytes_per_sector());
+#endif
   }
   uint32_t available_allocation_units() const override { return 0; }
   uint32_t sectors_per_allocation_unit() const override { return 1; }
   uint32_t bytes_per_sector() const override { return 0x200; }
+
+#if REX_PLATFORM_IOS
+  // PARCHE LOCAL - iOS: the image is read with pread, not mapped (disc_image_device.cpp).
+  // `length` bytes at `offset` of the image file; false if they are not all there.
+  bool ReadAt(size_t offset, void* buffer, size_t length) const;
+#endif
 
  private:
   enum class Error {
@@ -66,6 +76,10 @@ class DiscImageDevice : public Device {
   std::filesystem::path host_path_;
   std::unique_ptr<Entry> root_entry_;
   std::unique_ptr<memory::MappedMemory> mmap_;
+#if REX_PLATFORM_IOS
+  int file_descriptor_ = -1;
+  size_t host_size_ = 0;
+#endif
   DiscInfo disc_info_{};
   uint64_t file_count_ = 0;
   uint64_t total_file_size_ = 0;
