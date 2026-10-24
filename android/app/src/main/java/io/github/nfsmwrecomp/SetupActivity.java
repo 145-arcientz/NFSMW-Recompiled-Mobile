@@ -1,6 +1,7 @@
 package io.github.nfsmwrecomp;
 
 import androidx.appcompat.app.AppCompatActivity;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -25,6 +26,7 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
 import android.provider.OpenableColumns;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -82,6 +84,11 @@ public class SetupActivity extends AppCompatActivity {
     private static final int PEDIR_ISO = 1;
     private static final int PEDIR_DRIVER = 2;
     private static final int PEDIR_AVISOS = 3;
+    private static final int PEDIR_EXPORTAR = 4;
+    private static final int PEDIR_IMPORTAR = 5;
+    // El acceso a todos los archivos (Android 11+, en sus ajustes) y el almacenamiento de antes (8-10).
+    private static final int PEDIR_TODOS_ARCHIVOS = 6;
+    private static final int PEDIR_ALMACENAMIENTO = 7;
 
     private static final int ACENTO = 0xFF6F7432;
     // El acento sobre fondo oscuro, para iconos y textos: el de siempre se pierde.
@@ -122,6 +129,20 @@ public class SetupActivity extends AppCompatActivity {
     private MaterialButton botonJugar;
     private TextView textoInforme;
     private View filaTurbo;
+    // Exportar e importar las partidas (Partidas): en su hilo; el texto dice como fue.
+    private final ExecutorService archivos = Executors.newSingleThreadExecutor();
+    private TextView textoPartidas;
+    private MaterialButton botonExportar;
+    private MaterialButton botonImportar;
+    private MaterialButton botonElegirIso;
+    // Lo que se hace al volver de pedir el acceso a todos los archivos: con el o sin el.
+    private Runnable trasDarPermiso;
+    private Runnable trasNegarPermiso;
+
+    /** Exportar o importar las partidas, en el hilo de archivos. */
+    private interface TrabajoPartidas {
+        Partidas.Resultado hacer(Context app) throws IOException;
+    }
 
     // Si el gamertag esta libre en el servidor de la LAN (ComprobacionGamertag).
     // La red, en su hilo; `comprobaciones` cuenta las consultas para tirar las
@@ -267,6 +288,8 @@ public class SetupActivity extends AppCompatActivity {
                 .unregisterOnSharedPreferenceChangeListener(cambioAnfitrion);
         hiloPrincipal.removeCallbacksAndMessages(null);
         red.shutdownNow();
+        // Una copia a medias si que se termina: no se corta un .zip ni se dejan las partidas sin poner.
+        archivos.shutdown();
         super.onDestroy();
     }
 
@@ -372,7 +395,7 @@ public class SetupActivity extends AppCompatActivity {
         // --- La seccion elegida. Todas se construyen al empezar y solo se ve una:
         // refrescar() y la comprobacion del gamertag tienen siempre sus vistas.
         FrameLayout contenido = new FrameLayout(this);
-        paneles[S_JUEGO] = panel(tarjetaJuego());
+        paneles[S_JUEGO] = panel(tarjetaJuego(), tarjetaPartidas());
         paneles[S_PANTALLA] = panel(tarjetaPantalla());
         paneles[S_GRAFICOS] = panel(tarjetaGraficos());
         paneles[S_MULTIJUGADOR] = panel(tarjetaPerfil(),
@@ -507,12 +530,9 @@ public class SetupActivity extends AppCompatActivity {
         MaterialButton elegirIso = new MaterialButton(this);
         elegirIso.setText(R.string.elegir_iso);
         estilarBotonSecundario(elegirIso);
-        elegirIso.setOnClickListener(v -> {
-            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            i.addCategory(Intent.CATEGORY_OPENABLE);
-            i.setType("*/*");
-            startActivityForResult(i, PEDIR_ISO);
-        });
+        elegirIso.setOnClickListener(v -> conAccesoTotal(getString(R.string.permiso_archivos_iso),
+                this::buscarIsos, this::elegirIsoConSelector));
+        botonElegirIso = elegirIso;
 
         // Por que Jugar, en el menu, no se puede pulsar.
         avisoJugar = resumen(0);
@@ -530,6 +550,266 @@ public class SetupActivity extends AppCompatActivity {
             elegirIso,
             avisoJugar
         );
+    }
+
+    // --- Acceso a todos los archivos -------------------------------------------------
+
+    /**
+     * Con acceso a todos los archivos (Partidas.accesoTotal), conAcceso. Si no,
+     * se explica para que es y se pide, o se usa el selector de Android
+     * (conSelector), que en algunos moviles no ensena el almacenamiento interno.
+     */
+    private void conAccesoTotal(String explicacion, Runnable conAcceso, Runnable conSelector) {
+        if (Partidas.accesoTotal(this)) {
+            conAcceso.run();
+            return;
+        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.permiso_archivos_titulo)
+                .setMessage(explicacion)
+                .setPositiveButton(R.string.permiso_archivos_dar,
+                        (d, w) -> pedirAccesoTotal(conAcceso, conSelector))
+                .setNeutralButton(R.string.permiso_archivos_selector, (d, w) -> conSelector.run())
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * Android 11+: la pantalla de ajustes del acceso a todos los archivos de esta
+     * app (o la lista general, en las capas que no tienen la de una app). Android
+     * 8-10: los permisos de almacenamiento de antes. Al volver, volverDePermiso.
+     */
+    private void pedirAccesoTotal(Runnable conAcceso, Runnable conSelector) {
+        trasDarPermiso = conAcceso;
+        trasNegarPermiso = conSelector;
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                startActivityForResult(new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        Uri.parse("package:" + getPackageName())), PEDIR_TODOS_ARCHIVOS);
+            } catch (ActivityNotFoundException e) {
+                try {
+                    startActivityForResult(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+                            PEDIR_TODOS_ARCHIVOS);
+                } catch (ActivityNotFoundException e2) {
+                    volverDePermiso();
+                }
+            }
+        } else {
+            requestPermissions(new String[] {android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, PEDIR_ALMACENAMIENTO);
+        }
+    }
+
+    /** De vuelta de pedir el permiso: lo que tocaba con el o, si no se dio, el selector. */
+    private void volverDePermiso() {
+        Runnable si = trasDarPermiso;
+        Runnable no = trasNegarPermiso;
+        trasDarPermiso = null;
+        trasNegarPermiso = null;
+        if (si == null) {
+            return;
+        }
+        if (Partidas.accesoTotal(this)) {
+            si.run();
+        } else {
+            Toast.makeText(this, R.string.permiso_archivos_denegado, Toast.LENGTH_LONG).show();
+            no.run();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int peticion, String[] permisos, int[] resultados) {
+        super.onRequestPermissionsResult(peticion, permisos, resultados);
+        if (peticion == PEDIR_ALMACENAMIENTO) {
+            volverDePermiso();
+        }
+    }
+
+    // --- La ISO ---------------------------------------------------------------------------
+
+    private void elegirIsoConSelector() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        startActivityForResult(i, PEDIR_ISO);
+    }
+
+    /**
+     * Las .iso del almacenamiento interno y de la SD que son de una edicion que
+     * lleva el APK (BuscadorIsos), en su hilo.
+     */
+    private void buscarIsos() {
+        botonElegirIso.setEnabled(false);
+        botonElegirIso.setText(R.string.iso_buscando);
+        final Context app = getApplicationContext();
+        archivos.execute(() -> {
+            BuscadorIsos.Busqueda b = BuscadorIsos.buscarCompatibles(app);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                botonElegirIso.setEnabled(true);
+                botonElegirIso.setText(R.string.elegir_iso);
+                mostrarIsos(b);
+            });
+        });
+    }
+
+    /**
+     * Una fila por ISO: nombre, edicion, tamano y carpeta, y si le falta el
+     * final. Sin ninguna, que ediciones valen y cuantas se descartaron. El
+     * selector de Android sigue a mano.
+     */
+    private void mostrarIsos(BuscadorIsos.Busqueda b) {
+        MaterialAlertDialogBuilder d = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.iso_encontradas_titulo)
+                .setNeutralButton(R.string.iso_con_selector, (x, w) -> elegirIsoConSelector())
+                .setNegativeButton(android.R.string.cancel, null);
+        List<BuscadorIsos.Encontrada> isos = b.compatibles;
+        if (isos.isEmpty()) {
+            String texto = getString(R.string.iso_ninguna_encontrada, Ediciones.nombres());
+            if (b.descartadas > 0) {
+                texto += "\n\n" + getString(R.string.iso_descartadas, b.descartadas);
+            }
+            d.setMessage(texto);
+        } else {
+            CharSequence[] filas = new CharSequence[isos.size()];
+            for (int i = 0; i < filas.length; i++) {
+                BuscadorIsos.Encontrada e = isos.get(i);
+                String fila = e.iso.getName() + "\n" + e.edicion.nombre + " · "
+                        + Formatter.formatShortFileSize(this, e.iso.length()) + " · "
+                        + BuscadorIsos.carpetaVisible(e.iso);
+                if (e.info.faltan > 0) {
+                    fila += "\n" + getString(R.string.iso_incompleta_corta,
+                            Formatter.formatShortFileSize(this, e.info.faltan));
+                }
+                filas[i] = fila;
+            }
+            d.setItems(filas, (x, i) -> usarIso(isos.get(i)));
+        }
+        d.show();
+    }
+
+    /**
+     * La ISO elegida es su ruta: el juego la abre directamente (Ajustes.iso). Ya
+     * esta mirada (su edicion y si esta entera), asi que no se lee otra vez.
+     */
+    private void usarIso(BuscadorIsos.Encontrada e) {
+        ajustes.iso(e.iso.getAbsolutePath());
+        ajustes.nombreIso(e.iso.getName());
+        ajustes.isoMirada(e.info.xex, e.info.faltan);
+        refrescar();
+    }
+
+    // --- Las partidas ----------------------------------------------------------------------
+
+    /**
+     * Las partidas guardadas: el juego las deja dentro de la app, donde no
+     * llegan el explorador ni el PC. Se exportan a un .zip (Partidas): con
+     * acceso a todos los archivos, a NFSMW/partidas; si no, donde diga el
+     * selector de Android. Se importan siempre con el selector.
+     */
+    private View tarjetaPartidas() {
+        botonExportar = new MaterialButton(this);
+        botonExportar.setText(R.string.partidas_exportar);
+        estilarBotonSecundario(botonExportar);
+        botonExportar.setOnClickListener(v -> {
+            if (!Partidas.hay(this)) {
+                textoPartidas.setText(R.string.partidas_ninguna);
+                textoPartidas.setVisibility(View.VISIBLE);
+                return;
+            }
+            conAccesoTotal(getString(R.string.permiso_archivos_partidas, Partidas.RUTA_VISIBLE),
+                    this::exportarACarpeta, this::exportarConSelector);
+        });
+        botonImportar = new MaterialButton(this);
+        botonImportar.setText(R.string.partidas_importar);
+        estilarBotonSecundario(botonImportar);
+        botonImportar.setOnClickListener(v -> importarConSelector());
+        LinearLayout fila = new LinearLayout(this);
+        fila.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams izquierda =
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        izquierda.setMarginEnd(dp(8));
+        fila.addView(botonExportar, izquierda);
+        fila.addView(botonImportar, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        textoPartidas = resumen(0);
+        textoPartidas.setTextColor(Color.WHITE);
+        textoPartidas.setPadding(0, dp(8), 0, 0);
+        textoPartidas.setVisibility(View.GONE);
+        return tarjeta(
+            seccion(R.string.seccion_partidas),
+            resumen(R.string.partidas_resumen),
+            espacio(8),
+            fila,
+            textoPartidas
+        );
+    }
+
+    private void exportarACarpeta() {
+        File destino = new File(Partidas.carpetaVisible(), Partidas.nombreSugerido());
+        copiarPartidas(true, app -> Partidas.exportar(app, destino),
+                Partidas.RUTA_VISIBLE + "/" + destino.getName());
+    }
+
+    private void exportarConSelector() {
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("application/zip");
+        i.putExtra(Intent.EXTRA_TITLE, Partidas.nombreSugerido());
+        startActivityForResult(i, PEDIR_EXPORTAR);
+    }
+
+    private void importarConSelector() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        // Cada explorador le pone al .zip su tipo: la marca de dentro dice si vale.
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"application/zip",
+                "application/x-zip-compressed", "application/octet-stream"});
+        startActivityForResult(i, PEDIR_IMPORTAR);
+    }
+
+    /** Antes de importar: las partidas de ahora se sustituyen. */
+    private void confirmarImportar(TrabajoPartidas importar) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.partidas_importar_titulo)
+                .setMessage(getString(R.string.partidas_importar_aviso, Partidas.rutaCopiaAntesDeImportar(this)))
+                .setPositiveButton(R.string.partidas_importar, (d, w) -> copiarPartidas(false, importar, null))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * Exporta o importa en su hilo y lo cuenta debajo de los botones. donde: el
+     * .zip exportado, como lo ve el jugador (null = lo eligio el con el selector).
+     */
+    private void copiarPartidas(boolean exportar, TrabajoPartidas trabajo, String donde) {
+        botonExportar.setEnabled(false);
+        botonImportar.setEnabled(false);
+        textoPartidas.setText(exportar ? R.string.partidas_exportando : R.string.partidas_importando);
+        textoPartidas.setVisibility(View.VISIBLE);
+        final Context app = getApplicationContext();
+        archivos.execute(() -> {
+            String texto;
+            try {
+                Partidas.Resultado r = trabajo.hacer(app);
+                String tamano = Formatter.formatShortFileSize(app, r.bytes);
+                texto = !exportar ? getString(R.string.partidas_importadas, r.archivos, tamano)
+                        : donde != null ? getString(R.string.partidas_exportadas_en, r.archivos, tamano, donde)
+                        : getString(R.string.partidas_exportadas, r.archivos, tamano);
+            } catch (Partidas.NoValido e) {
+                texto = getString(R.string.partidas_no_valido);
+            } catch (IOException | RuntimeException e) {
+                texto = getString(R.string.partidas_error, String.valueOf(e.getMessage()));
+            }
+            final String fin = texto;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                botonExportar.setEnabled(true);
+                botonImportar.setEnabled(true);
+                textoPartidas.setText(fin);
+            });
+        });
     }
 
     private View tarjetaPantalla() {
@@ -2091,10 +2371,23 @@ public class SetupActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int peticion, int resultado, Intent datos) {
         super.onActivityResult(peticion, resultado, datos);
+        // Los ajustes de Android no devuelven nada: lo que cuenta es si ahora hay acceso.
+        if (peticion == PEDIR_TODOS_ARCHIVOS) {
+            volverDePermiso();
+            return;
+        }
         if (resultado != RESULT_OK || datos == null || datos.getData() == null) {
             return;
         }
         Uri uri = datos.getData();
+        if (peticion == PEDIR_EXPORTAR) {
+            copiarPartidas(true, app -> Partidas.exportar(app, uri), null);
+            return;
+        }
+        if (peticion == PEDIR_IMPORTAR) {
+            confirmarImportar(app -> Partidas.importar(app, uri));
+            return;
+        }
         if (peticion == PEDIR_ISO) {
             try {
                 getContentResolver().takePersistableUriPermission(uri,
@@ -2130,7 +2423,7 @@ public class SetupActivity extends AppCompatActivity {
     private Ediciones.Edicion edicionAlJugar() {
         String iso = ajustes.iso();
         if (Ediciones.varias() && iso != null && ajustes.xexIso() == null) {
-            IsoXex.Info info = IsoXex.mirar(getApplicationContext(), Uri.parse(iso));
+            IsoXex.Info info = IsoXex.mirar(getApplicationContext(), Ajustes.uriIso(iso));
             ajustes.isoMirada(info != null ? info.xex : "", info != null ? info.faltan : 0);
         }
         return ajustes.edicion();
@@ -2147,7 +2440,7 @@ public class SetupActivity extends AppCompatActivity {
         }
         final Context app = getApplicationContext();
         new Thread(() -> {
-            IsoXex.Info info = IsoXex.mirar(app, Uri.parse(iso));
+            IsoXex.Info info = IsoXex.mirar(app, Ajustes.uriIso(iso));
             runOnUiThread(() -> {
                 if (iso.equals(ajustes.iso())) {
                     // Vacio = no se pudo leer; asi no se reintenta en cada arranque.

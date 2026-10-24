@@ -10,6 +10,41 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Añadido
 
+- **Exportar e importar las partidas** (sección Juego del lanzador): el motor nativo guarda en el
+  almacenamiento interno de la app (`files/nativo/usuario`), donde no llegan ni el explorador ni
+  el PC. «Exportar» mete en un `.zip`, donde diga el selector de Android, el perfil, las partidas,
+  los logros y las copias de `saves/`. Deja fuera `nfsmw.toml`, los `.nfsp` y las cachés.
+  «Importar» pregunta antes y sustituye las partidas actuales por las de un `.zip` exportado por la
+  app (lleva dentro `nfsmw_partidas.txt`). Antes deja las de ahora en
+  `Android/data/io.github.nfsmwrecomp/files/partidas_antes_de_importar.zip`. Con el motor de Xenos
+  usa su carpeta (`Android/data/.../files/datos`). Textos en los 10 idiomas. Sin probar en el móvil.
+- **Acceso a todos los archivos, para elegir la ISO** (y las partidas): en algunos móviles el
+  selector de Android no enseña el almacenamiento interno. «Elegir ISO» explica el permiso y lo
+  pide: el de todos los archivos (`MANAGE_EXTERNAL_STORAGE`) en Android 11+, y los de
+  almacenamiento de antes en 8-10. Con él, la app busca las `.iso` de más de 100 MB en el
+  almacenamiento interno y en las SD (`BuscadorIsos`: hasta 6 carpetas de profundidad, sin
+  `Android/`, con tope de 8 s). Solo enseña las compatibles: lee el SHA-256 del `default.xex` de
+  cada una (`IsoXex`) y descarta las de otros juegos y de ediciones que el APK no lleva. En la
+  lista salen con su edición, tamaño y carpeta, y marcadas si están incompletas. Si no hay
+  ninguna, dice qué ediciones valen y cuántas `.iso` descartó. La elegida se
+  guarda como ruta y el juego la abre directamente: el SDK ya montaba un fichero normal como
+  imagen de disco. Sin el permiso, o desde la lista, sigue a mano el selector de Android. Con el
+  permiso, las partidas se exportan a `NFSMW/partidas` del almacenamiento interno, y la copia de
+  antes de importar también va ahí. Importar abre siempre el selector de Android. Sin probar en el móvil.
+- **Preajuste «Mis ajustes»** (0.5.5, motor nativo): al aplicar «Ahorro de batería» o «Valores de
+  fábrica», antes se guardan los ajustes gráficos del usuario, y el botón nuevo vuelve a ellos.
+  Si el usuario no ha tocado nada desde el último preajuste, lo guardado no se pisa (aplicar
+  «Ahorro» y luego «Fábrica» no pierde los suyos). Solo aparece cuando hay algo guardado; textos
+  en los 10 idiomas.
+- **«Pantalla» es una sección propia del menú lateral** (0.5.5), entre Juego y Gráficos, con su
+  icono: resolución, estirar, panorámico y contador de fps. Gráficos se queda con los ajustes
+  gráficos.
+- Herramientas para depurar Vulkan en el móvil (0.5.5): `apk_ediciones.py --capas-vulkan <carpeta>`
+  (o `-Pnfsmw.capas_vulkan`) mete la capa de validación de Khronos en el APK, que se enciende con
+  `--vulkan_validation_enabled=true --vulkan_log_debug_messages=true` (y en el móvil
+  `setprop debug.vvl.validate_sync true` para la de sincronización). Los APK con `--registro`,
+  `--depurable` o `--capas-vulkan` salen como `nfsmw-all-<versión>-depuracion-release.apk` y no
+  pisan el de publicar.
 - **OpenGL ES: escalado FSR 1.0 y CAS** (0.5.4): el presentador de GLES hace los mismos efectos que
   el de Vulkan (bilineal, AMD CAS de nitidez o reescalado y FSR 1.0 con EASU y RCAS, con y sin
   tramado), encadenados en texturas intermedias `GL_RGB10_A2`. Antes pintaba siempre en bilineal
@@ -495,6 +530,16 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Cambiado
 
+- **Android 8.0 como mínimo** (0.5.5, `minSdk 26`, antes 29): para llegar a los móviles con GLES 3.2
+  que se quedaron en Android 8 o 9 (Galaxy S7/S8/Note 8, Snapdragon 820/835, Pixel 1), que es
+  para lo que está el backend de OpenGL ES. Los motivos de cierre (Android 11) y el recorte de la
+  cámara del editor táctil (Android 9) comprueban la versión; ninguna biblioteca nativa usa nada
+  más nuevo que Android 8.0. Sin probar en un móvil con Android 8 o 9.
+- **Las sombras se dibujan siempre en cada fotograma** (0.5.5): se quita la opción «cada 2
+  fotogramas», que dejaba el mapa un fotograma por detrás del coche y hacía temblar las sombras.
+  Vale también para quien la tuviera guardada, para el preajuste «Ahorro de batería» y para el
+  perfil automático de las GPU débiles.
+- «API gráfica» es la primera opción de Gráficos (0.5.5), antes de los preajustes.
 - El APK del motor nativo ya no exige Vulkan en el manifiesto (0.5.3): se puede instalar en un
   móvil sin Vulkan (el de Xenos lo sigue exigiendo).
 - Motor nativo (0.5.3): lo que los dibujos y las copias de Vulkan hacen sin tocar la API
@@ -648,6 +693,18 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Arreglado
 
+- **Vulkan en Mali: retrovisor negro, franja negra en el horizonte de la pista del bosque y vídeo
+  del menú duplicado** (0.5.5). No eran del driver de ARM, sino fallos de sincronización nuestros
+  que el de Adreno perdona: la capa de validación, en el Samsung A22 (Mali-G57), vio copias,
+  borrados, blits y lecturas de imágenes seguidos sin barrera entre ellos (por ejemplo, el destino
+  de render se borraba antes de que su resolve lo hubiera copiado, y el cubo del retrovisor
+  recibía sus caras antes de su borrado inicial), también entre búferes enviados uno tras otro.
+  Ahora hay una barrera entre dos transferencias seguidas (`BarreraTransferencias`,
+  `nfsmw_nativo_barreras_transferencia`, encendida; `false` para comparar). Con eso, cero avisos
+  de sincronización de la capa de validación y los tres fallos resueltos en el A22.
+- El presentador de Vulkan reutilizaba su semáforo de presentación antes de que la presentación
+  anterior lo soltara (0.5.5, `VUID-vkQueueSubmit-pSignalSemaphores-00067`): ahora hay uno por
+  imagen de la cadena de presentación.
 - El gamertag vacío se veía montado sobre su etiqueta (0.5.1): sin foco, la etiqueta
   "Gamertag" y el ejemplo "User" se pintaban en el mismo sitio. Ahora la etiqueta va siempre
   arriba y el ejemplo, en gris, dentro. Lo mismo en el campo del servidor.

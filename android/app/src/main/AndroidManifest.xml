@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- La emulacion de la GPU Xenos va sobre Vulkan 1.1 como minimo. El motor
          nativo no lo exige: sin Vulkan juega con OpenGL ES (vulkanRequerido sale
@@ -32,6 +33,22 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Exportar e importar las partidas (Partidas.java) en NFSMW/partidas del
+         almacenamiento interno, sin el selector de Android, que en algunos
+         moviles no ensena ese almacenamiento. Se pide al pulsar Exportar o
+         Importar; sin el, se usa el selector. Android 11+: acceso a todos los
+         archivos; Android 8-10: los permisos de almacenamiento de antes. La app
+         no va a Google Play, que limita MANAGE_EXTERNAL_STORAGE. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+
     <!-- Es un juego: appCategory es lo que leen Android 12+ (modo de juego y
          panel de juegos) y los lanzadores; isGame, el indicador de antes, lo
          siguen mirando los lanzadores de juegos de algunos fabricantes. -->
@@ -43,6 +60,7 @@
         android:isGame="true"
         android:label="@string/app_name"
         android:largeHeap="true"
+        android:requestLegacyExternalStorage="true"
         android:theme="@android:style/Theme.Material">
 
         <!-- Modo de juego de Android 12+: que el sistema no baje la resolucion
