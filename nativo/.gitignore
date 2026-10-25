@@ -24,10 +24,6 @@ app_*/
 # --- Build output -------------------------------------------------------------
 out/
 build/
-android/.gradle/
-android/local.properties
-android/app/build/
-android/app/.cxx/
 *.nro
 *.nacp
 *.elf
@@ -43,6 +39,3 @@ __pycache__/
 *.pyc
 .vs/
 .vscode/
-
-# The Android app's own assets (settings), not game data.
-!android/app/src/main/assets/

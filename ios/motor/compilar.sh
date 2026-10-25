@@ -33,7 +33,7 @@ done
 
 # Without the game, Android, Mesa, the other editions and the build folders.
 excluir=(--exclude=.git --exclude=/nativo/assets/ --exclude=/nativo/out/ --exclude=/nativo/sdk/out/
-         --exclude=/nativo/app/out/ --exclude=/nativo/android/ --exclude=/nativo/mesa/ --exclude='/nativo/app_*/'
+         --exclude=/nativo/app/out/ --exclude=/nativo/mesa/ --exclude='/nativo/app_*/'
          --exclude=/nativo/pgo/ --exclude=/nativo/extras/ --exclude=build/)
 
 mkdir -p "$copia"
@@ -83,7 +83,7 @@ python3 "$aqui/textos.py" "$repo/android/app/src/main/res" "$aqui/textos" "$app/
 # El icono, el de Android en los tamanos de iOS (los nombra CFBundleIconFiles en Info.plist).
 python3 "$aqui/iconos.py" "$repo/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" "$app"
 # Los ajustes del motor que lleva el APK (assets/nativo/nfsmw.toml): el lanzador los copia a Documents.
-cp "$repo/nativo/android/app/src/main/assets/nfsmw.toml" "$app/nfsmw.toml"
+cp "$repo/nativo/app/nfsmw_movil.toml" "$app/nfsmw.toml"
 for f in edicion.json nfsmw_shaders.nfsp; do
     if [ -f "$principal/nativo/out/$f" ]; then
         cp "$principal/nativo/out/$f" "$app/"

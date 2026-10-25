@@ -78,7 +78,7 @@ require(otrasEdiciones.none { it["id"] == (edicion["id"] ?: "pal_es") }) {
 // TU copia del juego, viajan en el APK. MotorNativo.java los instala al jugar.
 val assetsNativo = layout.buildDirectory.dir("generated/nfsmw-nativo-assets")
 val copiarAssetsNativo = tasks.register<Copy>("copiarAssetsNativo") {
-    from(File(nativo, "android/app/src/main/assets/nfsmw.toml"))
+    from(File(nativo, "app/nfsmw_movil.toml")) { rename { "nfsmw.toml" } }
     from(File(outNativo, "nfsmw_shaders.nfsp"))
     // La del backend de OpenGL ES (nfsmw_nativo_api = gles), si se ha generado
     // (preparar_nativo.py o nativo/tools/biblioteca_shaders_gles.mjs).

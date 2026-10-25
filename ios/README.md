@@ -116,7 +116,7 @@ Dentro de la app van, del checkout principal:
 - `edicion.json`: la edición del código generado (`nativo/out`);
 - `nfsmw_shaders.nfsp`: su biblioteca de shaders;
 - `nfsmw.toml`: los ajustes del motor que lleva el APK de Android
-  (`nativo/android/app/src/main/assets/nfsmw.toml`). Al pulsar Jugar, el lanzador lo copia a
+  (`nativo/app/nfsmw_movil.toml`). Al pulsar Jugar, el lanzador lo copia a
   `Documents`, como `MotorNativo.instalarAjustes` en Android: si falta, o si la app trae otro y el de
   `Documents` no se ha cambiado.
 

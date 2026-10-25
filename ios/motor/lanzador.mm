@@ -599,7 +599,7 @@ double ProporcionPantalla() {
 }
 
 // nfsmw.toml: los ajustes del motor que el lanzador no ensena, los mismos que lleva el APK de Android
-// (nativo/android/app/src/main/assets/nfsmw.toml, que compilar.sh mete en la app). Sin el, el motor
+// (nativo/app/nfsmw_movil.toml, que compilar.sh mete en la app). Sin el, el motor
 // se queda con los valores del codigo, que para varios son los de PC: la escena en tres franjas con
 // MSAA, la cara del retrovisor del cubemap no en cada fotograma, dos mapas de sombras... Como
 // MotorNativo.instalarAjustes: se pone el de la app y se renueva cuando la app trae otro, salvo que el

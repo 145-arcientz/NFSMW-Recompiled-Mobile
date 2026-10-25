@@ -516,8 +516,8 @@ renderizador a lo que falte en la GPU, solo cuando falta:
 | tiene Vulkan 1.1 | pasa el SPIR-V 1.5 de la biblioteca a 1.3 al crear cada shader; el SDK activa `VK_EXT_descriptor_indexing` |
 | es un Mali | no usa las consultas de oclusión (colgaban su driver): sin destello del sol |
 
-La biblioteca de shaders se genera con el `shader_common.h` de su app de Android
-(`android/app/src/main/assets/shaders`), "sin punteros", el mismo que copia
+La biblioteca de shaders se genera con el `shader_common.h` que traía su app de Android
+(ahora en `nativo/tools/instalador_shaders`), "sin punteros", el mismo que copia
 `preparar_nativo.py` al instalador. Para la PAL sale con el SHA-256 que esperan ellos
 (`b84602ca…`).
 
