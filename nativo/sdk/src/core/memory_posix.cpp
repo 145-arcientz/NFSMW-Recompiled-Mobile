@@ -21,7 +21,10 @@
 
 #if REX_PLATFORM_MAC
 #include <mach/mach.h>
+#if !REX_PLATFORM_IOS
+// PARCHE LOCAL - iOS: an #error in the iOS SDK; QueryProtect uses vm_region_64 there.
 #include <mach/mach_vm.h>
+#endif
 #include <mach/vm_region.h>
 #endif  // REX_PLATFORM_MAC
 
@@ -389,9 +392,20 @@ bool QueryProtect(void* base_address, size_t& length, PageAccess& access_out) {
   mach_msg_type_number_t info_count = VM_REGION_BASIC_INFO_COUNT_64;
   mach_port_t object_name;
 
+#if REX_PLATFORM_IOS
+  // The same call with vm_address_t/vm_size_t, which are 64-bit on arm64.
+  vm_address_t direccion = static_cast<vm_address_t>(address);
+  vm_size_t tamano = 0;
+  kern_return_t kr =
+      vm_region_64(mach_task_self(), &direccion, &tamano, VM_REGION_BASIC_INFO_64,
+                   reinterpret_cast<vm_region_info_t>(&info), &info_count, &object_name);
+  address = direccion;
+  region_size = tamano;
+#else
   kern_return_t kr =
       mach_vm_region(mach_task_self(), &address, &region_size, VM_REGION_BASIC_INFO_64,
                      reinterpret_cast<vm_region_info_t>(&info), &info_count, &object_name);
+#endif
   if (kr != KERN_SUCCESS) {
     return false;
   }
@@ -462,6 +476,32 @@ FileMappingHandle CreateFileMappingHandle(const std::filesystem::path& path, siz
     return kFileMappingHandleInvalid;
   }
   return static_cast<FileMappingHandle>(ashmem_fd);
+#elif REX_PLATFORM_IOS
+  // PARCHE LOCAL - iOS: shm_open is denied to apps (EPERM; measured on an iPhone 13 Pro,
+  // ios/README.md). A file in the app's own tmp works with the same MAP_SHARED views; it is
+  // unlinked at once, so the descriptor is the only reference and nothing is left behind.
+  (void)path;
+  (void)access;
+  std::string plantilla;
+  if (const char* tmp = std::getenv("TMPDIR"); tmp && *tmp) {
+    plantilla = tmp;
+  } else {
+    plantilla = "/tmp";
+  }
+  if (plantilla.back() != '/') {
+    plantilla += '/';
+  }
+  plantilla += "rex_memoria_XXXXXX";
+  int fd = mkstemp(plantilla.data());
+  if (fd < 0) {
+    return kFileMappingHandleInvalid;
+  }
+  unlink(plantilla.c_str());
+  if (rex_ftruncate64(fd, static_cast<off_t>(length)) != 0) {
+    close(fd);
+    return kFileMappingHandleInvalid;
+  }
+  return static_cast<FileMappingHandle>(fd);
 #else
   int oflag;
   switch (access) {
@@ -497,7 +537,7 @@ FileMappingHandle CreateFileMappingHandle(const std::filesystem::path& path, siz
 
 void CloseFileMappingHandle(FileMappingHandle handle, const std::filesystem::path& path) {
   close(static_cast<int>(handle));
-#if !REX_PLATFORM_ANDROID
+#if !REX_PLATFORM_ANDROID && !REX_PLATFORM_IOS
   auto full_path = MakeShmName(path);
   shm_unlink(full_path.c_str());
 #endif

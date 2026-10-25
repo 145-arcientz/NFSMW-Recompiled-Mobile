@@ -37,7 +37,9 @@ class DiscImageEntry : public Entry {
 
   X_STATUS Open(uint32_t desired_access, File** out_file) override;
 
-  bool can_map() const override { return true; }
+  // PARCHE LOCAL - iOS: the image is not mapped there (disc_image_device.cpp); the xex loader reads
+  // the file into a buffer instead.
+  bool can_map() const override { return !REX_PLATFORM_IOS; }
   std::unique_ptr<memory::MappedMemory> OpenMapped(memory::MappedMemory::Mode mode, size_t offset,
                                                    size_t length) override;
 

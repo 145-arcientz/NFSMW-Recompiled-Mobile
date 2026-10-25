@@ -31,9 +31,10 @@
 
 #include "nfsmw_nativo_sistema.h"
 
-#if REX_PLATFORM_ANDROID
-// PARCHE LOCAL (NFSMW Recompiled): la define la app de Android (nativo_android.cpp).
-// Espera mientras la app esta en segundo plano.
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
+// PARCHE LOCAL (NFSMW Recompiled): la define la app de Android (nativo_android.cpp), que
+// iOS tambien compila. Espera mientras la app esta en segundo plano o con el editor del
+// mando tactil abierto.
 extern "C" void NfsmwAndroidPausaEnSwap() __attribute__((weak));
 #endif
 
@@ -122,12 +123,20 @@ std::string Resumen();
 #include "../../sdk/src/core/threading_switch.h"
 #endif
 
+#if REX_PLATFORM_IOS
+// iOS has only the native renderer: the Xenos emulation plugin is not built there.
+REXCVAR_DEFINE_STRING(nfsmw_renderizador, "nativo", "NFSMW",
+                      "nativo = renderizador nativo (en iOS no hay emulacion de la GPU)")
+    .allowed({"nativo"})
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+#else
 REXCVAR_DEFINE_STRING(nfsmw_renderizador, "xenos", "NFSMW",
                       "xenos = emulacion de la GPU; nativo = renderizador nativo en desarrollo "
                       "(pieza C1: el juego corre sin emulacion y la pantalla muestra un color de "
                       "prueba)")
     .allowed({"xenos", "nativo"})
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+#endif
 
 REXCVAR_DEFINE_STRING(nfsmw_nativo_api, "vulkan", "NFSMW",
                       "API del renderizador nativo: vulkan, o gles (OpenGL ES 3.1/3.2, solo en Android, en obras: "
@@ -824,6 +833,14 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
       if (!juego.empty() && std::filesystem::is_regular_file(std::filesystem::path(juego) / nombre_biblioteca, ec)) {
         biblioteca = std::filesystem::path(juego) / nombre_biblioteca;
       }
+#if REX_PLATFORM_IOS
+      // iOS: the one inside the app (ios/motor/compilar.sh puts it there), as the APK carries it on
+      // Android; one copied to Documents or next to the extracted game wins over it.
+      else if (const auto app = rex::filesystem::GetExecutablePath().parent_path() / nombre_biblioteca;
+               std::filesystem::is_regular_file(app, ec)) {
+        biblioteca = app;
+      }
+#endif
     }
     if (shaders_.Cargar(biblioteca)) {
       ActivarGanchos(&shaders_);  // step C5b: shader objects and Draw* records
@@ -1973,7 +1990,7 @@ class SistemaGraficoNativo final : public rex::system::IGraphicsSystem {
           swap_alto_.store(datos.Leer(), std::memory_order_relaxed);
         }
         TrazaSwap();
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
         // PARCHE LOCAL (NFSMW Recompiled): en segundo plano el anillo se para aqui, en el
         // cambio de fotograma, y el juego se queda esperando sitio en el anillo.
         if (NfsmwAndroidPausaEnSwap) {

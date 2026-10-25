@@ -139,6 +139,13 @@ std::filesystem::path GetExecutableFolder() {
   if (auto carpeta = rex::platform::env::get("REX_APP_FOLDER"); carpeta && !carpeta->empty()) {
     return std::filesystem::path(*carpeta);
   }
+#elif REX_PLATFORM_IOS
+  // PARCHE LOCAL - iOS: the executable is inside the app bundle, read-only and replaced on every
+  // install. As on Android, the "executable folder" is the app's own writable one: Documents,
+  // which the Files app shows (settings, shader library, caches, logs, the game next to it).
+  if (auto home = rex::platform::env::get("HOME"); home && !home->empty()) {
+    return std::filesystem::path(*home) / "Documents";
+  }
 #endif
   return GetExecutablePath().parent_path();
 }
@@ -151,6 +158,13 @@ std::filesystem::path GetUserFolder() {
   // to the NRO, as in the portable PC version.
   auto exe_dir = GetExecutableFolder();
   return exe_dir.empty() ? std::filesystem::path("/switch") : exe_dir;
+#elif REX_PLATFORM_IOS
+  // PARCHE LOCAL - iOS: HOME is the app container, where only Documents, Library and tmp are
+  // writable; ~/.local/share could not be created.
+  if (auto home = rex::platform::env::get("HOME"); home && !home->empty()) {
+    return std::filesystem::path(*home) / "Library" / "Application Support";
+  }
+  return {};
 #else
   // get preferred data home
   if (auto xdg = rex::platform::env::get("XDG_DATA_HOME")) {

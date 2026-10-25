@@ -48,9 +48,11 @@ set(REXSYSTEM_SOURCES
     xex_module.cpp
 )
 
-if(REXGLUE_PLATFORM_SWITCH)
+if(REXGLUE_PLATFORM_SWITCH OR IOS)
     # A NRO is a single static executable: no shared libraries, no dlopen.
     # rexglue_switch_configure_target links it whole into the title.
+    # PARCHE LOCAL - iOS: the same, one executable in the app bundle
+    # (rexglue_configure_target force-loads it).
     add_library(rexruntime STATIC ${REXSYSTEM_SOURCES})
 else()
     add_library(rexruntime SHARED ${REXSYSTEM_SOURCES})

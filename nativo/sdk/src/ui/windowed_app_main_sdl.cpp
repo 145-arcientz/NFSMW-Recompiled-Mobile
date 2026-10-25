@@ -19,11 +19,22 @@
 #include <rex/cvar.h>
 #include <rex/logging.h>
 #include <rex/platform.h>
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
+// PARCHE LOCAL - iOS: SDL owns the real main there too (UIApplicationMain), and calls ours
+// as SDL_main once UIKit has started.
 #include <SDL3/SDL_main.h>
 #endif
 #include <rex/ui/windowed_app.h>
 #include <rex/ui/windowed_app_context_sdl.h>
+
+#if REX_PLATFORM_IOS
+// PARCHE LOCAL - iOS: start-up steps straight to the device log (idevicesyslog), before and
+// independently of the engine's logging.
+#include <os/log.h>
+#define REX_TRAZA_ARRANQUE(texto) os_log(OS_LOG_DEFAULT, "[arranque] %{public}s", texto)
+#else
+#define REX_TRAZA_ARRANQUE(texto) ((void)0)
+#endif
 
 #if REX_PLATFORM_WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -40,16 +51,20 @@
 namespace {
 
 int RunWindowedApp(int argc, char** argv) {
+  REX_TRAZA_ARRANQUE("main");
   auto remaining = rex::cvar::Init(argc, argv);
   rex::cvar::ApplyEnvironment();
   rex::InitLoggingEarly();
+  REX_TRAZA_ARRANQUE("cvars y log temprano");
 
   int result;
   {
     rex::ui::SDLWindowedAppContext app_context;
     if (!app_context.Initialize()) {
+      REX_TRAZA_ARRANQUE("SDLWindowedAppContext::Initialize fallo");
       return EXIT_FAILURE;
     }
+    REX_TRAZA_ARRANQUE("SDL inicializado");
 
 #if REX_PLATFORM_WIN32
     // Apartment-threaded COM for shell dialogs.
@@ -79,7 +94,10 @@ int RunWindowedApp(int argc, char** argv) {
     }
     app->SetParsedArguments(std::move(parsed));
 
-    result = app->OnInitialize() ? app_context.RunMainMessageLoop() : EXIT_FAILURE;
+    REX_TRAZA_ARRANQUE("app creada, OnInitialize");
+    const bool iniciada = app->OnInitialize();
+    REX_TRAZA_ARRANQUE(iniciada ? "OnInitialize bien, bucle de mensajes" : "OnInitialize fallo");
+    result = iniciada ? app_context.RunMainMessageLoop() : EXIT_FAILURE;
 
     app->InvokeOnDestroy();
   }
@@ -148,12 +166,33 @@ int WINAPI wWinMain(HINSTANCE hinstance, HINSTANCE hinstance_prev, LPWSTR comman
 extern "C" int NfsmwSondaSiSePide(int argc, char** argv) __attribute__((weak));
 #endif
 
+#if REX_PLATFORM_IOS
+// PARCHE LOCAL - iOS: the app's launcher (ios/motor/lanzador.mm) shows before the game, in the same
+// process, and returns the command line with what was chosen there (argv[0] included); empty to start
+// with the usual one.
+std::vector<std::string> NfsmwLanzadorIos(int argc, char** argv) __attribute__((weak));
+#endif
+
 int main(int argc, char* argv[]) {
 #if REX_PLATFORM_ANDROID
   if (NfsmwSondaSiSePide) {
     const int sonda = NfsmwSondaSiSePide(argc, argv);
     if (sonda >= 0) {
       return sonda;
+    }
+  }
+#endif
+#if REX_PLATFORM_IOS
+  if (NfsmwLanzadorIos) {
+    // Static: the cvars may keep pointers into argv.
+    static std::vector<std::string> argumentos = NfsmwLanzadorIos(argc, argv);
+    if (!argumentos.empty()) {
+      static std::vector<char*> punteros;
+      for (auto& a : argumentos) {
+        punteros.push_back(a.data());
+      }
+      punteros.push_back(nullptr);
+      return RunWindowedApp(static_cast<int>(argumentos.size()), punteros.data());
     }
   }
 #endif

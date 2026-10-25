@@ -32,10 +32,12 @@
 #include "nfsmw_nativo_sincronizacion.h"
 #include "nfsmw_gpu_compatibilidad.h"
 #include "nfsmw_reflejo_demanda.h"  // road reflection only when it is read
+#include "nfsmw_nativo_captura.h"   // GuardarPng (nfsmw_volcado)
 
 #include "nfsmw_ajustes_graficos.h"
 
 #include <rex/cvar.h>
+#include <rex/filesystem.h>
 #include <rex/graphics/xenos.h>
 #include <rex/logging.h>
 #include <rex/system/xmemory.h>
@@ -56,6 +58,8 @@ extern "C" void RexSwitchPerfTiron(uint64_t inicio, uint64_t fin);
 #endif
 #include <cmath>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -73,6 +77,11 @@ REXCVAR_DEFINE_BOOL(nfsmw_nativo_barreras_transferencia, true, "NFSMW",
                     "Barrera entre dos transferencias seguidas (copia, borrado, blit, lectura a bufer). Sin ella "
                     "Mali puede solaparlas (la capa de validacion lo vio en el A22). false = como antes, para "
                     "comparar");
+REXCVAR_DEFINE_BOOL(nfsmw_nativo_barrera_total, REX_PLATFORM_IOS != 0, "NFSMW",
+                    "Barrera de memoria completa antes de abrir cada pase, al cerrarlo y al empezar la salida. "
+                    "MoltenVK no traduce las dependencias de los render passes; sin ella, en el iPhone el pase "
+                    "del resplandor leia a medias lo que acababa de escribir otro y salian cuadrados de colores "
+                    "en el cielo. Por defecto solo en iOS");
 
 REXCVAR_DEFINE_INT32(nfsmw_nativo_resolver_sin_copia_alternar_s, 0, "NFSMW",
                      "Renderizador nativo (prueba, build 154): con N > 0 alterna copiar e intercambiar cada N "
@@ -85,11 +94,21 @@ REXCVAR_DEFINE_INT32(nfsmw_nativo_sombras_escala, 100, "NFSMW",
                      "PARCHE LOCAL (NFSMW Recompiled): hasta 250 (4000x4000), mas definicion en las sombras "
                      "de los coches")
     .range(50, 250);
-REXCVAR_DEFINE_BOOL(nfsmw_nativo_resolver_sin_copia, true, "NFSMW",
+REXCVAR_DEFINE_BOOL(nfsmw_nativo_resolver_sin_copia, REX_PLATFORM_IOS == 0, "NFSMW",
                     "Renderizador nativo (17/09, build 154; por defecto desde la 161, medido en consola: -2,36 ms "
                     "de los 7,41 de copias): al resolver un destino entero a una textura del mismo "
                     "tamano y formato, intercambia las imagenes en vez de copiar los pixeles. La imagen no cambia; si "
-                    "el juego vuelve a dibujar en ese destino sin borrarlo antes, se restaura la copia");
+                    "el juego vuelve a dibujar en ese destino sin borrarlo antes, se restaura la copia. Apagado en "
+                    "iOS: con MoltenVK, el pase de los coches del mapa de sombras no veia entera la copia que "
+                    "restaura el mundo y salian recuadros sin sombra alrededor del coche");
+REXCVAR_DEFINE_BOOL(nfsmw_volcado, false, "NFSMW",
+                    "Diagnostico: con un fichero 'volcar' en la carpeta de la app (Documents en iOS), el "
+                    "siguiente fotograma se guarda paso a paso en volcado/NNN: cada destino de color tal como "
+                    "lo dejan sus dibujos al resolverlo y la imagen presentada, en PNG, con indice.txt. El "
+                    "fichero se borra al empezar. Lento, solo para pruebas");
+REXCVAR_DEFINE_BOOL(nfsmw_volcado_sin_esperar, true, "NFSMW",
+                    "nfsmw_volcado: true = cada paso solo graba su copia a un bufer y se espera a la GPU una vez al "
+                    "final del fotograma (no cambia el ritmo de la GPU entre pases); false = esperar en cada paso");
 /*
  * Swap also when the command does not clear the render target.
  *
@@ -1391,8 +1410,23 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       // format, which the draws sample as k_24_8. With a depth source no color
       // is cleared (IsClearingColor, graphics/util/draw.h:534-538).
       const bool borrara = ((control >> 9) & 0x1) && borrar_profundidad_;
+      if (volcado_activo_) {  // nfsmw_volcado: the depth target as its draws left it, before the copy
+        if (Imagen* p = ObtenerProfundidad(reg.rb_depth_info & 0xFFF, (reg.rb_depth_info >> 16) & 0x1, pitch)) {
+          Volcar(*p, fmt::format("profundidad {:03X} pitch {} -> {:08X}{}{}", reg.rb_depth_info & 0xFFF, pitch,
+                                 reg.rb_copy_dest_base, copiar ? ", copia" : "", borrara ? ", borra" : ""));
+        }
+      }
       if (copiar) {
         CopiarProfundidad(reg, pitch, borrara);
+        if (volcado_activo_) {  // and the texture the scene samples, after it (a deferred copy shows the old one)
+          const auto it = resueltas_.find(reg.rb_copy_dest_base & 0x1FFFFFFF);
+          if (it != resueltas_.end()) {
+            Volcar(it->second.imagen, fmt::format("resuelta {:08X} tras la copia{}", reg.rb_copy_dest_base,
+                                                  pendientes_.count(reg.rb_copy_dest_base & 0x1FFFFFFF)
+                                                      ? " (APLAZADA: aun no copiada)"
+                                                      : ""));
+          }
+        }
       }
       if (borrara) {
         BorrarProfundidad(reg, pitch);
@@ -1478,6 +1512,14 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       }
     }
 
+    if (volcado_activo_) {  // nfsmw_volcado: what the draws left in this target, before it is copied or cleared
+      Volcar(*destino_render,
+             fmt::format("destino {:03X} pitch {} rect {},{}-{},{}, {} dibujos -> {:08X} {}{}", info_color & 0xFFF,
+                         pitch, x0, y0, x1, y1, dibujos_antes, base_resuelta,
+                         resuelta ? fmt::format("{}x{}", resuelta->imagen.ancho, resuelta->imagen.alto)
+                                  : std::string("sin textura"),
+                         borrar_color ? ", borra" : ""));
+    }
     if (!Grabar()) {
       return false;
     }
@@ -2102,6 +2144,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     // nfsmw_nativo_frontal_perezoso. Before submitting the work: either it is drawn from the image that
     // holds the content (no copy) or the deferred copy is recorded now, ahead of the output.
     Imagen* const origen_frontal = FrontalAlPresentar(base, ancho, alto);
+    VolcadoAlPresentar(base, origen_frontal);  // nfsmw_volcado
     const bool mosaico =
         presentador && REXCVAR_GET(nfsmw_nativo_diag_resueltas) && ComponerMosaico(base);
     // Without waiting for the GPU: the output goes after the work on the same queue.
@@ -5393,6 +5436,173 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
 
   // Read-back of a small resolved texture: the copied rectangle goes to a host-visible buffer in the
   // same submission; EscribirLecturas moves it into guest memory.
+  // nfsmw_volcado. Once per second Presentar looks for a 'volcar' file in the app folder. If it is there,
+  // it is deleted and the next frame is dumped: every color target when the game resolves it, and the
+  // image that goes to the screen, closing with indice.txt. Each image waits for the GPU: slow, one frame.
+  void VolcadoAlPresentar(uint32_t base, Imagen* origen_frontal) {
+    if (!REXCVAR_GET(nfsmw_volcado)) {
+      return;
+    }
+    if (volcado_activo_) {
+      Imagen* presentada = origen_frontal;
+      if (!presentada) {
+        auto it = resueltas_.find(base);
+        if (it != resueltas_.end()) {
+          presentada = &it->second.imagen;
+        }
+      }
+      if (presentada) {
+        Volcar(*presentada, fmt::format("presentada {:08X}{}", base, origen_frontal ? " (frontal perezoso)" : ""));
+      } else {
+        volcado_indice_ += fmt::format("--- | presentada {:08X} | sin imagen\n", base);
+      }
+      if (!volcado_pendientes_.empty()) {  // nfsmw_volcado_sin_esperar: the only wait of the frame
+        EsperarGpuDelTodo();
+        for (VolcadoPendiente& p : volcado_pendientes_) {
+          GuardarVolcado(p.lectura, p.nombre, p.ancho, p.alto, p.clase);
+        }
+        volcado_pendientes_.clear();
+      }
+      std::ofstream indice(volcado_carpeta_ / "indice.txt");
+      indice << volcado_indice_;
+      REXLOG_INFO("[volcado] {} pasos en {}", volcado_paso_, volcado_carpeta_.string());
+      volcado_activo_ = false;
+      return;
+    }
+    const auto ahora = std::chrono::steady_clock::now();
+    if (ahora - volcado_mirado_ < std::chrono::seconds(1)) {
+      return;
+    }
+    volcado_mirado_ = ahora;
+    const std::filesystem::path raiz = rex::filesystem::GetExecutableFolder();
+    std::error_code ec;
+    if (!std::filesystem::exists(raiz / "volcar", ec)) {
+      return;
+    }
+    std::filesystem::remove(raiz / "volcar", ec);
+    ++volcado_n_;
+    volcado_carpeta_ = raiz / "volcado" / fmt::format("{:03}", volcado_n_);
+    std::filesystem::remove_all(volcado_carpeta_, ec);
+    std::filesystem::create_directories(volcado_carpeta_, ec);
+    volcado_paso_ = 0;
+    volcado_indice_ = "paso | que | tamano | formato Vk | notas\n";
+    volcado_activo_ = true;
+    REXLOG_INFO("[volcado] el siguiente fotograma va a {}", volcado_carpeta_.string());
+  }
+
+  void Volcar(const Imagen& imagen, const std::string& que) {
+    const uint32_t paso = ++volcado_paso_;
+    std::string linea = fmt::format("{:03} | {} | {}x{} | {} |", paso, que, imagen.ancho, imagen.alto,
+                                    int(imagen.formato));
+    if (imagen.contenido_invalido) {
+      linea += fmt::format(" contenido_invalido (esta en {:08X})", imagen.resuelta_base);
+    }
+    if (imagen.intercambio_rb) {
+      linea += " intercambio_rb";
+    }
+    // 0 color; depth, as gray (GuardarVolcado): 1 D32S8, 2 D24S8.
+    const uint32_t clase = imagen.formato == kFormatoColor                ? 0
+                           : imagen.formato == VK_FORMAT_D32_SFLOAT_S8_UINT ? 1
+                           : imagen.formato == VK_FORMAT_D24_UNORM_S8_UINT  ? 2
+                                                                            : 3;
+    if (clase == 3 || imagen.imagen == VK_NULL_HANDLE || !imagen.preparada || !imagen.ancho || !imagen.alto) {
+      volcado_indice_ += linea + " no volcada\n";
+      return;
+    }
+    if (dibujos_) {
+      dibujos_->TerminarPase();  // a copy cannot go inside a pass
+    }
+    Lectura lectura;
+    uint32_t tipo = 0;
+    void* mapeado = nullptr;
+    const VkDeviceSize bytes = VkDeviceSize(imagen.ancho) * imagen.alto * 4;
+    if (!Grabar() ||
+        !rex::ui::vulkan::util::CreateDedicatedAllocationBuffer(
+            dispositivo_, bytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT, rex::ui::vulkan::util::MemoryPurpose::kReadback,
+            lectura.bufer, lectura.memoria, &tipo)) {
+      volcado_indice_ += linea + " sin bufer\n";
+      return;
+    }
+    if (dfn_.vkMapMemory(device_, lectura.memoria, 0, VK_WHOLE_SIZE, 0, &mapeado) != VK_SUCCESS) {
+      DestruirLectura(lectura);
+      volcado_indice_ += linea + " sin mapear\n";
+      return;
+    }
+    lectura.datos = static_cast<uint8_t*>(mapeado);
+    lectura.bytes = bytes;
+    lectura.coherente = (dispositivo_->memory_types().host_coherent >> tipo) & 0x1;
+    VkMemoryBarrier barrera{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    barrera.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                            VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    barrera.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    dfn_.vkCmdPipelineBarrier(comandos_trabajo_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              0, 1, &barrera, 0, nullptr, 0, nullptr);
+    VkBufferImageCopy copia{};
+    copia.imageSubresource = {clase == 0 ? VK_IMAGE_ASPECT_COLOR_BIT : VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
+    copia.imageExtent = {imagen.ancho, imagen.alto, 1};
+    dfn_.vkCmdCopyImageToBuffer(comandos_trabajo_, imagen.imagen, VK_IMAGE_LAYOUT_GENERAL, lectura.bufer, 1, &copia);
+    const std::string nombre = fmt::format("{:03}.png", paso);
+    volcado_indice_ += linea + " " + nombre + "\n";
+    if (REXCVAR_GET(nfsmw_volcado_sin_esperar)) {
+      volcado_pendientes_.push_back({lectura, nombre, imagen.ancho, imagen.alto, clase});  // written at the end
+      return;
+    }
+    EsperarGpuDelTodo();  // submits, waits and starts recording again
+    GuardarVolcado(lectura, nombre, imagen.ancho, imagen.alto, clase);
+  }
+
+  // With the GPU done with the copy: the buffer to a PNG, and freed. Depth (clase 1 and 2) goes as gray,
+  // stretched between the smallest and largest value below 1.0; what is still at 1.0 (cleared, nothing
+  // drawn) is pure white.
+  void GuardarVolcado(Lectura& lectura, const std::string& nombre, uint32_t ancho, uint32_t alto, uint32_t clase) {
+    if (!lectura.coherente) {
+      VkMappedMemoryRange rango{VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE};
+      rango.memory = lectura.memoria;
+      rango.size = VK_WHOLE_SIZE;
+      dfn_.vkInvalidateMappedMemoryRanges(device_, 1, &rango);
+    }
+    const uint8_t* rgba = lectura.datos;
+    std::vector<uint8_t> gris;
+    if (clase != 0) {
+      const size_t n = size_t(ancho) * alto;
+      std::vector<float> z(n);
+      for (size_t i = 0; i < n; ++i) {
+        uint32_t v;
+        std::memcpy(&v, lectura.datos + i * 4, 4);
+        if (clase == 1) {
+          std::memcpy(&z[i], &v, 4);
+        } else {
+          z[i] = float(v & 0xFFFFFF) / 16777215.0f;
+        }
+      }
+      float minimo = 1.0f, maximo = 0.0f;
+      size_t borrados = 0;
+      for (float v : z) {
+        if (v >= 1.0f) {
+          ++borrados;
+        } else {
+          minimo = std::min(minimo, v);
+          maximo = std::max(maximo, v);
+        }
+      }
+      const float rango = maximo > minimo ? maximo - minimo : 1.0f;
+      gris.resize(n * 4);
+      for (size_t i = 0; i < n; ++i) {
+        const uint8_t g =
+            z[i] >= 1.0f ? 255 : uint8_t(std::clamp((z[i] - minimo) / rango, 0.0f, 1.0f) * 220.0f + 0.5f);
+        gris[i * 4] = gris[i * 4 + 1] = gris[i * 4 + 2] = g;
+        gris[i * 4 + 3] = 255;
+      }
+      volcado_indice_ += fmt::format("    {}: profundidad {:.6f}..{:.6f}, {} de {} texels a 1.0\n", nombre, minimo,
+                                     maximo, borrados, n);
+      rgba = gris.data();
+    }
+    if (!nfsmw::captura::GuardarPng(volcado_carpeta_ / nombre, rgba, ancho, alto)) {
+      volcado_indice_ += "!!! no se pudo escribir " + nombre + "\n";
+    }
+    DestruirLectura(lectura);
+  }
+
   void LeerResuelta(const RegistrosCopia& reg, const Resuelta& resuelta, int32_t x0, int32_t y0,
                     uint32_t dx, uint32_t dy, uint32_t ancho, uint32_t alto) {
     const int32_t maximo = REXCVAR_GET(nfsmw_nativo_leer_resueltas_texels);
@@ -5621,6 +5831,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     pase.renderPass = render_pass_salida_;
     pase.framebuffer = framebuffer;
     pase.renderArea.extent = {ancho, alto};
+    BarreraTotal(dfn_, comandos_salida_[s]);  // nfsmw_nativo_barrera_total (iOS)
     if (desde_destino) {
       // That image was just written as a render target (or copy destination) in the frame's work, which goes in
       // another submission: make the output read it fully written.
@@ -5819,6 +6030,20 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
   std::chrono::steady_clock::time_point informe_lecturas_{};
   std::vector<LecturaPendiente> lecturas_pendientes_;  // recorded in the current submission
   uint64_t lecturas_hechas_ = 0;
+  // nfsmw_volcado (VolcadoAlPresentar).
+  bool volcado_activo_ = false;
+  uint32_t volcado_n_ = 0;
+  uint32_t volcado_paso_ = 0;
+  std::string volcado_indice_;
+  std::filesystem::path volcado_carpeta_;
+  std::chrono::steady_clock::time_point volcado_mirado_{};
+  struct VolcadoPendiente {
+    Lectura lectura;
+    std::string nombre;
+    uint32_t ancho, alto;
+    uint32_t clase;  // Volcar: 0 color, 1 D32S8, 2 D24S8
+  };
+  std::vector<VolcadoPendiente> volcado_pendientes_;  // nfsmw_volcado_sin_esperar
   // Rear-view mirror diagnostic (AnotarCopia).
   uint64_t dibujados_ultima_copia_ = 0;
   std::unordered_map<uint32_t, CopiaDestino> copias_por_destino_;

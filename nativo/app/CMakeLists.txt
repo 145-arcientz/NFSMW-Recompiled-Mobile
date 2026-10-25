@@ -188,7 +188,13 @@ endif()
 #
 # Since src/nfsmw_app.h sets gpu_plugin=xenos by default, the --gpu_plugin
 # argument is no longer needed; it can still be passed to change it.
-rexglue_setup_target(nfsmw GPU_PLUGINS xenos)
+#
+# iOS has only the native renderer (nfsmw_renderizador = nativo): no plugin.
+if(IOS)
+    rexglue_setup_target(nfsmw)
+else()
+    rexglue_setup_target(nfsmw GPU_PLUGINS xenos)
+endif()
 
 # The SDK's FFmpeg (WMV3 decoder) for the cutscenes: nfsmw_video_wmv3.cpp.
 target_link_libraries(nfsmw PRIVATE libavcodec)

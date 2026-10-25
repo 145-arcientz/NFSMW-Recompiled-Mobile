@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>es</string>
+    <key>CFBundleExecutable</key>
+    <string>nfsmw</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.github.victorgbd.nfsmw</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>NFSMW</string>
+    <key>CFBundleDisplayName</key>
+    <string>NFSMW</string>
+    <!-- The icon: the Android one, scaled by iconos.py (compilar.sh) into loose PNGs in the bundle.
+         Without a Mac there is no actool to build an asset catalog. -->
+    <key>CFBundleIcons</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon29x29</string>
+                <string>AppIcon40x40</string>
+                <string>AppIcon60x60</string>
+            </array>
+        </dict>
+    </dict>
+    <key>CFBundleIcons~ipad</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon29x29</string>
+                <string>AppIcon40x40</string>
+                <string>AppIcon60x60</string>
+                <string>AppIcon76x76</string>
+                <string>AppIcon83.5x83.5</string>
+            </array>
+        </dict>
+    </dict>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>iPhoneOS</string>
+    </array>
+    <key>MinimumOSVersion</key>
+    <string>16.0</string>
+    <key>UIDeviceFamily</key>
+    <array>
+        <integer>1</integer>
+        <integer>2</integer>
+    </array>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+        <string>metal</string>
+    </array>
+    <!-- Landscape only, full screen, no status bar. -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UIRequiresFullScreen</key>
+    <true/>
+    <key>UIStatusBarHidden</key>
+    <true/>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    <!-- Without a launch screen iOS runs the app letterboxed at an old phone size. -->
+    <key>UILaunchScreen</key>
+    <dict/>
+    <!-- SDL3 uses the UIScene life cycle: without this UIKit never connects SDL's scene delegate,
+         the app shows an empty window and SDL never calls our main ("Info.plist contained no
+         UIScene configuration dictionary (looking for configuration named SDLSceneConfiguration)"). -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>SDLSceneConfiguration</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>SDLUIKitSceneDelegate</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
+    <!-- Documents in the Files app: the player copies the game and nfsmw_shaders.nfsp there. -->
+    <!-- The LAN multiplayer: the EA server on a PC or on the hosting phone, and the other phones. -->
+    <!-- The host's EA server keeps serving in the background and with the screen locked: while it is
+         on, segundo_plano.mm plays silence (mixed with other apps) so iOS does not suspend the app. -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+    </array>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>To play the game online against an EA server on your Wi-Fi (a PC or another phone), and to host one.</string>
+    <key>UIFileSharingEnabled</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+    <!-- Game controllers (SDL3 uses GameController.framework). -->
+    <key>GCSupportsControllerUserInteraction</key>
+    <true/>
+    <key>GCSupportedGameControllers</key>
+    <array>
+        <dict>
+            <key>ProfileName</key>
+            <string>ExtendedGamepad</string>
+        </dict>
+    </array>
+</dict>
+</plist>

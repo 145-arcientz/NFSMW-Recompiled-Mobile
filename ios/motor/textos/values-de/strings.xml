@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ios_app_con_juego">Diese App enthält das Spiel. Sie ist nur für deine eigenen Geräte: nicht weitergeben.</string>
+    <string name="ios_juego_extraido">Entpacktes Spiel: %1$s</string>
+    <string name="ios_edicion_app">Diese App wurde für die Edition %1$s des Spiels gebaut.</string>
+    <string name="ios_iso_otra_edicion">Diese ISO ist eine andere Edition des Spiels. Diese App wurde für die Edition %1$s gebaut und startet mit keiner anderen: Wähle die ISO %1$s oder baue die App aus dieser ISO.</string>
+    <string name="ios_ayuda_iso">Kopiere deine ISO mit der Dateien-App nach Auf meinem iPhone › NFSMW oder von einem Computer mit dem Finder (Tab „Dateien“ des iPhone). Du kannst sie auch mit der Taste irgendwo in Dateien auswählen: Sie wird dort gelesen, wo sie liegt, ohne Kopie.</string>
+    <string name="ios_iso_sin_acceso">iOS gewährt keinen Zugriff mehr auf die gewählte ISO: Vielleicht wurde sie verschoben oder gelöscht. Wähle sie erneut.</string>
+    <string name="ios_cerrar_para_ajustes">Die Einstellungen gelten, sobald du auf Spielen tippst. Um sie später zu ändern, schließe die App im App-Umschalter und öffne sie erneut.</string>
+    <string name="ios_editar_tactil_resumen">Im Spiel öffnet das Zahnrad neben der Taste AUSBL. den Editor: Verschiebe die Touch-Tasten und ändere ihre Größe und Deckkraft.</string>
+    <string name="ios_vibracion_probada">So vibriert das Handy, wenn das Spiel die Touch-Steuerung vibrieren lässt. Ein physischer Controller vibriert selbst.</string>
+    <string name="ios_sin_biblioteca">Die Shader-Bibliothek (nfsmw_shaders.nfsp), die der native Renderer braucht, fehlt. Kopiere sie in den Ordner der App, neben die ISO, oder baue die App mit ihr.</string>
+    <string name="ios_audio">Ton mit niedriger Latenz (AVAudioEngine)</string>
+    <string name="ios_audio_resumen">Die iOS-Ausgabe dieser App mit niedriger Latenz, wie AAudio unter Android. Aus: die SDL-Ausgabe der nativen Engine.</string>
+    <string name="ios_metal_rapida">Schnelle Metal-Mathematik</string>
+    <string name="ios_metal_rapida_resumen">Schnellere Shader auf der GPU des iPhone, mit weniger genauer Rechnung: Farbige Quadrate oder Blitze können zurückkehren. Aus: dieselbe Rechnung wie unter Android.</string>
+    <string name="partidas_resumen">Das Spiel speichert im Ordner datos der App (Dateien › Auf meinem iPhone › NFSMW). Exportieren legt eine Kopie als .zip ab, wo du willst (Dateien, iCloud Drive…); Importieren ersetzt die aktuellen Spielstände durch die aus einer .zip. Die .zip-Dateien funktionieren auch in der Android-App.</string>
+</resources>

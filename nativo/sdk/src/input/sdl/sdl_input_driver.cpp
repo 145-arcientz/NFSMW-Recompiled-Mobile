@@ -24,9 +24,10 @@
 REXCVAR_DEFINE_STRING(hid_mappings_file, "gamecontrollerdb.txt", "Input",
                       "Path to SDL gamecontroller mappings file");
 
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
 // PARCHE LOCAL (NFSMW Recompiled): la define la app de Android (nativo_android.cpp) y
 // hace vibrar el movil con lo que el juego le pide al mando tactil (0-65535 cada motor).
+// En iOS, la del mando tactil de alli (ios/motor/controles_tactiles.mm), con el mismo nombre.
 extern "C" void NfsmwAndroidVibrar(uint16_t izquierdo, uint16_t derecho) __attribute__((weak));
 #endif
 
@@ -127,7 +128,9 @@ void SDLInputDriver::OnWindowAvailable(rex::ui::Window* window) {
       }
       SDL_Gamepad_initialized_ = true;
 
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
+      // PARCHE LOCAL - iOS: the same touch pad, fed by the app's UIKit overlay
+      // (ios/motor/controles_tactiles.mm) instead of Android's TouchControlsView.
       ControllerState touch = {};
       touch.id = AllocateDeviceId();
       touch.is_touch = true;
@@ -135,7 +138,7 @@ void SDLInputDriver::OnWindowAvailable(rex::ui::Window* window) {
       touch_device_id_ = touch.id;
       UpdateXCapabilities(touch);
       controllers_.push_back(touch);
-      REXLOG_INFO("SDL input: Android touch gamepad is ready");
+      REXLOG_INFO("SDL input: touch gamepad is ready");
 #endif
 
       // Load custom controller mappings if available
@@ -306,7 +309,7 @@ X_RESULT SDLInputDriver::SetDeviceVibration(DeviceId id, X_INPUT_VIBRATION* vibr
   }
 
   if (controller->is_touch) {
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
     // PARCHE LOCAL (NFSMW Recompiled): el mando tactil vibra con el movil.
     if (NfsmwAndroidVibrar) {
       NfsmwAndroidVibrar(vibration->left_motor_speed, vibration->right_motor_speed);
@@ -719,7 +722,7 @@ void SDLInputDriver::UpdateXCapabilities(ControllerState& state) {
     state.caps.gamepad.thumb_ly = static_cast<int16_t>(0xFFFFu);
     state.caps.gamepad.thumb_rx = static_cast<int16_t>(0xFFFFu);
     state.caps.gamepad.thumb_ry = static_cast<int16_t>(0xFFFFu);
-#if REX_PLATFORM_ANDROID
+#if REX_PLATFORM_ANDROID || REX_PLATFORM_IOS
     // PARCHE LOCAL (NFSMW Recompiled): con la app que hace vibrar el movil, el
     // mando tactil tiene los dos motores.
     const uint16_t motores = NfsmwAndroidVibrar ? 0xFFFFu : 0;

@@ -211,7 +211,9 @@ if(REXGLUE_USE_VULKAN)
     set(VMA_ENABLE_INSTALL ON CACHE BOOL "" FORCE)
     add_subdirectory(vulkan-memory-allocator)
 
-    if(APPLE)
+    # PARCHE LOCAL - iOS: no loader (an app cannot load ICDs) and MoltenVK comes prebuilt
+    # (libMoltenVK.a from the Khronos release), linked by the iOS app.
+    if(APPLE AND NOT IOS)
         # Build the loader and MoltenVK revisions shipped by the pinned SDK.
         # They remain runtime-loaded; no Vulkan implementation is linked into
         # rexglue itself.

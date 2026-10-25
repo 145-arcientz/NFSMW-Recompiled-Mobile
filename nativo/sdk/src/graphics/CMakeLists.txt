@@ -4,6 +4,11 @@
 # Runtime-loaded via rex::system::LoadGpuPlugin; consumers never link this
 # target. The Xenos format layer is compiled into rexcore.
 
+# PARCHE LOCAL - iOS: left out when the app uses only its own renderer.
+if(NOT REXGLUE_BUILD_XENOS)
+    return()
+endif()
+
 set(REXGPU_XENOS_SOURCES
     plugin_main.cpp
 

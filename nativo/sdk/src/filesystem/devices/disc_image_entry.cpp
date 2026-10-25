@@ -44,9 +44,15 @@ std::unique_ptr<memory::MappedMemory> DiscImageEntry::OpenMapped(memory::MappedM
     return nullptr;
   }
 
+#if REX_PLATFORM_IOS
+  (void)offset;
+  (void)length;
+  return nullptr;  // not mapped on iOS: can_map() is false
+#else
   size_t real_offset = data_offset_ + offset;
   size_t real_length = length ? std::min(length, data_size_) : data_size_;
   return mmap_->Slice(real_offset, real_length);
+#endif
 }
 
 }  // namespace rex::filesystem
