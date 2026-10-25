@@ -183,20 +183,14 @@ Cómo compilarlas está en la cabecera de `prueba_servidor_ea.py`.
 
 ## Fases
 
-0. **[PruebaMemoria](PruebaMemoria/)**: una app sin nada del juego que mide en el iPhone lo que el
-   SDK necesita:
+0. **La prueba de memoria**: una app sin nada del juego que midió en el iPhone lo que el SDK
+   necesita. Ya no está en el repositorio; queda en el historial, en `ios/PruebaMemoria` del commit
+   `be92e6a` (se compilaba con `xtool dev` en esa carpeta). Medía:
    - una zona compartida de 4,5 GB (`shm_open` o un fichero);
    - la reserva de 4,5 GB de espacio de direcciones, con las vistas en espejo de `MapViewsMac` en
      `nativo/sdk/src/system/xmemory.cpp` (en iOS entra por esa rama);
    - los fallos de página capturados del `mmio_handler`;
    - cuánta memoria deja iOS antes de cerrar la app.
-
-   Se compila e instala con `cd ios/PruebaMemoria && xtool dev`; se pulsa «Probar» y el informe sale
-   en pantalla y en Archivos (`prueba_memoria.txt`). Si la firma falla por los permisos
-   (`PruebaMemoria.entitlements`), se quita `entitlementsPath` de `xtool.yml` y se prueba sin ellos:
-   el informe dirá entonces si la reserva cabe o no. xtool cambia el identificador de la app
-   (`XTL-<equipo>.io.github...`, se ve con `ideviceinstaller list --user`); con él, el informe se
-   saca por USB: `afcclient --container <id> get Documents/prueba_memoria.txt`.
 
    **Resultado** (iPhone 13 Pro, 6 GB, páginas de 16 KB, Apple ID gratuita): la zona compartida y
    la reserva de 4,5 GB caben, el espejo funciona y los fallos de página se capturan. iOS deja

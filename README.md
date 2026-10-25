@@ -409,9 +409,7 @@ NFSMW Recompiled/
 ├── android/             the Android app: Gradle, the launcher (Java) and the engine glue (C++)
 ├── nativo/              the native engine: its SDK fork, the game app (one app_<edition>
 │                        per extra edition) and the Vulkan and OpenGL ES renderers
-├── ios/
-│   ├── motor/           the iOS app: CMake, launcher, touch controls, sound, LAN host
-│   └── PruebaMemoria/   the memory layout test of phase 0
+├── ios/motor/           the iOS app: CMake, launcher, touch controls, sound, LAN host
 ├── sdk/                 nfsmw-parches.diff: everything this fork changes in the SDK
 ├── tools/
 │   ├── parche_*.py      the patches, applied to the SDK before building it
