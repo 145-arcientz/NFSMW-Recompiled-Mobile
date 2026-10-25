@@ -693,6 +693,16 @@ proyecto vibe-codeado: ver la sección "This fork" del [README](README.md).
 
 ### Arreglado
 
+- **El juego se cerraba al poco de la primera cinemática de la carrera** (SIGSEGV en
+  `sub_8237FE58`, el hilo del juego, a los ~15 s de empezar la del inicio del modo carrera; en
+  una AYN Thor siempre, con 30 o 60 fps). `[rexcrt]` cambia el memcpy del juego
+  (`sub_826BE1B0`) por `std::memcpy`, y el juego lo usa con rangos que se solapan: así quita un
+  controlador de animación de su lista de activos, copiando la cola un hueco hacia atrás. El del
+  juego copia hacia delante; el de bionic en arm64 no, y duplicaba elementos (en el móvil, otra
+  lista en 1203 de 2016 casos; en el PC, ninguno): un controlador parado seguía en la lista sin
+  pista, y al actualizarlo se leía la dirección 4. `tools/parche_memcpy.py` hace que el memcpy
+  nativo dé lo mismo que el del juego también con solape, en los dos SDK (en el del motor nativo
+  ya va aplicado). Comprobado en la Thor: pasa la cinemática y siete minutos de carrera.
 - **Vulkan en Mali: retrovisor negro, franja negra en el horizonte de la pista del bosque y vídeo
   del menú duplicado** (0.5.5). No eran del driver de ARM, sino fallos de sincronización nuestros
   que el de Adreno perdona: la capa de validación, en el Samsung A22 (Mali-G57), vio copias,
