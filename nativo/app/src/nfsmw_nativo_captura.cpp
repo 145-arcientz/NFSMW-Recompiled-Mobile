@@ -179,6 +179,18 @@ void Arrancar(std::function<rex::ui::Presenter*()> obtener_presentador) {
               int(REXCVAR_GET(nfsmw_captura_max)));
 }
 
+bool GuardarPng(const std::filesystem::path& ruta, const uint8_t* rgba, uint32_t ancho, uint32_t alto) {
+  rex::ui::RawImage imagen;
+  imagen.width = ancho;
+  imagen.height = alto;
+  imagen.stride = size_t(ancho) * 4;
+  imagen.data.assign(rgba, rgba + imagen.stride * alto);
+  const std::vector<uint8_t> png = CodificarPng(imagen);
+  std::ofstream fichero(ruta, std::ios::binary);
+  fichero.write(reinterpret_cast<const char*>(png.data()), std::streamsize(png.size()));
+  return bool(fichero);
+}
+
 void Parar() {
   {
     std::lock_guard<std::mutex> cerrojo(g_mutex);

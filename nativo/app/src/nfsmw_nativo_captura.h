@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <filesystem>
 #include <functional>
 
 namespace rex::ui {
@@ -19,5 +21,9 @@ void Arrancar(std::function<rex::ui::Presenter*()> obtener_presentador);
 
 // Stops the thread (idempotent).
 void Parar();
+
+// Writes an R8G8B8A8 image (alpha ignored, rows of ancho * 4 bytes) as an uncompressed PNG.
+// For diagnostics (nfsmw_volcado in nfsmw_nativo_destinos.cpp).
+bool GuardarPng(const std::filesystem::path& ruta, const uint8_t* rgba, uint32_t ancho, uint32_t alto);
 
 }  // namespace nfsmw::captura

@@ -4627,6 +4627,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
       }
       const auto antes_fin = std::chrono::steady_clock::now();
       dfn_.vkCmdEndRenderPass(pase_comandos_);
+      BarreraTotal(dfn_, pase_comandos_);  // nfsmw_nativo_barrera_total (iOS)
       if (estadisticas_pase_ != UINT32_MAX) {
         contexto_->TerminarEstadisticas(estadisticas_pase_);
         estadisticas_pase_ = UINT32_MAX;
@@ -10076,6 +10077,7 @@ class DibujosVulkanImpl final : public DibujosVulkan {
     // The statistics cover the whole pass, from here to after EndRenderPass.
     estadisticas_pase_ = contexto_->EmpezarEstadisticas(categoria_pase_);
     const auto antes_inicio = std::chrono::steady_clock::now();
+    BarreraTotal(dfn_, cmd);  // nfsmw_nativo_barrera_total (iOS)
     dfn_.vkCmdBeginRenderPass(cmd, &inicio, VK_SUBPASS_CONTENTS_INLINE);
     ns_render_pass_ += uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now() - antes_inicio).count());

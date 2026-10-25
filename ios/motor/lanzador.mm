@@ -698,6 +698,24 @@ std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, cons
     if (LeerBool(@"registro", false)) poner(@"--red_registro=true");
   }
   poner(LeerBool(@"registro", false) ? @"--log_level=debug" : @"--log_level=info");
+  // Pruebas: Documents/extra.txt (se sube por afcclient). Cada linea "--cvar=valor" va al final de los
+  // argumentos; "NOMBRE=valor" es una variable de entorno (las MVK_CONFIG_* de MoltenVK).
+  NSString* docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+  NSString* extra = [NSString stringWithContentsOfFile:[docs stringByAppendingPathComponent:@"extra.txt"]
+                                              encoding:NSUTF8StringEncoding error:nil];
+  for (NSString* bruta in [extra componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]) {
+    NSString* l = [bruta stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+    if (!l.length || [l hasPrefix:@"#"]) continue;
+    if ([l hasPrefix:@"--"]) {
+      poner(l);
+    } else {
+      NSRange igual = [l rangeOfString:@"="];
+      if (igual.location != NSNotFound) {
+        setenv([l substringToIndex:igual.location].UTF8String, [l substringFromIndex:igual.location + 1].UTF8String, 1);
+      }
+    }
+    NSLog(@"[extra] %@", l);
+  }
   return a;
 }
 

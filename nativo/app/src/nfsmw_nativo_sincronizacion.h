@@ -5,6 +5,7 @@
 
 REXCVAR_DECLARE(bool, nfsmw_nativo_sincronizacion_gpu);
 REXCVAR_DECLARE(bool, nfsmw_nativo_barreras_transferencia);
+REXCVAR_DECLARE(bool, nfsmw_nativo_barrera_total);
 
 namespace nfsmw::nativo {
 
@@ -44,6 +45,21 @@ inline void BarreraTransferencias(const Funciones& dfn, VkCommandBuffer comandos
   barrera.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
   barrera.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
   dfn.vkCmdPipelineBarrier(comandos, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1,
+                           &barrera, 0, nullptr, 0, nullptr);
+}
+
+// nfsmw_nativo_barrera_total: every earlier write before every later access, outside a render pass. The
+// render passes already declare this as subpass dependencies, but MoltenVK does not turn those into Metal
+// synchronization; an explicit barrier it does honour. Only where the cvar is on (iOS by default).
+template <typename Funciones>
+inline void BarreraTotal(const Funciones& dfn, VkCommandBuffer comandos) {
+  if (!REXCVAR_GET(nfsmw_nativo_barrera_total)) {
+    return;
+  }
+  VkMemoryBarrier barrera{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  barrera.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+  barrera.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  dfn.vkCmdPipelineBarrier(comandos, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
                            &barrera, 0, nullptr, 0, nullptr);
 }
 
