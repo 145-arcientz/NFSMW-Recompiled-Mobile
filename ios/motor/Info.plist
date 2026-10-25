@@ -106,6 +106,12 @@
     </dict>
     <!-- Documents in the Files app: the player copies the game and nfsmw_shaders.nfsp there. -->
     <!-- The LAN multiplayer: the EA server on a PC or on the hosting phone, and the other phones. -->
+    <!-- The host's EA server keeps serving in the background and with the screen locked: while it is
+         on, segundo_plano.mm plays silence (mixed with other apps) so iOS does not suspend the app. -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+    </array>
     <key>NSLocalNetworkUsageDescription</key>
     <string>To play the game online against an EA server on your Wi-Fi (a PC or another phone), and to host one.</string>
     <key>UIFileSharingEnabled</key>

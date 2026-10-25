@@ -13,7 +13,8 @@
 //     modo de compatibilidad (sin Xenos en iOS). El sonido por AAudio es aqui por AVAudioEngine.
 //   - Multijugador: la red va en red_lan.cpp y el servidor del anfitrion en servidor_ea.cpp. Buscar
 //     servidores por broadcast no sale sin un permiso de Apple que no tiene una Apple ID gratuita:
-//     se pregunta a cada IP de la red. El anfitrion sirve mientras la app esta delante.
+//     se pregunta a cada IP de la red. El anfitrion sigue sirviendo en segundo plano y con la
+//     pantalla bloqueada (segundo_plano.mm).
 //   - El editor del mando tactil es el de la partida (el engranaje junto a OCULTAR).
 //   - Volver aqui es cerrar la app y abrirla: iOS no deja que una app se cierre sola.
 //
@@ -43,6 +44,7 @@
 
 #include "ios_app.h"
 #include "red_lan.h"
+#include "segundo_plano.h"
 #include "servidor_ea.h"
 
 // Un toque en una vista que no es un boton (las filas de los servidores), con un bloque.
@@ -1620,7 +1622,13 @@ NSString* NfsmwTexto(NSString* clave) {
     std::string error;
     const bool bien = nfsmw::servidor::Arrancar(
         S(datos), S(logs), [] {}, [] { return NombreAnfitrion(); }, &error);
-    if (bien) return;
+    if (bien) {
+      // Que siga sirviendo con la app en segundo plano o la pantalla bloqueada.
+      dispatch_async(dispatch_get_main_queue(), ^{
+        if (LeerBool(@"anfitrion_lan", false)) nfsmw::segundo_plano::Mantener(true);
+      });
+      return;
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
       // Lo normal: los puertos ya los tiene otro.
       Poner(@"anfitrion_lan", @NO);
@@ -1642,6 +1650,7 @@ NSString* NfsmwTexto(NSString* clave) {
     [self arrancarAnfitrion];
   } else {
     nfsmw::servidor::Parar();
+    nfsmw::segundo_plano::Mantener(false);
   }
   [self actualizarAnfitrion];
   // Otro servidor, otros jugadores.

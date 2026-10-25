@@ -591,6 +591,15 @@ class Servidor : public std::enable_shared_from_this<Servidor> {
 
   bool parado() const { return parado_; }
 
+  // Un socket de escucha o el de la busqueda fallo sin que nadie parase el servidor: lo normal en iOS
+  // es que la app se congelase en segundo plano y el sistema le anulase los sockets ("Socket is not
+  // connected"). Se para entero, para que EnMarcha() lo diga y Revivir() lo vuelva a abrir.
+  void caer(const std::string& porque) {
+    if (parado_) return;
+    log(porque + ": the server is down; it restarts when the app comes back");
+    parar();
+  }
+
   // Jugadores dentro de Xbox Live (conectados al servidor de salas y autenticados).
   int jugadores() {
     std::lock_guard<std::recursive_mutex> l(candado_);
@@ -644,7 +653,7 @@ class Servidor : public std::enable_shared_from_this<Servidor> {
       const int s = accept(escucha, reinterpret_cast<sockaddr*>(&de), &largo);
       if (s < 0) {
         if (errno == EINTR || errno == ECONNABORTED) continue;
-        if (!parado_) log("[" + std::to_string(puerto) + "] accept: " + std::strerror(errno));
+        caer("[" + std::to_string(puerto) + "] accept: " + std::strerror(errno));
         break;
       }
       int uno = 1;
@@ -658,6 +667,7 @@ class Servidor : public std::enable_shared_from_this<Servidor> {
         }
       }).detach();
     }
+    caer("[" + std::to_string(puerto) + "] poll: " + std::strerror(errno));  // nada si se paro a proposito
     close(escucha);
   }
 
@@ -806,7 +816,7 @@ class Servidor : public std::enable_shared_from_this<Servidor> {
       const ssize_t n = recvfrom(busqueda_, buf, sizeof(buf), 0, reinterpret_cast<sockaddr*>(&de), &largo);
       if (n < 0) {
         if (errno == EINTR) continue;
-        if (!parado_) log("[" + std::to_string(PUERTO_GAMERTAG) + "/udp] " + std::strerror(errno));
+        caer("[" + std::to_string(PUERTO_GAMERTAG) + "/udp] " + std::strerror(errno));
         break;
       }
       if (size_t(n) < pregunta.size() || std::memcmp(buf, pregunta.data(), pregunta.size()) != 0) continue;
@@ -821,6 +831,7 @@ class Servidor : public std::enable_shared_from_this<Servidor> {
       log("[" + std::to_string(PUERTO_GAMERTAG) + "/udp] search from " + ip + ": answered '" + nombre + "', " +
           std::to_string(j) + " players");
     }
+    caer("[" + std::to_string(PUERTO_GAMERTAG) + "/udp] poll: " + std::strerror(errno));
     close(busqueda_);
   }
 
@@ -1501,6 +1512,11 @@ class Servidor : public std::enable_shared_from_this<Servidor> {
 
 std::mutex g_mutex;
 std::shared_ptr<Servidor> g_servidor;
+// Lo que se le paso a Arrancar, para Revivir; g_quiere: arrancado y sin Parar() desde entonces.
+bool g_quiere = false;
+std::string g_datos, g_logs;
+std::function<void()> g_alCambiar;
+std::function<std::string()> g_nombre;
 
 }  // namespace
 
@@ -1508,18 +1524,45 @@ bool Arrancar(const std::string& datos, const std::string& logs, std::function<v
               std::function<std::string()> nombre, std::string* error) {
   std::lock_guard<std::mutex> l(g_mutex);
   if (g_servidor && !g_servidor->parado()) return true;
-  auto s = std::make_shared<Servidor>(datos, logs, std::move(alCambiar), std::move(nombre));
+  auto s = std::make_shared<Servidor>(datos, logs, alCambiar, nombre);
   std::string motivo;
   if (!s->arrancar(&motivo)) {
     if (error) *error = motivo;
     return false;
   }
   g_servidor = s;
+  g_quiere = true;
+  g_datos = datos;
+  g_logs = logs;
+  g_alCambiar = std::move(alCambiar);
+  g_nombre = std::move(nombre);
   return true;
+}
+
+bool Revivir(std::string* error) {
+  // Los sockets del que cayo los cierran sus hilos en su siguiente vuelta (VUELTA_MS); hasta entonces
+  // los puertos siguen cogidos. Unos cuantos intentos, sin el candado durante la espera.
+  for (int intento = 0; intento < 8; ++intento) {
+    {
+      std::lock_guard<std::mutex> l(g_mutex);
+      if (!g_quiere) return false;
+      if (g_servidor && !g_servidor->parado()) return true;
+      auto s = std::make_shared<Servidor>(g_datos, g_logs, g_alCambiar, g_nombre);
+      std::string motivo;
+      if (s->arrancar(&motivo)) {
+        g_servidor = s;
+        return true;
+      }
+      if (error) *error = motivo;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(VUELTA_MS));
+  }
+  return false;
 }
 
 void Parar() {
   std::lock_guard<std::mutex> l(g_mutex);
+  g_quiere = false;
   if (g_servidor) {
     // Sus hilos lo retienen hasta que acaban.
     g_servidor->parar();

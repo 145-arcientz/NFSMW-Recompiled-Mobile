@@ -58,6 +58,7 @@ target_sources(nfsmw PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/lanzador.mm"
     "${CMAKE_CURRENT_LIST_DIR}/red_lan.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/servidor_ea.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/segundo_plano.mm"
     "${CMAKE_CURRENT_LIST_DIR}/controles_tactiles.mm"
     "${CMAKE_CURRENT_LIST_DIR}/../../android/app/src/main/cpp/nativo/nativo_android.cpp")
 target_compile_options(nfsmw PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
