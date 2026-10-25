@@ -102,8 +102,8 @@ android {
         // de nombres que necesita. Por debajo no hay Snapdragon que merezca la pena.
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.5.4"
+        versionCode = 14
+        versionName = "0.5.5"
 
         buildConfigField("boolean", "CON_JUEGO", conJuego.toString())
         // El motor de Xenos necesita Vulkan 1.1; el nativo tiene OpenGL ES de respaldo.

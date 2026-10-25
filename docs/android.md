@@ -35,7 +35,8 @@ En el PC:
 | Python 3.10+ y Git | Los scripts |
 | **Para el APK con juego:** Visual Studio Build Tools con *Desarrollo para el escritorio con C++* y *Compilador Clang*, y tu ISO | El codegen corre en el PC |
 
-En el móvil: Snapdragon de 64 bits, Android 10 o superior y Vulkan 1.1.
+En el móvil: 64 bits, Android 8.0 o superior y Vulkan 1.1 (el motor nativo también va con
+OpenGL ES 3.2 donde Vulkan falta o falla; ver [motor-nativo-gles.md](motor-nativo-gles.md)).
 
 ## Los pasos
 
@@ -72,9 +73,23 @@ RAM y 8 a la vez, clang se queda sin memoria.
    SDK acepta la GPU y si hay texturas BC. No necesita el juego.
 3. **Importar un driver Turnip** (opcional): un `.zip` para adrenotools, con su
    `meta.json`.
-4. **Elegir la ISO**, la de la edición con la que compilaste el APK (la pantalla de
-   inicio dice cuál, y avisa si la ISO elegida es de otra). No se copia: se lee en su sitio.
+4. **Elegir la ISO**, la de una edición que lleve el APK (la pantalla de inicio dice
+   cuáles, y avisa si la ISO elegida es de otra). Pide el **acceso a todos los archivos**
+   (`MANAGE_EXTERNAL_STORAGE` en Android 11+; los permisos de almacenamiento de antes en
+   8-10): con él, la app busca las `.iso` en la memoria interna y en la SD
+   (`BuscadorIsos.java`) y enseña solo las compatibles, por el SHA-256 de su `default.xex`
+   (`IsoXex`), con su edición, tamaño y carpeta. En algunos móviles el selector de Android
+   no enseña la memoria interna. Sin el permiso, «Usar el selector», como antes. No se
+   copia: se lee en su sitio.
 5. Conecta un mando y **Jugar**.
+
+**Las partidas** del motor nativo están en el almacenamiento interno de la app
+(`files/nativo/usuario`), donde no llegan ni el explorador ni el PC. La tarjeta
+«Partidas guardadas» de la sección Juego (`Partidas.java`) las exporta a un `.zip` (con
+el acceso a todos los archivos, a `NFSMW/partidas`; si no, donde diga el selector) e
+importa uno con el selector. Antes de importar guarda las de ahora en
+`partidas_antes_de_importar.zip`. El `.zip` lleva `nfsmw_partidas.txt` como marca, y no
+lleva `nfsmw.toml`, las bibliotecas de shaders ni las cachés.
 
 Los registros quedan en `Android/data/io.github.nfsmwrecomp/files/logs/nfsmw.log`.
 Algunas ROMs (la de nubia, por ejemplo) capan `adb logcat`: el fichero es lo que
@@ -82,10 +97,11 @@ vale.
 
 ### La pantalla de inicio
 
-Va en inglés, español o portugués: el idioma del móvil, o el que se elija en la
-sección Idioma (preferencia `idioma`; lo aplica `Idioma.java` en cada
-actividad). Los textos están en `res/values` (inglés, el de por defecto),
-`res/values-es` y `res/values-pt`. Una cadena nueva va en los tres.
+Va en 10 idiomas (inglés, español, alemán, francés, italiano, polaco, portugués,
+japonés, coreano y chino tradicional): el del móvil, o el que se elija en la sección
+Idioma (preferencia `idioma`; lo aplica `Idioma.java` en cada actividad). Los textos
+están en `res/values` (inglés, el de por defecto) y en un `res/values-*` por idioma.
+Una cadena nueva va en los 10.
 
 Los ajustes van agrupados por lo que tocan. Cada uno lleva debajo una línea que
 explica qué hace:
@@ -624,6 +640,12 @@ compartido. `parche_iso.py` hace que el SDK reconozca la URI en tres sitios:
 la comprobación de `ConstructRuntime`, el montaje en `SetupVfs` y
 `MappedMemory::Open`, que pide el descriptor a Java (`openContentFd`). También
 evita que se busque `default.xex` fuera de la imagen.
+
+Desde la 0.5.5 la ISO también puede ser una **ruta**: la que elige el buscador con el
+acceso a todos los archivos (`/storage/emulated/0/...`). Con ese permiso, `open()` sobre la
+ruta sí funciona, y el SDK ya montaba un fichero normal como imagen de disco
+(`DiscImageDevice`). `Ajustes.uriIso` la pasa a `file://` para leerla con el
+`ContentResolver` (`IsoXex`).
 
 ### Por qué la app arranca el juego por su nombre
 
