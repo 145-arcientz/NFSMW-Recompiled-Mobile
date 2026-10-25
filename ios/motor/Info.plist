@@ -13,7 +13,7 @@
     <key>CFBundleName</key>
     <string>NFSMW</string>
     <key>CFBundleDisplayName</key>
-    <string>NFS Most Wanted</string>
+    <string>NFSMW</string>
     <!-- The icon: the Android one, scaled by iconos.py (compilar.sh) into loose PNGs in the bundle.
          Without a Mac there is no actool to build an asset catalog. -->
     <key>CFBundleIcons</key>

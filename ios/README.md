@@ -147,7 +147,7 @@ El registro dice qué se usó: `[compatibilidad] abanicos de triangulos: ...` y
 
 ## El juego en el iPhone
 
-La app sale en Archivos como **NFS Most Wanted**, con su carpeta `Documents`. El lanzador busca el
+La app sale en Archivos como **NFSMW**, con su carpeta `Documents`. El lanzador busca el
 juego en este orden:
 
 1. **La ISO elegida con «Elegir ISO…»**, en cualquier sitio de Archivos. Se lee donde está, sin
