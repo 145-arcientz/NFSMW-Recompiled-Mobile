@@ -4,7 +4,7 @@
     <string name="ios_juego_extraido">Jeu extrait : %1$s</string>
     <string name="ios_edicion_app">Cette app a été compilée pour l\'édition %1$s du jeu.</string>
     <string name="ios_iso_otra_edicion">Cette ISO est une autre édition du jeu. Cette app a été compilée pour l\'édition %1$s et ne démarrera pas avec une autre : choisissez l\'ISO %1$s, ou compilez l\'app à partir de cette ISO.</string>
-    <string name="ios_ayuda_iso">Copiez votre ISO avec l\'app Fichiers dans Sur mon iPhone › NFS Most Wanted, ou depuis un ordinateur avec le Finder (onglet Fichiers de l\'iPhone). Vous pouvez aussi la choisir n\'importe où dans Fichiers avec le bouton : elle est lue là où elle est, sans copie.</string>
+    <string name="ios_ayuda_iso">Copiez votre ISO avec l\'app Fichiers dans Sur mon iPhone › NFSMW, ou depuis un ordinateur avec le Finder (onglet Fichiers de l\'iPhone). Vous pouvez aussi la choisir n\'importe où dans Fichiers avec le bouton : elle est lue là où elle est, sans copie.</string>
     <string name="ios_iso_sin_acceso">iOS ne donne plus accès à l\'ISO choisie : elle a peut-être été déplacée ou supprimée. Choisissez-la à nouveau.</string>
     <string name="ios_cerrar_para_ajustes">Les réglages s\'appliquent en touchant Jouer. Pour les changer ensuite, fermez l\'app depuis le sélecteur d\'apps et rouvrez-la.</string>
     <string name="ios_editar_tactil_resumen">Dans le jeu, l\'engrenage à côté du bouton MASQUER ouvre l\'éditeur : déplacez les boutons tactiles et changez leur taille et leur opacité.</string>
@@ -14,4 +14,5 @@
     <string name="ios_audio_resumen">La sortie iOS à faible latence de cette app, comme AAudio sur Android. Désactivé : la sortie SDL du moteur natif.</string>
     <string name="ios_metal_rapida">Calcul rapide de Metal</string>
     <string name="ios_metal_rapida_resumen">Des shaders plus rapides sur le GPU de l\'iPhone, avec des calculs moins exacts : des carrés de couleur ou des flashs peuvent revenir. Désactivé : les mêmes calculs que sur Android.</string>
+    <string name="partidas_resumen">Le jeu enregistre dans le dossier datos de l\'app (Fichiers › Sur mon iPhone › NFSMW). Exporter laisse une copie dans un .zip à l\'endroit de ton choix (Fichiers, iCloud Drive…) ; importer remplace les sauvegardes actuelles par celles d\'un .zip. Les .zip fonctionnent aussi dans l\'app Android.</string>
 </resources>

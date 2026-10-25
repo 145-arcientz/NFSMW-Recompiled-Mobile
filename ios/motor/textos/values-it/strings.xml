@@ -4,7 +4,7 @@
     <string name="ios_juego_extraido">Gioco estratto: %1$s</string>
     <string name="ios_edicion_app">Questa app è stata compilata per l\'edizione %1$s del gioco.</string>
     <string name="ios_iso_otra_edicion">Questa ISO è di un\'altra edizione del gioco. Questa app è stata compilata per l\'edizione %1$s e non si avvia con un\'altra: scegli la ISO %1$s, oppure compila l\'app da questa ISO.</string>
-    <string name="ios_ayuda_iso">Copia la tua ISO con l\'app File in Su iPhone › NFS Most Wanted, oppure da un computer con il Finder (scheda File dell\'iPhone). Puoi anche sceglierla ovunque in File con il pulsante: viene letta dov\'è, senza copiarla.</string>
+    <string name="ios_ayuda_iso">Copia la tua ISO con l\'app File in Su iPhone › NFSMW, oppure da un computer con il Finder (scheda File dell\'iPhone). Puoi anche sceglierla ovunque in File con il pulsante: viene letta dov\'è, senza copiarla.</string>
     <string name="ios_iso_sin_acceso">iOS non dà più accesso alla ISO scelta: forse è stata spostata o eliminata. Sceglila di nuovo.</string>
     <string name="ios_cerrar_para_ajustes">Le impostazioni si applicano quando tocchi Gioca. Per cambiarle dopo, chiudi l\'app dal selettore delle app e riaprila.</string>
     <string name="ios_editar_tactil_resumen">Nel gioco, l\'ingranaggio accanto al pulsante NASCONDI apre l\'editor: sposta i pulsanti touch e cambia dimensione e opacità.</string>
@@ -14,4 +14,5 @@
     <string name="ios_audio_resumen">L\'uscita iOS a bassa latenza di questa app, come AAudio su Android. Disattivato: l\'uscita SDL del motore nativo.</string>
     <string name="ios_metal_rapida">Matematica veloce di Metal</string>
     <string name="ios_metal_rapida_resumen">Shader più veloci sulla GPU dell\'iPhone, con calcoli meno esatti: possono tornare quadrati colorati o lampi. Disattivato: gli stessi calcoli di Android.</string>
+    <string name="partidas_resumen">Il gioco salva nella cartella datos dell\'app (File › Sul mio iPhone › NFSMW). Esporta lascia una copia in un .zip dove scegli (File, iCloud Drive…); importa mette quelli di un .zip al posto di quelli attuali. I .zip funzionano anche nell\'app Android.</string>
 </resources>

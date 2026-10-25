@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "ios_app.h"
+#include "partidas.h"
 #include "red_lan.h"
 #include "segundo_plano.h"
 #include "servidor_ea.h"
@@ -1033,6 +1034,12 @@ NSString* NfsmwTexto(NSString* clave) {
   UILabel* avisoJugar_;
   UILabel* avisoAcceso_;
   UILabel* avisoBiblioteca_;
+  // Partidas guardadas (partidas.h): lo que se hizo, y para que se abrio el selector de documentos
+  // (la ISO, el .zip exportado que se va a guardar o el que se va a importar).
+  UILabel* textoPartidas_;
+  enum class Eleccion { ISO, EXPORTAR, IMPORTAR } selector_;
+  NSURL* exportado_;
+  nfsmw::partidas::Resultado exportadas_;
   UILabel* errorGamertag_;
   UILabel* vibracionProbada_;
   Edicion edicion_;
@@ -1258,15 +1265,123 @@ NSString* NfsmwTexto(NSString* clave) {
   avisoJugar_ = Etiqueta(T(@"jugar_sin_iso"), 13, UIFontWeightRegular, AVISO);
   avisoBiblioteca_ = Etiqueta(T(@"ios_sin_biblioteca"), 13, UIFontWeightRegular, AVISO);
   UIStackView* boton = FilaBotones(@[elegir]);
+  // Partidas guardadas: exportar a un .zip e importar uno (las de Android valen).
+  UIButton* exportar = Boton(T(@"partidas_exportar"), BOTON, BLANCO, ^{ [yo exportarPartidas]; });
+  UIButton* importar = Boton(T(@"partidas_importar"), BOTON, BLANCO, ^{ [yo importarPartidas]; });
+  textoPartidas_ = Etiqueta(@"", 14, UIFontWeightRegular, BLANCO);
+  textoPartidas_.hidden = YES;
   return Tarjeta(@[
     Seccion(T(@"seccion_juego")), Columna(@[Resumen(T(@"ios_app_con_juego"))], 0, 12), textoIso_,
     Columna(@[textoEdicion_], 4), Espacio(12), boton, Columna(@[Resumen(T(@"ios_ayuda_iso"))], 8),
     Columna(@[avisoAcceso_, avisoJugar_, avisoBiblioteca_], 8, 0, 6),
-    Columna(@[Resumen(T(@"ios_cerrar_para_ajustes"))], 12)
+    Columna(@[Resumen(T(@"ios_cerrar_para_ajustes"))], 12),
+    Columna(@[Titulo(T(@"seccion_partidas")), Resumen(T(@"partidas_resumen"))], 20, 0, 4), Espacio(10),
+    FilaBotones(@[exportar, importar]), Columna(@[textoPartidas_], 8)
   ]);
 }
 
+// ---- Partidas guardadas (Partidas.java en Android)
+
+// La carpeta donde guarda el motor (user_data_root, nfsmw_app.h) y la version, que va en la marca.
+NSString* CarpetaPartidas() { return [Documentos() stringByAppendingPathComponent:@"datos"]; }
+std::string VersionApp() {
+  NSString* v = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"];
+  return v ? v.UTF8String : "";
+}
+NSString* Tamano(uint64_t bytes) {
+  return [NSByteCountFormatter stringFromByteCount:(long long)bytes countStyle:NSByteCountFormatterCountStyleFile];
+}
+
+- (void)textoPartidas:(NSString*)texto {
+  textoPartidas_.text = texto;
+  textoPartidas_.hidden = texto.length == 0;
+}
+
+// El .zip se hace en tmp y luego el selector de iOS lo guarda donde diga el jugador (Archivos, iCloud).
+- (void)exportarPartidas {
+  const std::string carpeta = CarpetaPartidas().UTF8String;
+  if (!nfsmw::partidas::Hay(carpeta)) {
+    [self textoPartidas:T(@"partidas_ninguna")];
+    return;
+  }
+  [self textoPartidas:T(@"partidas_exportando")];
+  NSString* ruta = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithUTF8String:nfsmw::partidas::NombreSugerido().c_str()]];
+  __weak NfsmwLanzador* yo = self;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    nfsmw::partidas::Resultado r;
+    std::string error;
+    const bool bien = nfsmw::partidas::Exportar(carpeta, ruta.UTF8String, VersionApp(), r, error);
+    NSString* fallo = bien ? nil : [NSString stringWithUTF8String:error.c_str()];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [yo exportado:bien ? [NSURL fileURLWithPath:ruta] : nil resultado:r fallo:fallo];
+    });
+  });
+}
+
+- (void)exportado:(NSURL*)url resultado:(nfsmw::partidas::Resultado)r fallo:(NSString*)fallo {
+  if (!url) {
+    [self textoPartidas:NfsmwTextoF(@"partidas_error", fallo ?: @"")];
+    return;
+  }
+  exportado_ = url;
+  exportadas_ = r;
+  selector_ = Eleccion::EXPORTAR;
+  UIDocumentPickerViewController* p = [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url] asCopy:YES];
+  p.delegate = self;
+  [self presentViewController:p animated:YES completion:nil];
+}
+
+- (void)importarPartidas {
+  selector_ = Eleccion::IMPORTAR;
+  UIDocumentPickerViewController* p = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeZIP]
+                                                                                                asCopy:YES];
+  p.delegate = self;
+  p.allowsMultipleSelection = NO;
+  [self presentViewController:p animated:YES completion:nil];
+}
+
+// Las de ahora se sustituyen: se pregunta antes, diciendo donde queda la copia.
+- (void)confirmarImportar:(NSURL*)url {
+  // Como la ensena Archivos: la carpeta de la app lleva su nombre.
+  NSString* app = NSBundle.mainBundle.infoDictionary[@"CFBundleDisplayName"] ?: @"NFSMW";
+  NSString* copia = [app stringByAppendingString:@" › partidas_antes_de_importar.zip"];
+  UIAlertController* a = [UIAlertController alertControllerWithTitle:T(@"partidas_importar_titulo")
+                                                             message:NfsmwTextoF(@"partidas_importar_aviso", copia)
+                                                      preferredStyle:UIAlertControllerStyleAlert];
+  __weak NfsmwLanzador* yo = self;
+  [a addAction:[UIAlertAction actionWithTitle:T(@"editor_cancelar").localizedCapitalizedString
+                                        style:UIAlertActionStyleCancel
+                                      handler:^(UIAlertAction*) {
+                                        [NSFileManager.defaultManager removeItemAtURL:url error:nil];
+                                      }]];
+  [a addAction:[UIAlertAction actionWithTitle:T(@"partidas_importar")
+                                        style:UIAlertActionStyleDestructive
+                                      handler:^(UIAlertAction*) { [yo importar:url]; }]];
+  [self presentViewController:a animated:YES completion:nil];
+}
+
+- (void)importar:(NSURL*)url {
+  [self textoPartidas:T(@"partidas_importando")];
+  const std::string carpeta = CarpetaPartidas().UTF8String;
+  const std::string copia = [Documentos() stringByAppendingPathComponent:@"partidas_antes_de_importar.zip"].UTF8String;
+  __weak NfsmwLanzador* yo = self;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    nfsmw::partidas::Resultado r;
+    std::string error;
+    const auto hecho = nfsmw::partidas::Importar(carpeta, url.path.UTF8String, copia, VersionApp(), r, error);
+    [NSFileManager.defaultManager removeItemAtURL:url error:nil];  // la copia que hizo el selector
+    NSString* texto = hecho == nfsmw::partidas::Importado::kBien
+                          ? NfsmwTextoF(@"partidas_importadas", r.archivos, Tamano(r.bytes))
+                      : hecho == nfsmw::partidas::Importado::kNoValido
+                          ? T(@"partidas_no_valido")
+                          : NfsmwTextoF(@"partidas_error", [NSString stringWithUTF8String:error.c_str()]);
+    dispatch_async(dispatch_get_main_queue(), ^{ [yo textoPartidas:texto]; });
+  });
+}
+
 - (void)elegirIso {
+  selector_ = Eleccion::ISO;
   UIDocumentPickerViewController* p = [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[UTTypeData]
                                                                                                 asCopy:NO];
   p.delegate = self;
@@ -1278,6 +1393,16 @@ NSString* NfsmwTexto(NSString* clave) {
 // La ISO no se copia: se guarda un marcador para volver a abrirla donde esta en cada arranque.
 - (void)documentPicker:(UIDocumentPickerViewController*)picker didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
   NSURL* url = urls.firstObject;
+  if (selector_ == Eleccion::EXPORTAR) {  // el .zip ya esta donde lo dejo el jugador
+    [NSFileManager.defaultManager removeItemAtURL:exportado_ error:nil];
+    exportado_ = nil;
+    [self textoPartidas:url ? NfsmwTextoF(@"partidas_exportadas", exportadas_.archivos, Tamano(exportadas_.bytes)) : @""];
+    return;
+  }
+  if (selector_ == Eleccion::IMPORTAR) {
+    if (url) [self confirmarImportar:url];
+    return;
+  }
   if (!url) return;
   const BOOL acceso = [url startAccessingSecurityScopedResource];
   NSData* marcador = [url bookmarkDataWithOptions:0 includingResourceValuesForKeys:nil relativeToURL:nil error:nil];
@@ -1293,6 +1418,14 @@ NSString* NfsmwTexto(NSString* clave) {
   Poner(@"iso_marcador", marcador);
   Poner(@"iso_nombre", url.lastPathComponent);
   [self refrescar];
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController*)picker {
+  if (selector_ == Eleccion::EXPORTAR) {
+    [NSFileManager.defaultManager removeItemAtURL:exportado_ error:nil];
+    exportado_ = nil;
+    [self textoPartidas:@""];
+  }
 }
 
 - (void)refrescar {

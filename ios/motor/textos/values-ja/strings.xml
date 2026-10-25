@@ -4,7 +4,7 @@
     <string name="ios_juego_extraido">展開済みのゲーム：%1$s</string>
     <string name="ios_edicion_app">このアプリはゲームの %1$s 版用にビルドされています。</string>
     <string name="ios_iso_otra_edicion">この ISO はゲームの別の版です。このアプリは %1$s 版用にビルドされており、他の版では起動しません。%1$s 版の ISO を選ぶか、この ISO からアプリをビルドしてください。</string>
-    <string name="ios_ayuda_iso">「ファイル」アプリで ISO を「このiPhone内」› NFS Most Wanted にコピーするか、コンピュータの Finder（iPhone の「ファイル」タブ）からコピーしてください。ボタンで「ファイル」内の好きな場所から選ぶこともできます。コピーせずにその場所から読み込みます。</string>
+    <string name="ios_ayuda_iso">「ファイル」アプリで ISO を「このiPhone内」› NFSMW にコピーするか、コンピュータの Finder（iPhone の「ファイル」タブ）からコピーしてください。ボタンで「ファイル」内の好きな場所から選ぶこともできます。コピーせずにその場所から読み込みます。</string>
     <string name="ios_iso_sin_acceso">選択した ISO に iOS がアクセスを許可しなくなりました。移動または削除された可能性があります。もう一度選んでください。</string>
     <string name="ios_cerrar_para_ajustes">設定は「プレイ」を押したときに適用されます。後で変更するには、Appスイッチャーでアプリを閉じてから開き直してください。</string>
     <string name="ios_editar_tactil_resumen">ゲーム中、「隠す」ボタンの横の歯車でエディタが開きます。タッチボタンを移動し、サイズと不透明度を変更できます。</string>
@@ -14,4 +14,5 @@
     <string name="ios_audio_resumen">このアプリの iOS 低遅延出力です（Android の AAudio と同様）。オフ：ネイティブエンジンの SDL 出力。</string>
     <string name="ios_metal_rapida">Metal の高速演算</string>
     <string name="ios_metal_rapida_resumen">iPhone の GPU でシェーダーが速くなりますが、計算の精度は下がります。色付きの四角やフラッシュが出ることがあります。オフ：Android と同じ計算。</string>
+    <string name="partidas_resumen">ゲームはアプリの datos フォルダ（ファイル › このiPhone内 › NFSMW）にセーブします。エクスポートは選んだ場所（ファイル、iCloud Drive…）に .zip のコピーを残し、インポートは .zip のセーブで今のセーブを置き換えます。.zip は Android アプリでも使えます。</string>
 </resources>

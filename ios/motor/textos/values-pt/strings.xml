@@ -4,7 +4,7 @@
     <string name="ios_juego_extraido">Jogo extraído: %1$s</string>
     <string name="ios_edicion_app">Este app foi compilado para a edição %1$s do jogo.</string>
     <string name="ios_iso_otra_edicion">Esta ISO é de outra edição do jogo. Este app foi compilado para a edição %1$s e não inicia com outra: escolha a ISO %1$s ou compile o app com esta ISO.</string>
-    <string name="ios_ayuda_iso">Copie a sua ISO com o app Arquivos para No Meu iPhone › NFS Most Wanted, ou de um computador com o Finder (aba Arquivos do iPhone). Também pode escolhê-la em qualquer lugar de Arquivos com o botão: ela é lida onde está, sem cópia.</string>
+    <string name="ios_ayuda_iso">Copie a sua ISO com o app Arquivos para No Meu iPhone › NFSMW, ou de um computador com o Finder (aba Arquivos do iPhone). Também pode escolhê-la em qualquer lugar de Arquivos com o botão: ela é lida onde está, sem cópia.</string>
     <string name="ios_iso_sin_acceso">O iOS já não dá acesso à ISO escolhida: talvez tenha sido movida ou apagada. Escolha-a de novo.</string>
     <string name="ios_cerrar_para_ajustes">Os ajustes valem ao tocar em Jogar. Para mudá-los depois, feche o app no seletor de apps e abra-o de novo.</string>
     <string name="ios_editar_tactil_resumen">No jogo, a engrenagem ao lado do botão OCULTAR abre o editor: mova os botões de toque e mude o tamanho e a opacidade.</string>
@@ -14,4 +14,5 @@
     <string name="ios_audio_resumen">A saída de baixa latência do iOS deste app, como o AAudio no Android. Desligado: a saída SDL do motor nativo.</string>
     <string name="ios_metal_rapida">Matemática rápida do Metal</string>
     <string name="ios_metal_rapida_resumen">Shaders mais rápidos na GPU do iPhone, com contas menos exatas: podem voltar quadrados coloridos ou clarões. Desligado: as mesmas contas do Android.</string>
+    <string name="partidas_resumen">O jogo salva na pasta datos do app (Arquivos › No Meu iPhone › NFSMW). Exportar deixa uma cópia num .zip onde você escolher (Arquivos, iCloud Drive…); importar coloca os de um .zip no lugar dos atuais. Os .zip também funcionam no app de Android.</string>
 </resources>

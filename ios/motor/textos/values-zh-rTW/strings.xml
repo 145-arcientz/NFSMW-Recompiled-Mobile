@@ -4,7 +4,7 @@
     <string name="ios_juego_extraido">已解壓的遊戲：%1$s</string>
     <string name="ios_edicion_app">這個 App 是為遊戲的 %1$s 版建置的。</string>
     <string name="ios_iso_otra_edicion">這個 ISO 是遊戲的另一個版本。這個 App 是為 %1$s 版建置的，無法用其他版本啟動：請選擇 %1$s 版的 ISO，或用這個 ISO 建置 App。</string>
-    <string name="ios_ayuda_iso">用「檔案」App 把 ISO 複製到「我的 iPhone」› NFS Most Wanted，或在電腦上用 Finder（iPhone 的「檔案」分頁）複製。也可以用按鈕在「檔案」中的任何位置選擇它：直接在原處讀取，不會複製。</string>
+    <string name="ios_ayuda_iso">用「檔案」App 把 ISO 複製到「我的 iPhone」› NFSMW，或在電腦上用 Finder（iPhone 的「檔案」分頁）複製。也可以用按鈕在「檔案」中的任何位置選擇它：直接在原處讀取，不會複製。</string>
     <string name="ios_iso_sin_acceso">iOS 已不再允許存取所選的 ISO：可能已被移動或刪除。請重新選擇。</string>
     <string name="ios_cerrar_para_ajustes">設定會在點選「開始遊戲」時套用。之後要更改，請在 App 切換器中關閉 App 再重新開啟。</string>
     <string name="ios_editar_tactil_resumen">遊戲中，「隱藏」按鈕旁的齒輪會開啟編輯器：移動觸控按鈕，並調整大小與不透明度。</string>
@@ -14,4 +14,5 @@
     <string name="ios_audio_resumen">這個 App 的 iOS 低延遲輸出，如同 Android 上的 AAudio。關閉：使用原生引擎的 SDL 輸出。</string>
     <string name="ios_metal_rapida">Metal 快速運算</string>
     <string name="ios_metal_rapida_resumen">iPhone GPU 上的著色器更快，但計算較不精確：可能再次出現彩色方塊或閃光。關閉：與 Android 相同的計算。</string>
+    <string name="partidas_resumen">遊戲會存檔在 App 的 datos 資料夾（檔案 › 我的 iPhone › NFSMW）。匯出會在你選的位置（檔案、iCloud Drive…）留下一份 .zip；匯入會用 .zip 裡的存檔取代目前的存檔。.zip 在 Android App 也能用。</string>
 </resources>

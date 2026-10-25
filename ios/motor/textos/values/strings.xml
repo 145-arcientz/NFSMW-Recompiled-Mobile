@@ -8,7 +8,7 @@
     <string name="ios_juego_extraido">Extracted game: %1$s</string>
     <string name="ios_edicion_app">This app was built for the %1$s edition of the game.</string>
     <string name="ios_iso_otra_edicion">This ISO is a different edition of the game. This app was built for the %1$s edition and will not start with another one: choose the %1$s ISO, or build the app from this ISO.</string>
-    <string name="ios_ayuda_iso">Copy your ISO with the Files app to On My iPhone › NFS Most Wanted, or from a computer with Finder (the iPhone\'s Files tab). You can also choose it anywhere in Files with the button: it is read where it is, not copied.</string>
+    <string name="ios_ayuda_iso">Copy your ISO with the Files app to On My iPhone › NFSMW, or from a computer with Finder (the iPhone\'s Files tab). You can also choose it anywhere in Files with the button: it is read where it is, not copied.</string>
     <string name="ios_iso_sin_acceso">iOS no longer gives access to the chosen ISO: it may have been moved or deleted. Choose it again.</string>
     <string name="ios_cerrar_para_ajustes">The settings apply when you press Play. To change them later, close the app from the app switcher and open it again.</string>
     <string name="ios_editar_tactil_resumen">In the game, the gear next to the HIDE button opens the editor: move the touch buttons and change their size and opacity.</string>
@@ -18,4 +18,5 @@
     <string name="ios_audio_resumen">The iOS low-latency output of this app, like AAudio on Android. Off: the SDL output of the native engine.</string>
     <string name="ios_metal_rapida">Metal fast math</string>
     <string name="ios_metal_rapida_resumen">Faster shaders on the iPhone GPU, with less exact math: it can bring back colored squares or flashes. Off: the same math as on Android.</string>
+    <string name="partidas_resumen">The game saves in the app\'s datos folder (Files › On My iPhone › NFSMW). Export leaves a copy in a .zip wherever you choose (Files, iCloud Drive…); import puts the ones from a .zip in place of the current ones. The .zip files also work in the Android app.</string>
 </resources>

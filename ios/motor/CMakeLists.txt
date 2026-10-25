@@ -59,6 +59,7 @@ target_sources(nfsmw PRIVATE
     "${CMAKE_CURRENT_LIST_DIR}/red_lan.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/servidor_ea.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/segundo_plano.mm"
+    "${CMAKE_CURRENT_LIST_DIR}/partidas.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/controles_tactiles.mm"
     "${CMAKE_CURRENT_LIST_DIR}/../../android/app/src/main/cpp/nativo/nativo_android.cpp")
 target_compile_options(nfsmw PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
@@ -70,7 +71,9 @@ target_link_libraries(nfsmw PRIVATE
     "-framework CoreHaptics"
     "-framework AVFoundation"
     "-framework AudioToolbox"
-    "-framework UniformTypeIdentifiers")
+    "-framework UniformTypeIdentifiers"
+    # zlib, the system one: the saves .zip (partidas.cpp).
+    z)
 
 # Compiler runtime for iOS (__isPlatformVersionAtLeast, behind the @available checks in SDL's
 # Objective-C). The Swift toolchain for Linux has none; xtool extracted Xcode's.
