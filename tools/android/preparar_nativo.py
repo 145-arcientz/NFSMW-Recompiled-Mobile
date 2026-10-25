@@ -598,7 +598,7 @@ def shaders(arbol, carpeta_juego, salida):
     instalador = arbol / "out" / "host-tools" / "installer"
     if instalador.exists():
         shutil.rmtree(instalador)
-    shutil.copytree(arbol / "android" / "app" / "src" / "main" / "assets" / "shaders", instalador)
+    shutil.copytree(arbol / "tools" / "instalador_shaders", instalador)
     (instalador / "package.json").write_text('{"type":"module"}\n', encoding="utf-8")
     print("== Biblioteca de shaders")
     salida.parent.mkdir(parents=True, exist_ok=True)

@@ -33,7 +33,7 @@
 #include "nfsmw_video_nativo.h"  // HANG WATCHDOG - cutscene frames with FFmpeg
 
 #if REX_PLATFORM_ANDROID
-// android/app/src/main/cpp/android_rendimiento.cpp
+// android/app/src/main/cpp/nativo/nativo_android.cpp (the repo's Android app)
 extern "C" void nfsmw_android_nucleos_grandes_aplicar();
 #endif
 
