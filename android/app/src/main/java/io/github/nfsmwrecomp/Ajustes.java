@@ -2,6 +2,7 @@ package io.github.nfsmwrecomp;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -88,8 +89,18 @@ final class Ajustes {
     void menusTactiles(boolean v) { p.edit().putBoolean("menus_tactiles", v).apply(); }
     boolean deslizarInvertido() { return false; }
 
+    /**
+     * La ISO elegida: una URI content:// del selector de Android o, si se
+     * encontro con el acceso a todos los archivos (BuscadorIsos), su ruta. El
+     * juego recibe las dos tal cual en --game_data_root.
+     */
     String iso() { return p.getString("iso", null); }
     void iso(String uri) { p.edit().putString("iso", uri).apply(); }
+
+    /** La ISO como URI, para abrirla con el ContentResolver (una ruta pasa a file://). */
+    static Uri uriIso(String iso) {
+        return iso.startsWith("/") ? Uri.fromFile(new File(iso)) : Uri.parse(iso);
+    }
 
     String nombreIso() { return p.getString("iso_nombre", null); }
     void nombreIso(String n) { p.edit().putString("iso_nombre", n).apply(); }
