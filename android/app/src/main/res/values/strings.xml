@@ -6,7 +6,7 @@
     marked translatable="false" are the same in all of them and live only here.
 -->
 <resources>
-    <string name="app_name" translatable="false">NFSMW Recompiled</string>
+    <string name="app_name" translatable="false">NFSMW</string>
 
     <string name="apk_con_juego">This APK contains the game. It is for your own devices only: do not share it.</string>
     <string name="apk_sonda">APK without the game: it only includes the Vulkan probe, to test your phone and GPU driver.</string>
