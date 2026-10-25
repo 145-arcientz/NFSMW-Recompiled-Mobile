@@ -568,11 +568,13 @@ REXCVAR_DEFINE_BOOL(nfsmw_nativo_prueba_oclusion_siempre, false, "NFSMW",
  * default: shipping without that line would silently lose the improvement. Three cvars were found in
  * that state; one of them was worth 2 ms and had been inactive for six builds.
  */
-REXCVAR_DEFINE_BOOL(nfsmw_nativo_pase_sombras_sin_load, true, "NFSMW",
+REXCVAR_DEFINE_BOOL(nfsmw_nativo_pase_sombras_sin_load, REX_PLATFORM_IOS == 0, "NFSMW",
                     "Renderizador nativo (prueba de FPS): abre el pase del mapa de sombras sin cargar su "
                     "contenido previo (loadOp = DONT_CARE). Medido en la 112: no hay nada que ganar, el "
                     "loadOp de la profundidad no se paga en esta GPU (el pase con 0 triangulos cuesta "
-                    "0,037 ms)");
+                    "0,037 ms). Apagado en iOS: el pase de los coches se dibuja sobre el mundo sin borrarlo, y "
+                    "la GPU de Apple, por bloques, perdia la sombra del mundo en cada bloque con un coche "
+                    "(recuadros sin sombra alrededor del coche)");
 REXCVAR_DEFINE_INT32(nfsmw_nativo_omitir_sombras_alternar_s, 0, "NFSMW",
                      "Renderizador nativo (prueba): con N > 0 omite las sombras en los tramos impares "
                      "de N segundos y anota cada cambio, para comparar capturas del mismo sitio");

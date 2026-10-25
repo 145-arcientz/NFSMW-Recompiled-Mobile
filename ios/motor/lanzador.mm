@@ -656,6 +656,12 @@ std::vector<std::string> Argumentos(const Juego& j, const Edicion& edicion, cons
   // manda aunque el de Documents sea uno guardado desde el menu del juego con el valor del codigo (tres
   // franjas con MSAA 4x, que en Android no se usa: con MoltenVK salen cuadrados y destellos).
   poner(@"--nfsmw_render_sin_mosaico=true");
+  // El mapa de sombras como lo necesita la GPU de Apple: el pase que pinta los coches encima del mundo
+  // carga lo que hay (no DONT_CARE) y no se intercambia al resolver (sin la copia que lo restaura). Sin
+  // las dos cosas salen recuadros sin sombra alrededor del coche. El codigo ya trae esos valores en iOS,
+  // pero nfsmw.toml (el del APK) pone pase_sombras_sin_load = true y los argumentos mandan sobre el.
+  poner(@"--nfsmw_nativo_pase_sombras_sin_load=false");
+  poner(@"--nfsmw_nativo_resolver_sin_copia=false");
   poner([Antialiasing() isEqualToString:AA_FXAA] ? @"--nfsmw_antialiasing=fxaa" : @"--nfsmw_antialiasing=apagado");
   poner([NSString stringWithFormat:@"--nfsmw_nativo_anisotropico=%d", Anisotropico(LeerInt(@"anisotropico", 3))]);
   poner([@"--nfsmw_tratamiento_visual=" stringByAppendingString:LeerTexto(@"filtro_color", @"original")]);

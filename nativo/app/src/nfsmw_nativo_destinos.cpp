@@ -94,11 +94,13 @@ REXCVAR_DEFINE_INT32(nfsmw_nativo_sombras_escala, 100, "NFSMW",
                      "PARCHE LOCAL (NFSMW Recompiled): hasta 250 (4000x4000), mas definicion en las sombras "
                      "de los coches")
     .range(50, 250);
-REXCVAR_DEFINE_BOOL(nfsmw_nativo_resolver_sin_copia, true, "NFSMW",
+REXCVAR_DEFINE_BOOL(nfsmw_nativo_resolver_sin_copia, REX_PLATFORM_IOS == 0, "NFSMW",
                     "Renderizador nativo (17/09, build 154; por defecto desde la 161, medido en consola: -2,36 ms "
                     "de los 7,41 de copias): al resolver un destino entero a una textura del mismo "
                     "tamano y formato, intercambia las imagenes en vez de copiar los pixeles. La imagen no cambia; si "
-                    "el juego vuelve a dibujar en ese destino sin borrarlo antes, se restaura la copia");
+                    "el juego vuelve a dibujar en ese destino sin borrarlo antes, se restaura la copia. Apagado en "
+                    "iOS: con MoltenVK, el pase de los coches del mapa de sombras no veia entera la copia que "
+                    "restaura el mundo y salian recuadros sin sombra alrededor del coche");
 REXCVAR_DEFINE_BOOL(nfsmw_volcado, false, "NFSMW",
                     "Diagnostico: con un fichero 'volcar' en la carpeta de la app (Documents en iOS), el "
                     "siguiente fotograma se guarda paso a paso en volcado/NNN: cada destino de color tal como "
@@ -1408,13 +1410,23 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       // format, which the draws sample as k_24_8. With a depth source no color
       // is cleared (IsClearingColor, graphics/util/draw.h:534-538).
       const bool borrara = ((control >> 9) & 0x1) && borrar_profundidad_;
-      if (volcado_activo_) {  // nfsmw_volcado
-        volcado_indice_ += fmt::format("--- | profundidad {:03X} pitch {} -> {:08X}{}{} | no volcada\n",
-                                       reg.rb_depth_info & 0xFFF, pitch, reg.rb_copy_dest_base,
-                                       copiar ? ", copia" : "", borrara ? ", borra" : "");
+      if (volcado_activo_) {  // nfsmw_volcado: the depth target as its draws left it, before the copy
+        if (Imagen* p = ObtenerProfundidad(reg.rb_depth_info & 0xFFF, (reg.rb_depth_info >> 16) & 0x1, pitch)) {
+          Volcar(*p, fmt::format("profundidad {:03X} pitch {} -> {:08X}{}{}", reg.rb_depth_info & 0xFFF, pitch,
+                                 reg.rb_copy_dest_base, copiar ? ", copia" : "", borrara ? ", borra" : ""));
+        }
       }
       if (copiar) {
         CopiarProfundidad(reg, pitch, borrara);
+        if (volcado_activo_) {  // and the texture the scene samples, after it (a deferred copy shows the old one)
+          const auto it = resueltas_.find(reg.rb_copy_dest_base & 0x1FFFFFFF);
+          if (it != resueltas_.end()) {
+            Volcar(it->second.imagen, fmt::format("resuelta {:08X} tras la copia{}", reg.rb_copy_dest_base,
+                                                  pendientes_.count(reg.rb_copy_dest_base & 0x1FFFFFFF)
+                                                      ? " (APLAZADA: aun no copiada)"
+                                                      : ""));
+          }
+        }
       }
       if (borrara) {
         BorrarProfundidad(reg, pitch);
@@ -5447,7 +5459,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
       if (!volcado_pendientes_.empty()) {  // nfsmw_volcado_sin_esperar: the only wait of the frame
         EsperarGpuDelTodo();
         for (VolcadoPendiente& p : volcado_pendientes_) {
-          GuardarVolcado(p.lectura, p.nombre, p.ancho, p.alto);
+          GuardarVolcado(p.lectura, p.nombre, p.ancho, p.alto, p.clase);
         }
         volcado_pendientes_.clear();
       }
@@ -5488,8 +5500,12 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     if (imagen.intercambio_rb) {
       linea += " intercambio_rb";
     }
-    if (imagen.formato != kFormatoColor || imagen.imagen == VK_NULL_HANDLE || !imagen.preparada ||
-        !imagen.ancho || !imagen.alto) {
+    // 0 color; depth, as gray (GuardarVolcado): 1 D32S8, 2 D24S8.
+    const uint32_t clase = imagen.formato == kFormatoColor                ? 0
+                           : imagen.formato == VK_FORMAT_D32_SFLOAT_S8_UINT ? 1
+                           : imagen.formato == VK_FORMAT_D24_UNORM_S8_UINT  ? 2
+                                                                            : 3;
+    if (clase == 3 || imagen.imagen == VK_NULL_HANDLE || !imagen.preparada || !imagen.ancho || !imagen.alto) {
       volcado_indice_ += linea + " no volcada\n";
       return;
     }
@@ -5516,34 +5532,72 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     lectura.bytes = bytes;
     lectura.coherente = (dispositivo_->memory_types().host_coherent >> tipo) & 0x1;
     VkMemoryBarrier barrera{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-    barrera.srcAccessMask =
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    barrera.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                            VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT;
     barrera.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     dfn_.vkCmdPipelineBarrier(comandos_trabajo_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               0, 1, &barrera, 0, nullptr, 0, nullptr);
     VkBufferImageCopy copia{};
-    copia.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copia.imageSubresource = {clase == 0 ? VK_IMAGE_ASPECT_COLOR_BIT : VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
     copia.imageExtent = {imagen.ancho, imagen.alto, 1};
     dfn_.vkCmdCopyImageToBuffer(comandos_trabajo_, imagen.imagen, VK_IMAGE_LAYOUT_GENERAL, lectura.bufer, 1, &copia);
     const std::string nombre = fmt::format("{:03}.png", paso);
     volcado_indice_ += linea + " " + nombre + "\n";
     if (REXCVAR_GET(nfsmw_volcado_sin_esperar)) {
-      volcado_pendientes_.push_back({lectura, nombre, imagen.ancho, imagen.alto});  // written at the end
+      volcado_pendientes_.push_back({lectura, nombre, imagen.ancho, imagen.alto, clase});  // written at the end
       return;
     }
     EsperarGpuDelTodo();  // submits, waits and starts recording again
-    GuardarVolcado(lectura, nombre, imagen.ancho, imagen.alto);
+    GuardarVolcado(lectura, nombre, imagen.ancho, imagen.alto, clase);
   }
 
-  // With the GPU done with the copy: the buffer to a PNG, and freed.
-  void GuardarVolcado(Lectura& lectura, const std::string& nombre, uint32_t ancho, uint32_t alto) {
+  // With the GPU done with the copy: the buffer to a PNG, and freed. Depth (clase 1 and 2) goes as gray,
+  // stretched between the smallest and largest value below 1.0; what is still at 1.0 (cleared, nothing
+  // drawn) is pure white.
+  void GuardarVolcado(Lectura& lectura, const std::string& nombre, uint32_t ancho, uint32_t alto, uint32_t clase) {
     if (!lectura.coherente) {
       VkMappedMemoryRange rango{VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE};
       rango.memory = lectura.memoria;
       rango.size = VK_WHOLE_SIZE;
       dfn_.vkInvalidateMappedMemoryRanges(device_, 1, &rango);
     }
-    if (!nfsmw::captura::GuardarPng(volcado_carpeta_ / nombre, lectura.datos, ancho, alto)) {
+    const uint8_t* rgba = lectura.datos;
+    std::vector<uint8_t> gris;
+    if (clase != 0) {
+      const size_t n = size_t(ancho) * alto;
+      std::vector<float> z(n);
+      for (size_t i = 0; i < n; ++i) {
+        uint32_t v;
+        std::memcpy(&v, lectura.datos + i * 4, 4);
+        if (clase == 1) {
+          std::memcpy(&z[i], &v, 4);
+        } else {
+          z[i] = float(v & 0xFFFFFF) / 16777215.0f;
+        }
+      }
+      float minimo = 1.0f, maximo = 0.0f;
+      size_t borrados = 0;
+      for (float v : z) {
+        if (v >= 1.0f) {
+          ++borrados;
+        } else {
+          minimo = std::min(minimo, v);
+          maximo = std::max(maximo, v);
+        }
+      }
+      const float rango = maximo > minimo ? maximo - minimo : 1.0f;
+      gris.resize(n * 4);
+      for (size_t i = 0; i < n; ++i) {
+        const uint8_t g =
+            z[i] >= 1.0f ? 255 : uint8_t(std::clamp((z[i] - minimo) / rango, 0.0f, 1.0f) * 220.0f + 0.5f);
+        gris[i * 4] = gris[i * 4 + 1] = gris[i * 4 + 2] = g;
+        gris[i * 4 + 3] = 255;
+      }
+      volcado_indice_ += fmt::format("    {}: profundidad {:.6f}..{:.6f}, {} de {} texels a 1.0\n", nombre, minimo,
+                                     maximo, borrados, n);
+      rgba = gris.data();
+    }
+    if (!nfsmw::captura::GuardarPng(volcado_carpeta_ / nombre, rgba, ancho, alto)) {
       volcado_indice_ += "!!! no se pudo escribir " + nombre + "\n";
     }
     DestruirLectura(lectura);
@@ -5987,6 +6041,7 @@ class DestinosVulkan final : public DestinosNativos, public ContextoDestinos {
     Lectura lectura;
     std::string nombre;
     uint32_t ancho, alto;
+    uint32_t clase;  // Volcar: 0 color, 1 D32S8, 2 D24S8
   };
   std::vector<VolcadoPendiente> volcado_pendientes_;  // nfsmw_volcado_sin_esperar
   // Rear-view mirror diagnostic (AnotarCopia).
