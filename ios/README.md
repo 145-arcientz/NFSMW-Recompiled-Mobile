@@ -97,13 +97,13 @@ transferencia. Si el iPhone se cuelga, usbipd lo suelta (`Shared`) y hay que vol
 En WSL, desde la copia de Windows:
 
 ```sh
-bash /mnt/c/.../NFSMW-ios/ios/motor/compilar.sh [--dependencias] [--limpio] [--instalar]
+bash /mnt/c/.../NFSMW-Recompiled/ios/motor/compilar.sh [--dependencias] [--limpio] [--instalar]
 ```
 
 - Copia las fuentes a `~/nfsmw`, porque compilar en `/mnt/c` es varias veces más lento.
 - Trae las dependencias del SDK y el código generado del checkout principal
-  (`NFSMW_PRINCIPAL`, por defecto `../NFSMW-Recompiled`). Lo hace la primera vez y con
-  `--dependencias`.
+  (`NFSMW_PRINCIPAL`, por defecto `../NFSMW-Recompiled`: el mismo checkout, si se compila desde
+  él). Lo hace la primera vez y con `--dependencias`.
 - Si falta, baja MoltenVK de su release de Khronos.
 - Compila con el clang de Swift y el kit de iOS que instala xtool.
 - Deja `~/nfsmw/build-ios/NFSMW.ipa`. Con `--instalar`, la firma y la instala con xtool. El iPhone
