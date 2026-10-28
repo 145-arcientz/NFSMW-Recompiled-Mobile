@@ -12,6 +12,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          lfs: true
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -24,25 +25,23 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          if [ -f "tools/android/requirements.txt" ]; then pip install -r tools/android/requirements.txt; fi
+
       - name: Accept Android SDK Licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Generate C++ Source Code (Wajib)
         run: |
-          # Berdasarkan dokumentasi proyek, langkah ini wajib sebelum Gradle.
-          # Syarat utama: Anda HARUS mengunggah default.xex ke folder assets/game_root/
-          
           if [ -f "assets/game_root/default.xex" ]; then
-            echo "Ditemukan default.xex, memulai proses terjemahan ke C++..."
+            echo "File default.xex ditemukan. Memulai generasi kode C++..."
             python tools/android/preparar_sdk.py
             python tools/android/generar_codigo.py
           else
-            echo "========================================================="
-            echo "ERROR FATAL: File default.xex tidak ditemukan!"
-            echo "Anda HARUS mengekstrak default.xex dari ISO Xbox 360"
-            echo "dan mengunggahnya ke dalam folder: assets/game_root/default.xex"
-            echo "di repository GitHub Anda sebelum menjalankan build ini."
-            echo "========================================================="
+            echo "ERROR FATAL: File assets/game_root/default.xex tidak ditemukan!"
             exit 1
           fi
 
@@ -50,18 +49,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew || true
-          # Menggunakan --info dan --stacktrace agar log kegagalan lebih transparan
           ./gradlew assembleRelease --stacktrace --info
-
-      - name: Upload CMake & Build Error Logs (Jika Gagal)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Failed-CMake-Logs
-          path: |
-            android/app/.cxx/**/CMakeError.log
-            android/app/.cxx/**/CMakeOutput.log
-            android/app/build/intermediates/cxx/**/configure_*.txt
 
       - name: Upload APK
         if: success()
