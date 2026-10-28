@@ -1,5 +1,5 @@
 
-name: Build NFSMW APK
+name: Build NFSMW Android APK
 
 on:
   workflow_dispatch:
@@ -8,125 +8,99 @@ permissions:
   contents: read
 
 concurrency:
-  group: nfsmw-apk-${{ github.ref }}
+  group: nfsmw-android-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     env:
-      ANDROID_NDK_VERSION: "25.2.9519653"
-      ANDROID_CMAKE_VERSION: "3.22.1"
+      ANDROID_NDK_VERSION: "28.2.13676358"
+      ANDROID_CMAKE_VERSION: "3.31.6"
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
-      - name: Locate Android project
+      - name: Check Android project
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Repository root: $GITHUB_WORKSPACE"
-          echo "Searching for Gradle wrapper..."
-
-          GRADLEW="$(find "$GITHUB_WORKSPACE" \
-            -maxdepth 6 \
-            -type f \
-            -name gradlew \
-            -not -path '*/.git/*' \
-            -not -path '*/.gradle/*' \
-            -print -quit)"
-
-          if [ -z "$GRADLEW" ]; then
-            echo "::error::gradlew tidak ditemukan."
-            echo "Repository structure:"
-            find "$GITHUB_WORKSPACE" -maxdepth 4 -type f \
-              | head -200
+          if [ ! -f android/gradlew ]; then
+            echo "::error::android/gradlew tidak ditemukan."
+            find . -maxdepth 4 -name gradlew -type f
             exit 1
           fi
 
-          PROJECT_DIR="$(dirname "$GRADLEW")"
-
-          if [ ! -f "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties" ]; then
-            echo "::error::gradle-wrapper.properties tidak ditemukan."
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
+            echo "::error::Gradle wrapper configuration tidak ditemukan."
             exit 1
           fi
 
-          if [ ! -f "$PROJECT_DIR/settings.gradle" ] &&
-             [ ! -f "$PROJECT_DIR/settings.gradle.kts" ] &&
-             [ ! -f "$PROJECT_DIR/build.gradle" ] &&
-             [ ! -f "$PROJECT_DIR/build.gradle.kts" ]; then
-            echo "::error::Konfigurasi proyek Gradle tidak ditemukan."
-            exit 1
-          fi
-
-          chmod +x "$GRADLEW"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Android project: $PROJECT_DIR"
-          echo "Gradle wrapper configuration:"
-          cat "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
+          chmod +x android/gradlew
+          echo "Android project ditemukan."
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: "17"
-          cache: gradle
+          java-version: "21"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-          with:
-          packages: platform-tools
-          accept-android-sdk-licenses: true
 
-      - name: Accept Android SDK licenses
-        shell: bash
-        run: |
-          set -euo pipefail
-          yes | sdkmanager --licenses || true
-
-      - name: Install Android SDK packages
+      - name: Install Android build tools
         shell: bash
         run: |
           set -euo pipefail
 
           sdkmanager --install \
             "platform-tools" \
-            "platforms;android-30" \
-            "platforms;android-31" \
-            "platforms;android-32" \
-            "platforms;android-33" \
-            "platforms;android-34" \
             "platforms;android-35" \
-            "platforms;android-36" \
-            "build-tools;34.0.0" \
             "build-tools;35.0.0" \
-            "build-tools;36.0.0" \
             "ndk;${ANDROID_NDK_VERSION}" \
             "cmake;${ANDROID_CMAKE_VERSION}"
 
-      - name: Report build environment
+          yes | sdkmanager --licenses || true
+
+      - name: Check project prerequisites
         shell: bash
         run: |
           set -euo pipefail
-          java -version
-          cd "$PROJECT_DIR"
-          ./gradlew --version
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "PROJECT_DIR=$PROJECT_DIR"
 
-      - name: Build release APK
+          echo "Java:"
+          java -version
+
+          echo "Python:"
+          python --version
+
+          echo "Gradle:"
+          cd android
+          ./gradlew --version
+
+          echo "Generated Android sources:"
+          if [ -d app/generated-android ]; then
+            find app/generated-android -maxdepth 2 -type f | head -50
+          else
+            echo "Generated game sources are absent."
+            echo "The APK may contain only the Vulkan test."
+          fi
+
+      - name: Build APK
         shell: bash
         run: |
           set -o pipefail
-          cd "$PROJECT_DIR"
+          cd android
 
           ./gradlew \
             --no-daemon \
@@ -135,44 +109,32 @@ jobs:
             assembleRelease \
             2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
-      - name: Collect APK files
+      - name: Collect APK
         if: success()
         shell: bash
         run: |
           set -euo pipefail
 
-          mkdir -p "$GITHUB_WORKSPACE/release-apk"
+          mkdir -p release-apk
 
-          count=0
+          find android -type f \
+            -path "*/build/outputs/apk/*" \
+            -name "*.apk" \
+            -exec cp --parents {} release-apk/ \;
 
-          while IFS= read -r -d '' apk; do
-            relative="${apk#"$PROJECT_DIR"/}"
-            safe_name="$(echo "$relative" | tr '/' '_')"
-
-            cp "$apk" "$GITHUB_WORKSPACE/release-apk/$safe_name"
-            echo "APK found: $relative"
-            count=$((count + 1))
-          done < <(
-            find "$PROJECT_DIR" \
-              -type f \
-              -path "*/build/outputs/apk/*" \
-              -name "*.apk" \
-              -print0
-          )
-
-          if [ "$count" -eq 0 ]; then
-            echo "::error::Build selesai tetapi APK tidak ditemukan."
+          if ! find release-apk -type f -name "*.apk" | grep -q .; then
+            echo "::error::APK tidak ditemukan setelah build."
             exit 1
           fi
 
-          ls -lh "$GITHUB_WORKSPACE/release-apk"
+          find release-apk -type f -name "*.apk" -ls
 
-      - name: Upload APK artifact
+      - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: NFSMW-Mod-APK
-          path: release-apk/*.apk
+          name: NFSMW-Android-APK
+          path: release-apk/**/*.apk
           if-no-files-found: error
           retention-days: 7
 
