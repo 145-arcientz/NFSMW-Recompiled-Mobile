@@ -97,12 +97,13 @@ jobs:
           fi
 
 
+      
       - name: Build APK
         shell: bash
         run: |
           cd android
-
           set +e
+
           ./gradlew assembleRelease \
             --no-daemon \
             --stacktrace \
@@ -112,16 +113,16 @@ jobs:
           RESULT=${PIPESTATUS[0]}
           set -e
 
-          if [ "$RESULT" -ne 0 ]; then
-            echo ""
-            echo "========== GRADLE ERROR SUMMARY =========="
-            grep -n -B 5 -A 12 -E \
-              "What went wrong:|Caused by:|Could not|No such file|failed|error:" \
-              "$GITHUB_WORKSPACE/build.log" \
-              | tail -120 || true
+          echo ""
+          echo "========== CMAKE ERROR SEARCH =========="
 
-            exit "$RESULT"
-          fi
+          grep -n -B 12 -A 18 -E \
+            "CMake Error|CMake Error at|fatal error:|error:|No such file or directory|not found|Could NOT find|Failed to configure" \
+            "$GITHUB_WORKSPACE/build.log" \
+            | tail -200 || true
+
+          exit "$RESULT"
+
 
 
       - name: Collect APK
