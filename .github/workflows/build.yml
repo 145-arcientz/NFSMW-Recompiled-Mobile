@@ -31,8 +31,14 @@ jobs:
           if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
           if [ -f "tools/android/requirements.txt" ]; then pip install -r tools/android/requirements.txt; fi
 
-      - name: Accept Android SDK Licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+           - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 12266719
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: true
+          packages: platform-tools
+
 
       - name: Install required Linux dependencies
         run: |
