@@ -1,164 +1,72 @@
-
-name: Build NFSMW Android APK
+name: Build NFSMW APK
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
-concurrency:
-  group: nfsmw-android-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-
-    env:
-      ANDROID_NDK_VERSION: "28.2.13676358"
-      ANDROID_CMAKE_VERSION: "3.31.6"
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Check Android project
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ ! -f android/gradlew ]; then
-            echo "::error::android/gradlew tidak ditemukan."
-            find . -maxdepth 4 -name gradlew -type f
-            exit 1
-          fi
-
-          if [ ! -f android/gradle/wrapper/gradle-wrapper.properties ]; then
-            echo "::error::Gradle wrapper configuration tidak ditemukan."
-            exit 1
-          fi
-
-          chmod +x android/gradlew
-          echo "Android project ditemukan."
-
-      - name: Set up Java
-        uses: actions/setup-java@v5
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.11'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+      - name: Accept Android SDK Licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Install Android build tools
-        shell: bash
+      - name: Generate C++ Source Code (Wajib)
         run: |
-          set -euo pipefail
-
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            "ndk;${ANDROID_NDK_VERSION}" \
-            "cmake;${ANDROID_CMAKE_VERSION}"
-
-          yes | sdkmanager --licenses || true
-
-      - name: Check project prerequisites
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "Java:"
-          java -version
-
-          echo "Python:"
-          python --version
-
-          echo "Gradle:"
-          cd android
-          ./gradlew --version
-
-          echo "Generated Android sources:"
-          if [ -d app/generated-android ]; then
-            find app/generated-android -maxdepth 2 -type f | head -50
+          # Berdasarkan dokumentasi proyek, langkah ini wajib sebelum Gradle.
+          # Syarat utama: Anda HARUS mengunggah default.xex ke folder assets/game_root/
+          
+          if [ -f "assets/game_root/default.xex" ]; then
+            echo "Ditemukan default.xex, memulai proses terjemahan ke C++..."
+            python tools/android/preparar_sdk.py
+            python tools/android/generar_codigo.py
           else
-            echo "Generated game sources are absent."
-            echo "The APK may contain only the Vulkan test."
-          fi
-
-
-      
-      - name: Build APK
-        shell: bash
-        run: |
-          cd android
-          set +e
-
-          ./gradlew assembleRelease \
-            --no-daemon \
-            --stacktrace \
-            --info \
-            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
-
-          RESULT=${PIPESTATUS[0]}
-          set -e
-
-          echo ""
-          echo "========== CMAKE ERROR SEARCH =========="
-
-          grep -n -B 12 -A 18 -E \
-            "CMake Error|CMake Error at|fatal error:|error:|No such file or directory|not found|Could NOT find|Failed to configure" \
-            "$GITHUB_WORKSPACE/build.log" \
-            | tail -200 || true
-
-          exit "$RESULT"
-
-
-
-      - name: Collect APK
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          mkdir -p release-apk
-
-          find android -type f \
-            -path "*/build/outputs/apk/*" \
-            -name "*.apk" \
-            -exec cp --parents {} release-apk/ \;
-
-          if ! find release-apk -type f -name "*.apk" | grep -q .; then
-            echo "::error::APK tidak ditemukan setelah build."
+            echo "========================================================="
+            echo "ERROR FATAL: File default.xex tidak ditemukan!"
+            echo "Anda HARUS mengekstrak default.xex dari ISO Xbox 360"
+            echo "dan mengunggahnya ke dalam folder: assets/game_root/default.xex"
+            echo "di repository GitHub Anda sebelum menjalankan build ini."
+            echo "========================================================="
             exit 1
           fi
 
-          find release-apk -type f -name "*.apk" -ls
+      - name: Build APK with Gradle
+        working-directory: android
+        run: |
+          chmod +x gradlew || true
+          # Menggunakan --info dan --stacktrace agar log kegagalan lebih transparan
+          ./gradlew assembleRelease --stacktrace --info
+
+      - name: Upload CMake & Build Error Logs (Jika Gagal)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Failed-CMake-Logs
+          path: |
+            android/app/.cxx/**/CMakeError.log
+            android/app/.cxx/**/CMakeOutput.log
+            android/app/build/intermediates/cxx/**/configure_*.txt
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: NFSMW-Android-APK
-          path: release-apk/**/*.apk
+          name: NFSMW-Release-APK
+          path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
-          retention-days: 7
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: NFSMW-Build-Logs
-          path: build.log
-          if-no-files-found: ignore
-          retention-days: 7
