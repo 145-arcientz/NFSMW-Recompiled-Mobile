@@ -96,18 +96,33 @@ jobs:
             echo "The APK may contain only the Vulkan test."
           fi
 
+
       - name: Build APK
         shell: bash
         run: |
-          set -o pipefail
           cd android
 
-          ./gradlew \
+          set +e
+          ./gradlew assembleRelease \
             --no-daemon \
             --stacktrace \
-            --warning-mode all \
-            assembleRelease \
+            --info \
             2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+          RESULT=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$RESULT" -ne 0 ]; then
+            echo ""
+            echo "========== GRADLE ERROR SUMMARY =========="
+            grep -n -B 5 -A 12 -E \
+              "What went wrong:|Caused by:|Could not|No such file|failed|error:" \
+              "$GITHUB_WORKSPACE/build.log" \
+              | tail -120 || true
+
+            exit "$RESULT"
+          fi
+
 
       - name: Collect APK
         if: success()
