@@ -21,42 +21,57 @@ jobs:
       ANDROID_CMAKE_VERSION: "3.22.1"
 
     steps:
-      - name: Checkout source
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Validate project files
+      - name: Locate Android project
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Checking project structure..."
+          echo "Repository root: $GITHUB_WORKSPACE"
+          echo "Searching for Gradle wrapper..."
 
-          if [ ! -f gradlew ]; then
-            echo "::error::gradlew tidak ditemukan di root repository."
+          GRADLEW="$(find "$GITHUB_WORKSPACE" \
+            -maxdepth 6 \
+            -type f \
+            -name gradlew \
+            -not -path '*/.git/*' \
+            -not -path '*/.gradle/*' \
+            -print -quit)"
+
+          if [ -z "$GRADLEW" ]; then
+            echo "::error::gradlew tidak ditemukan."
+            echo "Repository structure:"
+            find "$GITHUB_WORKSPACE" -maxdepth 4 -type f \
+              | head -200
             exit 1
           fi
 
-          if [ ! -f settings.gradle ] &&
-             [ ! -f settings.gradle.kts ] &&
-             [ ! -f build.gradle ] &&
-             [ ! -f build.gradle.kts ]; then
-            echo "::error::File konfigurasi Gradle tidak ditemukan."
+          PROJECT_DIR="$(dirname "$GRADLEW")"
+
+          if [ ! -f "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties" ]; then
+            echo "::error::gradle-wrapper.properties tidak ditemukan."
             exit 1
           fi
 
-          chmod +x gradlew
+          if [ ! -f "$PROJECT_DIR/settings.gradle" ] &&
+             [ ! -f "$PROJECT_DIR/settings.gradle.kts" ] &&
+             [ ! -f "$PROJECT_DIR/build.gradle" ] &&
+             [ ! -f "$PROJECT_DIR/build.gradle.kts" ]; then
+            echo "::error::Konfigurasi proyek Gradle tidak ditemukan."
+            exit 1
+          fi
 
-          echo "Project files:"
-          find . -maxdepth 3 \
-            \( -name build.gradle -o \
-               -name build.gradle.kts -o \
-               -name settings.gradle -o \
-               -name settings.gradle.kts -o \
-               -name gradle-wrapper.properties -o \
-               -name libs.versions.toml \) \
-            -print
+          chmod +x "$GRADLEW"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "Android project: $PROJECT_DIR"
+          echo "Gradle wrapper configuration:"
+          cat "$PROJECT_DIR/gradle/wrapper/gradle-wrapper.properties"
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -67,28 +82,23 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
+          with:
           packages: platform-tools
           accept-android-sdk-licenses: true
 
-      - name: Accept SDK licenses
+      - name: Accept Android SDK licenses
         shell: bash
         run: |
           set -euo pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses \
-            || {
-              echo "::error::Gagal memproses lisensi Android SDK."
-              exit 1
-            }
+          yes | sdkmanager --licenses || true
 
-      - name: Install Android platforms
+      - name: Install Android SDK packages
         shell: bash
         run: |
           set -euo pipefail
 
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
-          "$SDKMANAGER" --install \
+          sdkmanager --install \
+            "platform-tools" \
             "platforms;android-30" \
             "platforms;android-31" \
             "platforms;android-32" \
@@ -102,81 +112,62 @@ jobs:
             "ndk;${ANDROID_NDK_VERSION}" \
             "cmake;${ANDROID_CMAKE_VERSION}"
 
-      - name: Report toolchain versions
+      - name: Report build environment
         shell: bash
         run: |
           set -euo pipefail
-
           java -version
+          cd "$PROJECT_DIR"
           ./gradlew --version
-
-          echo "Android SDK: $ANDROID_HOME"
-          echo "Installed platforms:"
-          ls "$ANDROID_HOME/platforms"
-
-          echo "Installed NDK:"
-          ls "$ANDROID_HOME/ndk"
-
-      - name: Check Gradle wrapper configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ ! -f gradle/wrapper/gradle-wrapper.properties ]; then
-            echo "::error::gradle-wrapper.properties tidak ditemukan."
-            exit 1
-          fi
-
-          if ! grep -q 'distributionUrl=' \
-            gradle/wrapper/gradle-wrapper.properties; then
-            echo "::error::distributionUrl Gradle tidak ditemukan."
-            exit 1
-          fi
-
-          echo "Gradle wrapper configuration:"
-          cat gradle/wrapper/gradle-wrapper.properties
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "PROJECT_DIR=$PROJECT_DIR"
 
       - name: Build release APK
         shell: bash
         run: |
           set -o pipefail
+          cd "$PROJECT_DIR"
+
           ./gradlew \
             --no-daemon \
             --stacktrace \
             --warning-mode all \
-            assembleRelease 2>&1 | tee build.log
+            assembleRelease \
+            2>&1 | tee "$GITHUB_WORKSPACE/build.log"
 
-      - name: Verify APK output
+      - name: Collect APK files
         if: success()
         shell: bash
         run: |
           set -euo pipefail
 
-          mkdir -p release-apk
+          mkdir -p "$GITHUB_WORKSPACE/release-apk"
 
           count=0
 
           while IFS= read -r -d '' apk; do
-            name="$(basename "$apk")"
-            cp "$apk" "release-apk/$name"
-            echo "Found APK: $apk"
+            relative="${apk#"$PROJECT_DIR"/}"
+            safe_name="$(echo "$relative" | tr '/' '_')"
+
+            cp "$apk" "$GITHUB_WORKSPACE/release-apk/$safe_name"
+            echo "APK found: $relative"
             count=$((count + 1))
           done < <(
-            find . -type f \
+            find "$PROJECT_DIR" \
+              -type f \
               -path "*/build/outputs/apk/*" \
               -name "*.apk" \
               -print0
           )
 
           if [ "$count" -eq 0 ]; then
-            echo "::error::Build sukses tetapi APK tidak ditemukan."
+            echo "::error::Build selesai tetapi APK tidak ditemukan."
             exit 1
           fi
 
-          echo "Verified $count APK file(s)."
-          ls -lh release-apk/
+          ls -lh "$GITHUB_WORKSPACE/release-apk"
 
-      - name: Upload APK
+      - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
