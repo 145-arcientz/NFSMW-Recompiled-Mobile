@@ -1,70 +1,265 @@
 name: Build NFSMW APK
 
+# Motor Xenos (el de "gradlew assembleRelease" sin argumentos).
+# Necesita assets/game_root/default.xex en un repositorio PRIVADO.
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NDK_VERSION: "28.2.13676358"
+  CMAKE_VERSION: "3.31.6"
+  COMPILE_SDK: "36"
+  BUILD_TOOLS: "36.0.0"
+  LLVM_VERSION: "20"
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
 
     steps:
-      - name: Checkout repository
+      # 1. El APK con juego lleva el codigo del juego traducido (README, Legal).
+      #    En un repositorio publico cualquiera con cuenta de GitHub podria
+      #    descargar el artefacto. Se corta antes de gastar minutos.
+      - name: Exigir repositorio privado
+        if: ${{ !github.event.repository.private }}
+        run: |
+          echo "::error title=Repositorio publico::Este build produce un APK con el codigo del juego traducido y necesita tu default.xex. Hazlo en un repositorio PRIVADO (README, seccion Legal: nunca publicar xex, codigo generado ni APK)."
+          exit 1
+
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          lfs: true
+          fetch-depth: 1
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: 12266719
-          accept-android-sdk-licenses: true
-          log-accepted-android-sdk-licenses: true
-          packages: platform-tools
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install Python Dependencies
+      # 2. Falla rapido y claro si falta el xex (no esta en el repo: .gitignore
+      #    ignora *.xex y el README dice que nunca va a estar).
+      - name: Comprobar default.xex
         run: |
-          python -m pip install --upgrade pip
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-          if [ -f "tools/android/requirements.txt" ]; then pip install -r tools/android/requirements.txt; fi
-
-      - name: Install required Linux dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-xcb-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev
-
-      - name: Generate C++ Source Code (Wajib)
-        run: |
-          if [ -f "assets/game_root/default.xex" ]; then
-            echo "File default.xex ditemukan. Memulai generasi kode C++..."
-            python tools/android/preparar_sdk.py
-            python tools/android/generar_codigo.py
-          else
-            echo "ERROR FATAL: File assets/game_root/default.xex tidak ditemukan!"
+          XEX=assets/game_root/default.xex
+          if [ ! -f "$XEX" ]; then
+            echo "::error title=Falta default.xex::No existe $XEX. Subelo a ese camino en tu repositorio privado (GitHub web: Add file > Upload files, dentro de assets/game_root)."
+            exit 1
+          fi
+          SIZE=$(stat -c %s "$XEX")
+          MAGIC=$(head -c 4 "$XEX")
+          echo "Tamano: $SIZE bytes"
+          echo "SHA-256: $(sha256sum "$XEX" | cut -d' ' -f1)"
+          if [ "$MAGIC" != "XEX2" ]; then
+            echo "::error title=default.xex invalido::El archivo no empieza con XEX2 (empieza con '$MAGIC'). Probablemente la subida salio mal o no es el default.xex de la ISO."
+            exit 1
+          fi
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "::error title=default.xex demasiado pequeno::$SIZE bytes: esta truncado."
             exit 1
           fi
 
-      - name: Build APK with Gradle
+      - name: Liberar disco
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      # Un runner privado tiene ~7 GB de RAM; cada fichero generado puede pedir
+      # mas de 2 GB a clang (CMakeLists.txt) y Gradle usa -Xmx4g.
+      - name: Anadir swap
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Sin "cmdline-tools-version": se usa el que trae la accion. Los demas
+      # paquetes se instalan despues, con version exacta.
+      - name: Android SDK (cmdline-tools)
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Instalar plataforma, NDK y CMake del proyecto
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-${COMPILE_SDK}" \
+            "build-tools;${BUILD_TOOLS}" \
+            "ndk;${NDK_VERSION}" \
+            "cmake;${CMAKE_VERSION}"
+          for d in "platforms/android-${COMPILE_SDK}" "ndk/${NDK_VERSION}" "cmake/${CMAKE_VERSION}"; do
+            if [ ! -d "${ANDROID_HOME}/${d}" ]; then
+              echo "::error title=SDK incompleto::Falta ${ANDROID_HOME}/${d}"
+              exit 1
+            fi
+          done
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          ls "${ANDROID_HOME}/ndk" "${ANDROID_HOME}/cmake" "${ANDROID_HOME}/build-tools"
+
+      # generar_codigo.py compila el CLI rexglue del SDK en el PC y pide
+      # clang++ 18+, cmake 3.25+ y ninja en el PATH. docs/00-entorno.md pide
+      # clang-20, lld-20, ninja-build y libgtk-3-dev en Linux. Los otros
+      # cuatro paquetes -dev ya estaban en tu workflow y se mantienen.
+      - name: Dependencias de Linux y Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget lsb-release software-properties-common gnupg ninja-build git \
+            libgtk-3-dev libx11-xcb-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh "${LLVM_VERSION}"
+          sudo apt-get install -y "lld-${LLVM_VERSION}"
+          sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${LLVM_VERSION}" 200
+          sudo update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${LLVM_VERSION}" 200
+          clang++ --version
+          cmake --version
+          ninja --version
+
+      # 3. Preparar el SDK, en el orden de docs/android.md.
+      #    preparar_sdk.py lo deja en ../rexglue-sdk-android, que es donde
+      #    Gradle y CMake lo buscan.
+      - name: Preparar SDK de Android (preparar_sdk.py)
+        run: |
+          mkdir -p logs
+          python tools/android/preparar_sdk.py 2>&1 | tee logs/preparar_sdk.log
+          MARCA="$(cd .. && pwd)/rexglue-sdk-android/.nfsmw-android/rexglue-sdk-v0.10.0-android.patch.aplicado"
+          if [ ! -f "$MARCA" ]; then
+            echo "::error title=SDK no preparado::No existe $MARCA. Revisa logs/preparar_sdk.log (descarga del SDK o de los parches de deivid22srk)."
+            exit 1
+          fi
+          echo "SDK listo: $MARCA"
+
+      # Cada fichero generado puede pedir mas de 2 GB a clang. Se baja el
+      # valor por defecto (4) segun la RAM del runner. Si la linea cambia en
+      # el proyecto, el paso falla en vez de ignorarlo.
+      - name: Ajustar paralelismo de ficheros generados
+        run: |
+          MEM_GB=$(free -g | awk '/^Mem:/{print $2}')
+          JOBS=$(( MEM_GB / 3 ))
+          [ "$JOBS" -lt 1 ] && JOBS=1
+          [ "$JOBS" -gt 4 ] && JOBS=4
+          F=android/app/src/main/cpp/CMakeLists.txt
+          if ! grep -q 'set(NFSMW_JOBS_RECOMP "4" CACHE STRING' "$F"; then
+            echo "::error title=CMakeLists cambio::No encuentro la linea NFSMW_JOBS_RECOMP en $F"
+            exit 1
+          fi
+          sed -i "s/set(NFSMW_JOBS_RECOMP \"4\" CACHE STRING/set(NFSMW_JOBS_RECOMP \"${JOBS}\" CACHE STRING/" "$F"
+          echo "RAM ${MEM_GB} GB -> NFSMW_JOBS_RECOMP=${JOBS}"
+          grep -n 'NFSMW_JOBS_RECOMP "' "$F"
+
+      - name: Generar C++ del juego (generar_codigo.py)
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          python tools/android/generar_codigo.py 2>&1 | tee logs/generar_codigo.log
+          GEN=app/generated-android/default
+          if [ ! -f "$GEN/sources.cmake" ]; then
+            echo "::error title=Sin codigo generado::No existe $GEN/sources.cmake. Revisa logs/generar_codigo.log."
+            exit 1
+          fi
+          echo "Ficheros .cpp generados: $(ls "$GEN"/*.cpp | wc -l)"
+          cat app/generated-android/edicion.json
+
+      # 4. Compilar. Sin '|| true': si falla, falla.
+      - name: Compilar APK (Gradle assembleRelease)
         working-directory: android
         run: |
-          chmod +x gradlew || true
-          ./gradlew assembleRelease --stacktrace --info
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace --info --console=plain --no-daemon 2>&1 | tee ../logs/gradle.log
 
-      - name: Upload APK
-        if: success()
+      # 5. Verificar que hay un APK de verdad, con la libreria nativa.
+      - name: Verificar APK
+        run: |
+          DIR=android/app/build/outputs/apk/release
+          mapfile -t APKS < <(find "$DIR" -maxdepth 1 -name '*.apk' | sort)
+          if [ "${#APKS[@]}" -eq 0 ]; then
+            echo "::error title=Sin APK::assembleRelease termino pero no hay .apk en $DIR"
+            ls -la "$DIR" || true
+            exit 1
+          fi
+          mkdir -p out_apk
+          for A in "${APKS[@]}"; do
+            echo "== $A ($(stat -c %s "$A") bytes)"
+            unzip -l "$A" | grep -E 'lib/arm64-v8a/.*\.so' || true
+            if ! unzip -l "$A" | grep -q 'lib/arm64-v8a/libmain.so'; then
+              echo "::error title=APK sin libmain.so::$A no contiene lib/arm64-v8a/libmain.so"
+              exit 1
+            fi
+            "${ANDROID_HOME}/build-tools/${BUILD_TOOLS}/apksigner" verify --print-certs "$A"
+            cp "$A" out_apk/
+          done
+          {
+            echo "### Resultado"
+            echo "APK generado y con firma valida. **No probado en ningun dispositivo.**"
+            echo ""
+            ls -la out_apk | sed 's/^/    /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # --- Diagnostico: se ejecuta siempre ---
+      - name: Primer error de CMake / compilador
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Primer error util"
+            echo '```'
+            for F in logs/preparar_sdk.log logs/generar_codigo.log logs/gradle.log; do
+              [ -f "$F" ] || continue
+              HIT=$(grep -n -m1 -E 'CMake Error|FAILED:|fatal error:|error: |\[ERROR\]|No hay un SDK preparado' "$F" || true)
+              if [ -n "$HIT" ]; then
+                echo "--- $F"
+                N=${HIT%%:*}
+                sed -n "$((N>3 ? N-3 : 1)),$((N+15))p" "$F"
+                break
+              fi
+            done
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Empaquetar logs de CMake de Gradle
+        if: ${{ always() }}
+        run: |
+          mkdir -p logs
+          if [ -d android/app/.cxx ]; then
+            find android/app/.cxx -type f \( -name '*.txt' -o -name '*.log' -o -name '*.json' \) -size -20M -print0 \
+              | xargs -0 -r tar czf logs/cxx-logs.tgz
+          fi
+          ls -la logs
+
+      - name: Subir logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-build
+          path: logs/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Subir APK
+        if: ${{ success() }}
         uses: actions/upload-artifact@v4
         with:
           name: NFSMW-Release-APK
-          path: android/app/build/outputs/apk/release/*.apk
+          path: out_apk/*.apk
           if-no-files-found: error
+          retention-days: 3
