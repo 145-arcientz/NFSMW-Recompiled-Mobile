@@ -34,6 +34,11 @@ jobs:
       - name: Accept Android SDK Licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
+      - name: Install required Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-xcb-dev
+
       - name: Generate C++ Source Code (Wajib)
         run: |
           if [ -f "assets/game_root/default.xex" ]; then
